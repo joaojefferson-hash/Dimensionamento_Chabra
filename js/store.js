@@ -12,8 +12,9 @@
      unidades:      [{ id, nome, empresasBaixo, empresasMedio, empresasAlto, empresas (soma),
                        meses: { [1..12]: { empresasBaixo, empresasMedio, empresasAlto } } }]  // exceções mensais (padrão = campos acima)
      documentos:    [{ id, nome, horas, periodicidadeMeses, responsavel }]   // periodicidade 0 = sob demanda
-     funcoes:       [{ id, nome, tipoProducao: 'tecnico' | 'administrativo' | 'nenhuma', chefia, ordem }]
-     colaboradores: [{ id, nome, funcaoId, funcao (nome), tipoProducao, chefia, empresasDia, inspecoesDia, relatoriosDia,
+     funcoes:       [{ id, nome, tipoProducao: 'tecnico' | 'administrativo' | 'nenhuma', chefia,
+                       coordena: 'todos' | 'tecnicos' | 'administrativos', respondeParaId (função de chefia acima; null = topo), ordem }]
+     colaboradores: [{ id, nome, funcaoId, funcao (nome), tipoProducao, chefia, coordena, empresasDia, inspecoesDia, relatoriosDia,
                        alocacoes: [{ unidadeId, unidadeNome, percentual }] }]
                     // produção declarada por dia; alocações somam ≤ 100% (o restante é "não alocado")
      parametros:    { diasUteis[12], fatorBaixo, fatorMedio, fatorAlto, ocupacaoAlvo,
@@ -31,6 +32,11 @@ const Store = (() => {
     { id: 'tecnico',        rotulo: 'Técnico',        descricao: 'faz inspeções e relatórios — entra na programação como técnico' },
     { id: 'administrativo', rotulo: 'Administrativo', descricao: 'finaliza empresas — entra na programação como administrativo' },
     { id: 'nenhuma',        rotulo: 'Sem produção',   descricao: 'não tem ritmo diário e não entra na programação (ex.: supervisores)' },
+  ];
+  const COORDENA = [
+    { id: 'todos',           rotulo: 'Toda a equipe',      descricao: 'técnicos, administrativos e as chefias abaixo dela nas unidades em que estiver' },
+    { id: 'tecnicos',        rotulo: 'Só os técnicos',     descricao: 'coordena a equipe técnica das unidades em que estiver' },
+    { id: 'administrativos', rotulo: 'Só os administrativos', descricao: 'coordena a equipe administrativa das unidades em que estiver' },
   ];
   const DEFAULT_COLABORADOR = { empresasDia: 2, inspecoesDia: 2, relatoriosDia: 2 };
   const DEFAULT_PARAMETROS = {
@@ -118,6 +124,9 @@ const Store = (() => {
     nome: toStr(f.nome),
     tipoProducao: TIPOS_PRODUCAO.some(t => t.id === f.tipoProducao) ? f.tipoProducao : 'nenhuma',
     chefia: f.chefia === true || f.chefia === 'true',
+    coordena: COORDENA.some(c => c.id === f.coordena) ? f.coordena : 'todos',
+    respondeParaId: toStr(f.respondeParaId) || null,
+    respondePara: toStr(f.respondePara), // nome (só no backup)
     ordem: Math.max(0, toInt(f.ordem, 0)),
   });
   const buildColaborador = c => ({
@@ -163,8 +172,8 @@ const Store = (() => {
     funcoes: {
       table: 'funcoes',
       build: buildFuncao,
-      toRow: f => ({ nome: f.nome, tipo_producao: f.tipoProducao, chefia: f.chefia, ordem: f.ordem }),
-      fromRow: r => ({ id: r.id, nome: r.nome, tipoProducao: r.tipo_producao, chefia: r.chefia === true, ordem: Number(r.ordem) }),
+      toRow: f => ({ nome: f.nome, tipo_producao: f.tipoProducao, chefia: f.chefia, coordena: f.chefia ? f.coordena : 'todos', responde_para: f.chefia ? f.respondeParaId : null, ordem: f.ordem }),
+      fromRow: r => ({ id: r.id, nome: r.nome, tipoProducao: r.tipo_producao, chefia: r.chefia === true, coordena: r.coordena || 'todos', respondeParaId: r.responde_para || null, ordem: Number(r.ordem) }),
     },
     unidades: {
       table: 'unidades',
@@ -321,7 +330,7 @@ const Store = (() => {
   /** Nome e tipo de produção de uma função (pelo id), para enriquecer o colaborador. */
   function infoFuncao(funcaoId) {
     const f = funcaoId ? state.funcoes.find(x => x.id === funcaoId) : null;
-    return { funcao: f ? f.nome : '', tipoProducao: f ? f.tipoProducao : 'nenhuma', chefia: !!(f && f.chefia) };
+    return { funcao: f ? f.nome : '', tipoProducao: f ? f.tipoProducao : 'nenhuma', chefia: !!(f && f.chefia), coordena: f && f.chefia ? f.coordena : 'todos', funcaoOrdem: f ? f.ordem : 9999 };
   }
 
   /** Preenche unidadeNome de cada alocação a partir do cache de unidades. */
@@ -482,7 +491,7 @@ const Store = (() => {
       app: APP_ID,
       version: SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
-      funcoes: state.funcoes,
+      funcoes: state.funcoes.map(f => { const s = f.respondeParaId ? state.funcoes.find(x => x.id === f.respondeParaId) : null; return { ...f, respondePara: s ? s.nome : null }; }),
       unidades: state.unidades.map(u => ({
         ...u,
         meses: undefined,
@@ -547,6 +556,7 @@ const Store = (() => {
   return {
     FUNCOES,
     TIPOS_PRODUCAO,
+    COORDENA,
     DEFAULT_COLABORADOR,
     DEFAULT_PARAMETROS,
     funcoes: makeCollection('funcoes'),

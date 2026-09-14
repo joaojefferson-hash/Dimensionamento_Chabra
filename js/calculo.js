@@ -162,7 +162,9 @@ const Calculo = (() => {
     const alocValidas = c => (c.alocacoes || []).filter(a => a && idsUnidades.has(a.unidadeId) && n(a.percentual) > 0);
     const fracaoEm = (c, unidadeId) => alocValidas(c).filter(a => a.unidadeId === unidadeId).reduce((s, a) => s + n(a.percentual), 0) / 100;
     // quem não produz fica fora das contas; se for chefia, aparece como responsável pelas unidades
-    const chefes = colaboradores.filter(c => c.chefia).map(c => ({ id: c.id, nome: c.nome, funcao: c.funcao || '', unidades: alocValidas(c).map(a => a.unidadeId) }));
+    const chefes = colaboradores.filter(c => c.chefia)
+      .map(c => ({ id: c.id, nome: c.nome, funcao: c.funcao || '', coordena: c.coordena || 'todos', ordem: n(c.funcaoOrdem) || 9999, unidades: alocValidas(c).map(a => a.unidadeId) }))
+      .sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR')); // chefia mais alta primeiro (ordem do cadastro de funções)
     const colabSemProducao = colaboradores.filter(c => !FUNCOES.includes(c.tipoProducao) && !c.chefia).map(c => `${c.nome}${c.funcao ? ' (' + c.funcao + ')' : ''}`);
     const produtivos = colaboradores.filter(c => FUNCOES.includes(c.tipoProducao));
     const colabSemUnidade = colaboradores.filter(c => (FUNCOES.includes(c.tipoProducao) || c.chefia) && alocValidas(c).length === 0).map(c => c.nome);
@@ -205,7 +207,7 @@ const Calculo = (() => {
       return {
         id: u.id, nome: u.nome, pessoas,
         colaboradores: colabs.map(c => ({ id: c.id, nome: c.nome, funcao: c.funcao, tipoProducao: c.tipoProducao, fracao: c.fracao })),
-        chefia: chefes.filter(ch => ch.unidades.includes(u.id)).map(ch => ({ id: ch.id, nome: ch.nome, funcao: ch.funcao })),
+        chefia: chefes.filter(ch => ch.unidades.includes(u.id)).map(ch => ({ id: ch.id, nome: ch.nome, funcao: ch.funcao, coordena: ch.coordena })),
         meses: mesesCalc,
         janela: consolidar(mesesCalc, p),
       };
@@ -261,7 +263,7 @@ const Calculo = (() => {
     return {
       janela: { de: Math.min(de, ate), ate: Math.max(de, ate), meses },
       unidades: resultadoUnidades,
-      total: { pessoas: pessoasTotal, meses: totalMeses, janela: totalJanela, chefia: chefes.map(ch => ({ id: ch.id, nome: ch.nome, funcao: ch.funcao })) },
+      total: { pessoas: pessoasTotal, meses: totalMeses, janela: totalJanela, chefia: chefes.map(ch => ({ id: ch.id, nome: ch.nome, funcao: ch.funcao, coordena: ch.coordena })) },
       avisos: {
         colabSemProducao,
         colabSemUnidade,

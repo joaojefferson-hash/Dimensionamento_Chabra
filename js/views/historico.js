@@ -107,7 +107,7 @@ const ViewHistorico = {
     unidades: { nome: 'nome', empresas_baixo: 'grau baixo (padrão)', empresas_medio: 'grau médio (padrão)', empresas_alto: 'grau alto (padrão)' },
     unidade_empresas_mes: { empresas_baixo: 'grau baixo', empresas_medio: 'grau médio', empresas_alto: 'grau alto' },
     colaboradores: { nome: 'nome', funcao: 'função', funcao_id: 'função', empresas_dia: 'empresas por dia', inspecoes_dia: 'inspeções por dia', relatorios_dia: 'relatórios por dia' },
-    funcoes: { nome: 'nome', tipo_producao: 'tipo de produção', chefia: 'chefia de equipe', ordem: 'ordem' },
+    funcoes: { nome: 'nome', tipo_producao: 'tipo de produção', chefia: 'chefia de equipe', coordena: 'coordena', responde_para: 'responde para', ordem: 'ordem' },
     colaborador_unidades: { percentual: '% do tempo' },
     parametros: { fator_baixo: 'peso do grau baixo', fator_medio: 'peso do grau médio', fator_alto: 'peso do grau alto', ocupacao_alvo: 'folga para imprevistos', dias_uteis: 'dias úteis', meses_por_inspecao: 'frequência de inspeção', meses_por_relatorio: 'frequência de relatório', meses_por_finalizacao: 'frequência de finalização' },
     documentos: { nome: 'nome', horas: 'horas', periodicidade_meses: 'periodicidade', responsavel: 'produzido por' },
@@ -119,7 +119,8 @@ const ViewHistorico = {
     if (campo === 'percentual') return `${UI.fmt(Number(v), 1)}%`;
     if (campo.startsWith('meses_por')) { const m = Number(v); return m >= 12 && m % 12 === 0 ? `a cada ${m / 12} ${m === 12 ? 'ano' : 'anos'}` : `a cada ${UI.fmt(m, 1)} ${m === 1 ? 'mês' : 'meses'}`; }
     if (campo === 'funcao') return String(v);
-    if (campo === 'funcao_id') { const f = Store.funcoes.get(String(v)); return f ? f.nome : 'função excluída'; }
+    if (campo === 'funcao_id' || campo === 'responde_para') { const f = Store.funcoes.get(String(v)); return f ? f.nome : 'função excluída'; }
+    if (campo === 'coordena') { const c = Store.COORDENA.find(x => x.id === v); return c ? c.rotulo.toLowerCase() : String(v); }
     if (campo === 'tipo_producao') { const t = Store.TIPOS_PRODUCAO.find(x => x.id === v); return t ? t.rotulo : String(v); }
     if (typeof v === 'boolean') return v ? 'sim' : 'não';
     if (Array.isArray(v)) return v.join(', ');

@@ -22,6 +22,9 @@ const ViewFuncoes = {
     const editing = this.editingId ? Store.funcoes.get(this.editingId) : null;
     if (this.editingId && !editing) this.editingId = null;
     const tipoAtual = editing ? editing.tipoProducao : 'tecnico';
+    const chefias = funcoes.filter(f => f.chefia && (!editing || f.id !== editing.id));
+    const nomeFuncao = id => { const f = id ? Store.funcoes.get(id) : null; return f ? f.nome : ''; };
+    const coordenaTexto = f => { const c = Store.COORDENA.find(x => x.id === f.coordena); return c ? c.rotulo.toLowerCase() : 'toda a equipe'; };
     const pessoasDe = f => colaboradores.filter(c => c.funcaoId === f.id).length;
     const tipoInfo = id => Store.TIPOS_PRODUCAO.find(t => t.id === id) || Store.TIPOS_PRODUCAO[2];
     const corTipo = id => (id === Calculo.TEC ? 'chip-green' : id === Calculo.ADM ? 'chip-blue' : 'chip-gray');
@@ -55,6 +58,29 @@ const ViewFuncoes = {
             <span class="check-inline"><input type="checkbox" name="chefia" ${editing && editing.chefia ? 'checked' : ''}> Chefia de equipe</span>
             <small>Marque para quem lidera pessoas. Na programação, o nome aparece como chefia das unidades em que a pessoa está — mesmo sem produção própria.</small>
           </label>
+          <div class="span-4 campos-chefia" ${editing && editing.chefia ? '' : 'hidden'}>
+            <div class="form-grid">
+              <div class="field span-2">
+                <span>Quem essa chefia coordena?</span>
+                <div class="tipo-opcoes">
+                  ${Store.COORDENA.map(c => `
+                    <label class="tipo-opcao">
+                      <input type="radio" name="coordena" value="${c.id}" ${(editing ? editing.coordena : 'todos') === c.id ? 'checked' : ''}>
+                      <span><strong>${UI.esc(c.rotulo)}</strong><small>${UI.esc(c.descricao)}</small></span>
+                    </label>`).join('')}
+                </div>
+                <small>No organograma, cada pessoa fica embaixo da chefia mais próxima que coordena o grupo dela na unidade.</small>
+              </div>
+              <label class="field span-2">
+                <span>Responde para</span>
+                <select class="input" name="respondePara">
+                  <option value="">Ninguém — é o topo</option>
+                  ${chefias.map(f => `<option value="${f.id}" ${editing && editing.respondeParaId === f.id ? 'selected' : ''}>${UI.esc(f.nome)}</option>`).join('')}
+                </select>
+                <small>A função de chefia acima desta. Ex.: Supervisor ADM responde para o Supervisor Geral, que responde para o Gerente.</small>
+              </label>
+            </div>
+          </div>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">${editing ? 'Salvar alterações' : 'Adicionar função'}</button>
             ${editing ? '<button type="button" class="btn btn-ghost" data-action="cancel">Cancelar</button>' : ''}
@@ -79,6 +105,7 @@ const ViewFuncoes = {
                   <th>Função</th>
                   <th>O que entrega</th>
                   <th>Chefia</th>
+                  <th>Coordena · responde para</th>
                   <th class="num">Pessoas</th>
                   <th class="actions">Ações</th>
                 </tr>
@@ -89,6 +116,7 @@ const ViewFuncoes = {
                     <td>${UI.esc(f.nome)}</td>
                     <td><span class="chip ${corTipo(f.tipoProducao)}">${UI.esc(t.rotulo)}</span> <span class="muted">${UI.esc(t.descricao)}</span></td>
                     <td>${f.chefia ? '<span class="chip chip-chefia">Chefia</span>' : '<span class="muted">—</span>'}</td>
+                    <td class="muted">${f.chefia ? `${coordenaTexto(f)} · ${f.respondeParaId ? `responde para <strong>${UI.esc(nomeFuncao(f.respondeParaId) || 'função excluída')}</strong>` : 'topo'}` : '—'}</td>
                     <td class="num">${n}</td>
                     <td class="actions">
                       <button type="button" class="btn-link" data-action="subir" data-id="${f.id}" title="Mover para cima" ${i === 0 ? 'disabled' : ''}>▲</button>
@@ -104,6 +132,7 @@ const ViewFuncoes = {
     `;
 
     const form = el.querySelector('#form-funcao');
+    form.chefia.addEventListener('change', () => { el.querySelector('.campos-chefia').hidden = !form.chefia.checked; });
 
     form.addEventListener('submit', async e => {
       e.preventDefault();
@@ -116,11 +145,19 @@ const ViewFuncoes = {
       }
       const tipoProducao = form.tipoProducao.value;
       const chefia = form.chefia.checked;
+      const coordena = chefia ? form.coordena.value : 'todos';
+      const respondeParaId = chefia ? (form.respondePara.value || null) : null;
+      // não pode responder para si mesma nem fechar um ciclo (A → B → A)
+      for (let cur = respondeParaId, passos = 0; cur && passos < 50; passos++) {
+        if (cur === this.editingId) { UI.toast('Essa escolha de "Responde para" fecharia um ciclo: a função acabaria respondendo para ela mesma.', 'error'); return; }
+        const f = Store.funcoes.get(cur);
+        cur = f ? f.respondeParaId : null;
+      }
       UI.busy(form, true);
       try {
         if (this.editingId) {
           const antes = Store.funcoes.get(this.editingId);
-          await Store.funcoes.update(this.editingId, { nome, tipoProducao, chefia });
+          await Store.funcoes.update(this.editingId, { nome, tipoProducao, chefia, coordena, respondeParaId });
           this.editingId = null;
           this.pendingFocus = true;
           const n = antes ? pessoasDe(antes) : 0;
@@ -129,7 +166,7 @@ const ViewFuncoes = {
             : 'Função atualizada.');
         } else {
           const ordem = funcoes.reduce((m, f) => Math.max(m, f.ordem), 0) + 1;
-          await Store.funcoes.add({ nome, tipoProducao, chefia, ordem });
+          await Store.funcoes.add({ nome, tipoProducao, chefia, coordena, respondeParaId, ordem });
           this.pendingFocus = true;
           UI.toast('Função adicionada.');
         }

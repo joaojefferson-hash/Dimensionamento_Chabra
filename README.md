@@ -79,9 +79,17 @@ pessoas que faltam/sobram    = sobra ÷ produção de uma pessoa inteira no per�
 - **Funções são cadastráveis** (tela Funções). Cada função tem um *tipo de produção*:
   `tecnico`, `administrativo` ou `nenhuma`. Quem tem função sem produção (supervisores)
   não tem ritmo diário e fica fora das contas. A função pode ser marcada como **chefia
-  de equipe**: a pessoa aparece como "Chefia: Fulano (Supervisor ADM)" nos cartões das
-  unidades em que estiver alocada (para quem não produz, o tempo não é dividido — só se
-  marcam as unidades). Uma função em uso não pode ser excluída.
+  de equipe**: a pessoa aparece como "Chefia: Fulano (Supervisor ADM · administrativos)"
+  nos cartões das unidades em que estiver alocada (para quem não produz, o tempo não é
+  dividido — só se marcam as unidades). Uma chefia diz **quem coordena** (`coordena`:
+  toda a equipe / só técnicos / só administrativos) e **para quem responde**
+  (`responde_para`: outra função de chefia; vazio = topo; ciclos são barrados no form).
+  Uma função em uso não pode ser excluída.
+- **Organograma** (modo da tela Colaboradores, `js/organograma.js`): chefias na
+  hierarquia das funções (Gerente → Supervisor Geral → Supervisor ADM; Supervisor TST
+  Externo → Gerente); cada pessoa fica embaixo da chefia mais próxima que coordena o
+  grupo dela na unidade (chefia específica ganha de "toda a equipe"; entre iguais, a
+  mais baixa na hierarquia); "Sem chefia definida" e "Sem unidade" ficam à parte.
 - Sinais: verde = dá conta; amarelo = no limite (sobra < 10%); vermelho = precisa contratar.
   As telas mostram frases prontas ("Faltam aproximadamente 3 técnicos…") em vez de
   números crus. O total soma as faltas das unidades (folga numa não cobre outra).
@@ -111,7 +119,7 @@ js/views/unidades.js        tela Unidades (CRUD)
 js/views/empresas.js        tela Empresas por Unidade (quantidade por unidade)
 js/views/catalogo.js        tela Catálogo de Documentos (oculta neste modelo)
 js/views/colaboradores.js   tela Colaboradores (CRUD; função vem do cadastro de funções) + modo Organograma
-js/organograma.js       organograma e barras por unidade (montados pelas alocações; chefia geral = chefia em todas as unidades)
+js/organograma.js       organograma (hierarquia das funções de chefia + equipes por unidade) e barras por unidade
 js/views/funcoes.js         tela Funções (nome, tipo de produção, chefia, ordem)
 js/views/usuarios.js        tela Usuários (só admin) — chama a Edge Function `usuarios`
 js/views/calendario.js      tela Calendário (dias úteis por mês, dias de referência)
@@ -121,7 +129,7 @@ js/views/historico.js       tela Histórico de alterações
 js/calculo.js           motor de dimensionamento (puro)
 js/programacao.js       utilitários das telas de programação (janela, barra, formatação)
 js/app.js               inicialização, navegação por hash (#/unidades …), badges, backup
-supabase/migrations/    SQL do banco (0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico, 0012 = funções cadastráveis, 0013 = chefia)
+supabase/migrations/    SQL do banco (0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico, 0012 = funções cadastráveis, 0013 = chefia, 0014 = coordena/responde_para)
 supabase/functions/usuarios/index.ts   Edge Function de gestão de usuários (chave secreta só no servidor)
 ```
 
@@ -134,7 +142,7 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
 |-----------------|-------------------------------------------------------------------------------------------|
 | `unidades`      | `id, nome (único), empresas_baixo/medio/alto (int ≥ 0), empresas (gerada = soma)`          |
 | `documentos`    | `id, nome (único), horas, periodicidade_meses (int ≥ 0), responsavel (função)`             |
-| `funcoes`       | `id, nome (único), tipo_producao (tecnico/administrativo/nenhuma), chefia (bool), ordem` |
+| `funcoes`       | `id, nome (único), tipo_producao (tecnico/administrativo/nenhuma), chefia (bool), coordena (todos/tecnicos/administrativos), responde_para → funcoes, ordem` |
 | `colaboradores` | `id, nome, funcao_id → funcoes, empresas_dia, inspecoes_dia, relatorios_dia` (ritmo por dia) |
 | `colaborador_unidades` | `colaborador_id, unidade_id, percentual (0–100; soma por colaborador ≤ 100, gatilho)` |
 | `unidade_empresas_mes` | `unidade_id, mes (1–12), empresas_baixo/medio/alto` — exceção mensal; sem linha = padrão |
@@ -150,7 +158,7 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
   menor que 100% (o restante é "não alocado" e não conta) mas nunca maior. Salvo pela RPC
   `definir_alocacoes(colaborador, jsonb)` numa transação.
 - No JS/backup as chaves são camelCase (`periodicidadeMeses`, `horasMes`, `empresasBaixo`…);
-  o backup v6 inclui `funcoes[{nome, tipoProducao, chefia, ordem}]`, `parametros`,
+  o backup v6 inclui `funcoes[{nome, tipoProducao, chefia, coordena, respondePara (nome), ordem}]`, `parametros`,
   `empresasPorMes[{mes, empresasBaixo…}]` nas unidades e `alocacoes[{unidadeNome, percentual}]`
   + `funcao` (nome) nos colaboradores (a importação resolve unidade e função pelo nome;
   função desconhecida → função técnica padrão; funções do backup são criadas/atualizadas,

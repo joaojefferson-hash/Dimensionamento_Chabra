@@ -148,7 +148,8 @@ const Programacao = (() => {
   function chefiaHTML(lista) {
     const l = Array.isArray(lista) ? lista : [];
     if (l.length === 0) return '<span class="chefia chefia-vazia" title="Nenhuma pessoa com função de chefia está nesta unidade">Chefia: <em>não definida</em></span>';
-    return `<span class="chefia" title="Pessoas com função de chefia alocadas nesta unidade">Chefia: ${l.map(ch => `<strong>${UI.esc(ch.nome)}</strong>${ch.funcao ? ` <span class="muted">(${UI.esc(ch.funcao)})</span>` : ''}`).join(' · ')}</span>`;
+    const grupo = ch => (ch.coordena === 'tecnicos' ? ' · técnicos' : ch.coordena === 'administrativos' ? ' · administrativos' : '');
+    return `<span class="chefia" title="Pessoas com função de chefia alocadas nesta unidade">Chefia: ${l.map(ch => `<strong>${UI.esc(ch.nome)}</strong>${ch.funcao ? ` <span class="muted">(${UI.esc(ch.funcao)}${grupo(ch)})</span>` : ''}`).join(' · ')}</span>`;
   }
 
   function avisosHTML(avisos) {

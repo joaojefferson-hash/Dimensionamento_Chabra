@@ -70,9 +70,9 @@ const ViewColaboradores = {
       <section class="card">
         <div class="card-head">
           <h2>Organograma</h2>
-          <span class="muted">chefia geral → unidades → equipe</span>
+          <span class="muted">chefias pela hierarquia das funções → equipes por unidade</span>
         </div>
-        ${Organograma.html({ unidades, colaboradores })}
+        ${Organograma.html({ unidades, colaboradores, funcoes: Store.funcoes.list() })}
       </section>
     `;
 

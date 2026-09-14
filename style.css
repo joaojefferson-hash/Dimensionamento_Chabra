@@ -782,7 +782,20 @@ form.busy { opacity: .7; pointer-events: none; }
 .org-pessoa:hover { background: var(--primary-light); }
 .org-nome { font-size: 13px; font-weight: 500; }
 .org-funcao { font-size: 11.5px; color: var(--text-muted); }
-.org-secao-chefia .org-nome::before { content: '★ '; color: #4a2c80; font-size: 11px; }
+
+.org-estrela { color: #4a2c80; font-size: 11px; }
+.org-chefe { border-top: 4px solid #4a2c80; }
+.org-chefe .org-pessoa { margin: -4px -6px 0; }
+.org-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; border-top: 1px solid var(--border); padding-top: 6px; }
+.org-meta .org-alerta { color: #8a5a00; font-weight: 600; }
+.org-equipes { width: 224px; padding: 6px 12px 8px; }
+.org-equipe { padding: 8px 0 4px; }
+.org-equipe + .org-equipe { border-top: 1px solid var(--border); }
+.org-equipe-titulo { font-size: 12.5px; margin-bottom: 2px; }
+.org-equipe-titulo strong { color: var(--primary-dark); }
+.org-grupo-rotulo { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin: 4px 0 2px; }
+.org-sem-chefia { border: 1px dashed #d9b64a; border-top: 4px solid #d9b64a; background: #fffdf5; }
+.org-sem-chefia .org-node-head { margin-bottom: 2px; }
 .org-vazio { display: block; font-size: 12px; color: var(--text-muted); font-style: italic; padding: 2px 0; }
 
 /* barras de pessoas por unidade */
