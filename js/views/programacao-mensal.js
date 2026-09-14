@@ -54,6 +54,7 @@ const ViewProgramacaoMensal = {
               <tr>
                 <th>Mês</th>
                 <th class="num">Dias úteis</th>
+                <th class="num" title="Empresas-cliente no mês (ponderadas pelos fatores de grau)">Empresas</th>
                 <th class="num">Capacidade (h)</th>
                 <th class="num">Demanda (h)</th>
                 <th class="num">Ocupação</th>
@@ -69,6 +70,7 @@ const ViewProgramacaoMensal = {
                   <tr class="${Programacao.classeLinha(b.status)}">
                     <td>${m.nomeLongo}</td>
                     <td class="num">${m.diasUteis}</td>
+                    <td class="num">${m.empresas} <span class="muted">(${UI.fmt(m.empresasPonderadas, 1)})</span>${m.empresasExcecao ? ' <span class="chip chip-blue" title="Quantidade específica deste mês">mês</span>' : ''}</td>
                     <td class="num">${Programacao.fmtH(b.capacidade)}</td>
                     <td class="num">${Programacao.fmtH(b.demanda)}</td>
                     <td class="num">${Programacao.fmtPct(b.ocupacao)}</td>
@@ -82,6 +84,7 @@ const ViewProgramacaoMensal = {
               <tr class="${Programacao.classeLinha(bj.status)}">
                 <th>Janela (${alvo.meses.length} ${alvo.meses.length === 1 ? 'mês' : 'meses'})</th>
                 <th class="num">${alvo.meses.reduce((s, m) => s + m.diasUteis, 0)}</th>
+                <th class="num" title="Média na janela">${Programacao.fmtFte(alvo.meses.reduce((s, m) => s + m.empresas, 0) / Math.max(1, alvo.meses.length))} <span class="muted">(${UI.fmt(alvo.meses.reduce((s, m) => s + m.empresasPonderadas, 0) / Math.max(1, alvo.meses.length), 1)})</span></th>
                 <th class="num">${Programacao.fmtH(bj.capacidade)}</th>
                 <th class="num">${Programacao.fmtH(bj.demanda)}</th>
                 <th class="num">${Programacao.fmtPct(bj.ocupacao)}</th>

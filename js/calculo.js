@@ -4,7 +4,8 @@
    Funções puras sobre os cadastros; nada de DOM. Também roda em Node (testes).
 
    Entradas (formato do Store):
-     unidades:      [{ id, nome, empresasBaixo, empresasMedio, empresasAlto }]
+     unidades:      [{ id, nome, empresasBaixo, empresasMedio, empresasAlto, meses?: { [1..12]: {...} } }]
+                    // "meses" = exceções mensais da quantidade de empresas; sem exceção vale o padrão
      documentos:    [{ id, nome, horas, periodicidadeMeses, responsavel }]
      colaboradores: [{ id, nome, funcao, horasMes, eficiencia, alocacoes: [{ unidadeId, percentual }] }]
      parametros:    { diasUteis[12], fatorBaixo, fatorMedio, fatorAlto, diasReferencia, ocupacaoAlvo }
@@ -16,8 +17,8 @@
      capacidade na unidade= capacidade_mes × percentual alocado/100 (colaborador pode estar em N unidades)
      colaboradores (FTE)  = Σ percentual/100
      empresas_ponderadas  = baixo×fatorBaixo + medio×fatorMedio + alto×fatorAlto
-     demanda_anual(doc)   = empresas_ponderadas × horas × (12 ÷ periodicidade)   [periodicidade 0 = fora]
-     demanda_mes          = demanda_anual ÷ 12 (distribuição uniforme)
+     demanda_mes(doc)     = empresas_ponderadas(mês) × horas ÷ periodicidade   [periodicidade 0 = fora]
+     demanda_anual(doc)   = Σ demanda_mes (com empresas constantes = ponderadas × horas × 12 ÷ periodicidade)
      capacidade_planejável= capacidade × ocupacaoAlvo/100
      gap_horas            = capacidade_planejável − demanda
      gap_colab            = gap_horas ÷ capacidade média por colaborador
@@ -45,15 +46,35 @@ const Calculo = (() => {
     return n(p.diasUteis[mes]) * horasDia(colab, p) * (n(colab.eficiencia) / 100);
   }
 
-  function empresasPonderadas(u, p) {
-    return n(u.empresasBaixo) * n(p.fatorBaixo) + n(u.empresasMedio) * n(p.fatorMedio) + n(u.empresasAlto) * n(p.fatorAlto);
+  /** Quantidades de empresas de uma unidade num mês (0..11): exceção do mês ou padrão. */
+  function empresasDoMes(u, mes) {
+    const exc = u.meses && u.meses[mes + 1];
+    return exc
+      ? { empresasBaixo: n(exc.empresasBaixo), empresasMedio: n(exc.empresasMedio), empresasAlto: n(exc.empresasAlto), excecao: true }
+      : { empresasBaixo: n(u.empresasBaixo), empresasMedio: n(u.empresasMedio), empresasAlto: n(u.empresasAlto), excecao: false };
   }
 
-  /** Demanda anual (h) de um documento para uma unidade. 0 se sob demanda. */
-  function demandaAnualDoc(u, d, p) {
+  /** Empresas ponderadas pelos fatores de grau. Com `mes` (0..11) usa a quantidade daquele mês. */
+  function empresasPonderadas(u, p, mes) {
+    const q = mes === undefined ? u : empresasDoMes(u, mes);
+    return n(q.empresasBaixo) * n(p.fatorBaixo) + n(q.empresasMedio) * n(p.fatorMedio) + n(q.empresasAlto) * n(p.fatorAlto);
+  }
+
+  /** Demanda (h) de um documento numa unidade num mês (0..11). 0 se sob demanda. */
+  function demandaMesDoc(u, d, p, mes) {
     const per = n(d.periodicidadeMeses);
     if (per <= 0) return 0;
-    return empresasPonderadas(u, p) * n(d.horas) * (12 / per);
+    return empresasPonderadas(u, p, mes) * n(d.horas) / per;
+  }
+
+  /** Demanda (h) de um documento numa unidade somada nos meses informados (0..11). */
+  function demandaJanelaDoc(u, d, p, meses) {
+    return meses.reduce((s, mes) => s + demandaMesDoc(u, d, p, mes), 0);
+  }
+
+  /** Demanda anual (h) de um documento para uma unidade (soma dos 12 meses). */
+  function demandaAnualDoc(u, d, p) {
+    return demandaJanelaDoc(u, d, p, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   }
 
   function status(gap, capacidadePlanejavel) {
@@ -128,12 +149,8 @@ const Calculo = (() => {
     const resultadoUnidades = unidades.map(u => {
       // colaboradores com alguma alocação nesta unidade, com a fração dedicada
       const colabs = colaboradores.map(c => ({ ...c, fracao: fracaoEm(c, u.id) })).filter(c => c.fracao > 0);
-      const demandaAnualPorFuncao = {};
-      FUNCOES.forEach(f => {
-        demandaAnualPorFuncao[f] = docsValidos
-          .filter(d => (d.responsavel || FUNCOES[0]) === f)
-          .reduce((s, d) => s + demandaAnualDoc(u, d, p), 0);
-      });
+      const docsPorFuncao = {};
+      FUNCOES.forEach(f => { docsPorFuncao[f] = docsValidos.filter(d => (d.responsavel || FUNCOES[0]) === f); });
 
       const mesesCalc = meses.map(mes => {
         const porFuncao = {};
@@ -144,10 +161,17 @@ const Calculo = (() => {
           // média por colaborador INTEIRO (100%), para converter gap em pessoas
           const refLista = cf.length ? cf : mediaGlobal[f];
           const media = refLista.reduce((s, c) => s + capacidadeMes(c, mes, p), 0) / refLista.length;
-          porFuncao[f] = bloco(cap, demandaAnualPorFuncao[f] / 12, fte, media, p, FUNCAO_CURTA[f]);
+          const demanda = docsPorFuncao[f].reduce((s, d) => s + demandaMesDoc(u, d, p, mes), 0);
+          porFuncao[f] = bloco(cap, demanda, fte, media, p, FUNCAO_CURTA[f]);
         });
         const total = somaBlocos(Object.values(porFuncao), p);
-        return { mes, nome: MESES[mes], nomeLongo: MESES_LONGO[mes], diasUteis: n(p.diasUteis[mes]), total, porFuncao };
+        const q = empresasDoMes(u, mes);
+        return {
+          mes, nome: MESES[mes], nomeLongo: MESES_LONGO[mes], diasUteis: n(p.diasUteis[mes]), total, porFuncao,
+          empresas: q.empresasBaixo + q.empresasMedio + q.empresasAlto,
+          empresasPonderadas: empresasPonderadas(u, p, mes),
+          empresasExcecao: q.excecao,
+        };
       });
 
       const janelaPorFuncao = {};
@@ -163,11 +187,16 @@ const Calculo = (() => {
       });
       const janelaTotal = somaBlocos(Object.values(janelaPorFuncao), p);
 
+      const mesesComExcecao = mesesCalc.filter(m => m.empresasExcecao).length;
       return {
         id: u.id,
         nome: u.nome,
         empresas: n(u.empresasBaixo) + n(u.empresasMedio) + n(u.empresasAlto),
         empresasPonderadas: empresasPonderadas(u, p),
+        // média na janela (varia quando há exceções mensais)
+        empresasMedia: mesesCalc.reduce((s, m) => s + m.empresas, 0) / Math.max(1, mesesCalc.length),
+        empresasPonderadasMedia: mesesCalc.reduce((s, m) => s + m.empresasPonderadas, 0) / Math.max(1, mesesCalc.length),
+        mesesComExcecao,
         colaboradores: colabs.map(c => ({ ...capacidadeNominal(c, meses, p), fracao: c.fracao })),
         meses: mesesCalc,
         janela: { total: janelaTotal, porFuncao: janelaPorFuncao },
@@ -180,7 +209,12 @@ const Calculo = (() => {
       FUNCOES.forEach(f => {
         porFuncao[f] = somaBlocos(resultadoUnidades.map(u => u.meses[i].porFuncao[f]), p, FUNCAO_CURTA[f]);
       });
-      return { mes, nome: MESES[mes], nomeLongo: MESES_LONGO[mes], diasUteis: n(p.diasUteis[mes]), total: somaBlocos(Object.values(porFuncao), p), porFuncao };
+      return {
+        mes, nome: MESES[mes], nomeLongo: MESES_LONGO[mes], diasUteis: n(p.diasUteis[mes]),
+        total: somaBlocos(Object.values(porFuncao), p), porFuncao,
+        empresas: resultadoUnidades.reduce((s, u) => s + u.meses[i].empresas, 0),
+        empresasPonderadas: resultadoUnidades.reduce((s, u) => s + u.meses[i].empresasPonderadas, 0),
+      };
     });
     const totalJanelaPorFuncao = {};
     FUNCOES.forEach(f => {
@@ -269,21 +303,21 @@ const Calculo = (() => {
     return Number.isInteger(m) && m >= 0 && m <= 11 ? m : fallback;
   }
 
-  /** Demanda anual por documento numa unidade (para tabelas de detalhe). */
-  function demandaPorDocumento(u, documentos, parametros) {
+  /** Demanda por documento numa unidade, nos meses informados (para tabelas de detalhe). */
+  function demandaPorDocumento(u, documentos, parametros, meses = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
     const p = normalizarParametros(parametros);
     return documentos.map(d => ({
       id: d.id,
       nome: d.nome,
       responsavel: d.responsavel || FUNCOES[0],
       sobDemanda: n(d.periodicidadeMeses) <= 0,
-      demandaAnual: demandaAnualDoc(u, d, p),
+      demanda: demandaJanelaDoc(u, d, p, meses),
     }));
   }
 
   return {
     MESES, MESES_LONGO, FUNCOES, FUNCAO_CURTA, COLAB_PADRAO, MARGEM_ATENCAO,
-    horasDia, capacidadeMes, empresasPonderadas, demandaAnualDoc, demandaPorDocumento,
+    horasDia, capacidadeMes, empresasDoMes, empresasPonderadas, demandaMesDoc, demandaJanelaDoc, demandaAnualDoc, demandaPorDocumento,
     gapColaboradores, recomendacao, status, calcular, normalizarParametros,
   };
 })();

@@ -615,3 +615,10 @@ form.busy { opacity: .7; pointer-events: none; }
 .aloc-rodape { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 2px 2px; border-top: 1px solid var(--border); flex-wrap: wrap; }
 .aloc-aviso { color: var(--text-muted); }
 .aloc-aviso.erro { color: var(--danger); font-weight: 600; }
+
+/* variação mensal de empresas */
+.table-mes .input-mes { width: 90px; }
+.table-mes .input-mes::placeholder { color: #a5b0ab; }
+.table-mes tbody tr.mes-excecao { background: #eef4fb; }
+.table-mes tbody tr.mes-excecao:hover { background: #e4edf8; }
+.table-mes tbody tr.mes-excecao .input-mes { border-color: #9db8dc; font-weight: 600; }

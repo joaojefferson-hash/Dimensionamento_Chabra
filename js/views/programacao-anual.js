@@ -20,12 +20,10 @@ const ViewProgramacaoAnual = {
     const r = Calculo.calcular({ unidades, documentos, colaboradores, parametros: p, janela });
     const bt = Programacao.blocoDe(r.total.janela, funcaoSel);
     const rotuloFuncao = funcaoSel ? Calculo.FUNCAO_CURTA[funcaoSel] : 'Total';
-    const fracaoAno = r.janela.meses.length / 12;
-
-    // demanda por documento na janela (todas as unidades)
+    // demanda por documento na janela (todas as unidades, com a quantidade de empresas de cada mês)
     const porDoc = documentos.map(d => {
-      const anual = unidades.reduce((s, u) => s + Calculo.demandaAnualDoc(u, d, p), 0);
-      return { ...d, demandaJanela: anual * fracaoAno, sobDemanda: d.periodicidadeMeses <= 0 };
+      const total = unidades.reduce((s, u) => s + Calculo.demandaJanelaDoc(u, d, p, r.janela.meses), 0);
+      return { ...d, demandaJanela: total, sobDemanda: d.periodicidadeMeses <= 0 };
     }).sort((a, b) => b.demandaJanela - a.demandaJanela);
     const totalDoc = porDoc.reduce((s, d) => s + d.demandaJanela, 0);
 
@@ -59,7 +57,7 @@ const ViewProgramacaoAnual = {
             <thead>
               <tr>
                 <th>Unidade</th>
-                <th class="num" title="Total de empresas (ponderadas pelos fatores de grau)">Empresas</th>
+                <th class="num" title="Média de empresas na janela (ponderadas pelos fatores de grau). Unidades com variação mensal mostram o nº de meses com exceção.">Empresas</th>
                 <th class="num" title="Colaboradores equivalentes (soma dos percentuais alocados)">Colab. (FTE)</th>
                 <th class="num">Capacidade (h)</th>
                 <th class="num">Demanda (h)</th>
@@ -76,7 +74,7 @@ const ViewProgramacaoAnual = {
                 return `
                   <tr class="${Programacao.classeLinha(b.status)}">
                     <td>${UI.esc(u.nome)}</td>
-                    <td class="num">${u.empresas} <span class="muted">(${UI.fmt(u.empresasPonderadas, 1)})</span></td>
+                    <td class="num">${Programacao.fmtFte(u.empresasMedia)} <span class="muted">(${UI.fmt(u.empresasPonderadasMedia, 1)})</span>${u.mesesComExcecao ? ` <span class="chip chip-blue" title="Quantidade varia por mês em ${u.mesesComExcecao} ${u.mesesComExcecao === 1 ? 'mês' : 'meses'} da janela">varia</span>` : ''}</td>
                     <td class="num">${Programacao.fmtFte(b.colaboradores)}</td>
                     <td class="num">${Programacao.fmtH(b.capacidade)}</td>
                     <td class="num">${Programacao.fmtH(b.demanda)}</td>
@@ -91,7 +89,7 @@ const ViewProgramacaoAnual = {
             <tfoot>
               <tr class="${Programacao.classeLinha(bt.status)}">
                 <th>Total</th>
-                <th class="num">${r.unidades.reduce((s, u) => s + u.empresas, 0)} <span class="muted">(${UI.fmt(r.unidades.reduce((s, u) => s + u.empresasPonderadas, 0), 1)})</span></th>
+                <th class="num">${Programacao.fmtFte(r.unidades.reduce((s, u) => s + u.empresasMedia, 0))} <span class="muted">(${UI.fmt(r.unidades.reduce((s, u) => s + u.empresasPonderadasMedia, 0), 1)})</span></th>
                 <th class="num">${Programacao.fmtFte(bt.colaboradores)}</th>
                 <th class="num">${Programacao.fmtH(bt.capacidade)}</th>
                 <th class="num">${Programacao.fmtH(bt.demanda)}</th>

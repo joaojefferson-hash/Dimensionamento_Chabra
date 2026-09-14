@@ -67,8 +67,8 @@ roda em Node para testes). Fórmulas:
 horas_dia              = capacidade mensal cadastrada ÷ dias úteis de referência (Calendário)
 capacidade_mes(colab)  = dias_uteis[mês] × horas_dia × eficiência
 empresas_ponderadas    = baixo × fator_baixo + médio × fator_medio + alto × fator_alto
-demanda_anual(doc)     = empresas_ponderadas × horas × (12 ÷ periodicidade)   (periodicidade 0 = fora do cálculo)
-demanda_mes            = demanda_anual ÷ 12 (uniforme)
+demanda_mes(doc)       = empresas_ponderadas(mês) × horas ÷ periodicidade   (periodicidade 0 = fora do cálculo)
+demanda_anual(doc)     = Σ demanda_mes (com empresas constantes = ponderadas × horas × 12 ÷ periodicidade)
 capacidade_planejável  = capacidade × ocupação-alvo
 gap_horas              = capacidade_planejável − demanda
 gap_colab              = gap_horas ÷ capacidade média por colaborador (mesma função)
@@ -113,7 +113,7 @@ js/views/programacao-anual.js   tela Programação Anual
 js/calculo.js           motor de dimensionamento (puro)
 js/programacao.js       utilitários das telas de programação (janela, barra, formatação)
 js/app.js               inicialização, navegação por hash (#/unidades …), badges, backup
-supabase/migrations/    SQL do banco (0001…0006; 0005 = alocação multiunidade)
+supabase/migrations/    SQL do banco (0001…0007; 0005 = alocação multiunidade, 0007 = empresas por mês)
 supabase/functions/usuarios/index.ts   Edge Function de gestão de usuários (chave secreta só no servidor)
 ```
 
@@ -128,15 +128,20 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
 | `documentos`    | `id, nome (único), horas, periodicidade_meses (int ≥ 0), responsavel (função)`             |
 | `colaboradores` | `id, nome, funcao, horas_mes, eficiencia (1–100)`                                          |
 | `colaborador_unidades` | `colaborador_id, unidade_id, percentual (0–100; soma por colaborador ≤ 100, gatilho)` |
+| `unidade_empresas_mes` | `unidade_id, mes (1–12), empresas_baixo/medio/alto` — exceção mensal; sem linha = padrão |
 | `parametros`    | linha única: `dias_uteis[12], fator_baixo/medio/alto, dias_referencia, ocupacao_alvo`      |
 
 - `periodicidade_meses = 0` significa **sob demanda** (documento sem renovação periódica).
+- A quantidade de empresas pode **variar por mês**: os campos da unidade são o padrão e a
+  tabela `unidade_empresas_mes` guarda as exceções (os três graus daquele mês). O motor
+  usa a quantidade de cada mês na demanda; a Programação Anual mostra a média na janela
+  e marca "varia".
 - Um colaborador pode atuar em várias unidades: `alocacoes = [{ unidadeId, percentual }]`.
   A capacidade dele entra em cada unidade multiplicada pelo percentual; a soma pode ser
   menor que 100% (o restante é "não alocado" e não conta) mas nunca maior. Salvo pela RPC
   `definir_alocacoes(colaborador, jsonb)` numa transação.
 - No JS/backup as chaves são camelCase (`periodicidadeMeses`, `horasMes`, `empresasBaixo`…);
-  o backup v3 inclui `parametros` e `alocacoes[{unidadeNome, percentual}]` nos colaboradores
+  o backup v4 inclui `parametros`, `empresasPorMes[{mes, empresasBaixo…}]` nas unidades e `alocacoes[{unidadeNome, percentual}]` nos colaboradores
   (a importação resolve a unidade pelo nome). Backups antigos: `empresas` → grau baixo;
   `unidadeNome` único → alocação de 100%.
 

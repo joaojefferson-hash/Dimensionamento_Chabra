@@ -9,7 +9,8 @@
      substitui tudo numa transação (RPC importar_backup).
 
    Formato em JS (igual ao backup exportado, versão 2):
-     unidades:      [{ id, nome, empresasBaixo, empresasMedio, empresasAlto, empresas (soma) }]
+     unidades:      [{ id, nome, empresasBaixo, empresasMedio, empresasAlto, empresas (soma),
+                       meses: { [1..12]: { empresasBaixo, empresasMedio, empresasAlto } } }]  // exceções mensais (padrão = campos acima)
      documentos:    [{ id, nome, horas, periodicidadeMeses, responsavel }]   // periodicidade 0 = sob demanda
      colaboradores: [{ id, nome, funcao, horasMes, eficiencia, alocacoes: [{ unidadeId, unidadeNome, percentual }] }]
                     // eficiencia em %; alocações somam ≤ 100% (o restante é "não alocado")
@@ -18,7 +19,7 @@
 
 const Store = (() => {
   const APP_ID = 'chabra-dimensiona';
-  const SCHEMA_VERSION = 3;
+  const SCHEMA_VERSION = 4;
   const LOCAL_KEY = 'chabra-dimensiona:data';            // versão antiga (só localStorage)
   const LOCAL_BACKUP_KEY = 'chabra-dimensiona:backup-local'; // onde os dados locais ficam após a migração
 
@@ -54,13 +55,28 @@ const Store = (() => {
 
   /* ---------- normalização de registros + mapeamento JS <-> tabela ---------- */
 
+  /** Normaliza exceções mensais: aceita objeto { "3": {...} } ou lista [{ mes, ... }]; devolve objeto por mês. */
+  const buildMeses = fonte => {
+    const out = {};
+    const entradas = Array.isArray(fonte) ? fonte.map(m => [m && m.mes, m])
+      : (fonte && typeof fonte === 'object') ? Object.entries(fonte) : [];
+    entradas.forEach(([k, v]) => {
+      const mes = Math.round(toNum(k, 0));
+      if (!v || mes < 1 || mes > 12) return;
+      out[mes] = { empresasBaixo: toInt(v.empresasBaixo, 0), empresasMedio: toInt(v.empresasMedio, 0), empresasAlto: toInt(v.empresasAlto, 0) };
+    });
+    return out;
+  };
   const buildUnidade = u => {
     // formato antigo (só "empresas") → tudo no grau baixo (fator 1,0)
     const legado = u.empresasBaixo == null && u.empresasMedio == null && u.empresasAlto == null ? toInt(u.empresas, 0) : 0;
     const baixo = toInt(u.empresasBaixo, legado);
     const medio = toInt(u.empresasMedio, 0);
     const alto = toInt(u.empresasAlto, 0);
-    return { nome: toStr(u.nome), empresasBaixo: baixo, empresasMedio: medio, empresasAlto: alto, empresas: baixo + medio + alto };
+    return {
+      nome: toStr(u.nome), empresasBaixo: baixo, empresasMedio: medio, empresasAlto: alto, empresas: baixo + medio + alto,
+      meses: buildMeses(u.empresasPorMes !== undefined ? u.empresasPorMes : u.meses),
+    };
   };
   const buildDocumento = d => ({
     nome: toStr(d.nome),
@@ -131,6 +147,7 @@ const Store = (() => {
         id: r.id, nome: r.nome,
         empresasBaixo: Number(r.empresas_baixo), empresasMedio: Number(r.empresas_medio), empresasAlto: Number(r.empresas_alto),
         empresas: Number(r.empresas),
+        meses: {},
       }),
     },
     documentos: {
@@ -230,6 +247,12 @@ const Store = (() => {
           if (error) throw falha(error, 'Falha ao carregar as alocações.');
           return ['_alocacoes', data];
         }));
+    consultas.push(
+      db.from('unidade_empresas_mes').select('unidade_id, mes, empresas_baixo, empresas_medio, empresas_alto')
+        .then(({ data, error }) => {
+          if (error) throw falha(error, 'Falha ao carregar a variação mensal de empresas.');
+          return ['_meses', data];
+        }));
     const resultados = await Promise.all(consultas);
     state = Object.fromEntries(resultados);
     // distribui as alocações nos colaboradores (unidadeNome preenchido a partir do cache)
@@ -239,6 +262,14 @@ const Store = (() => {
     });
     delete state._alocacoes;
     state.colaboradores.forEach(c => { c.alocacoes = comNomes(porColab[c.id] || []); });
+    const porUnidade = {};
+    state._meses.forEach(m => {
+      (porUnidade[m.unidade_id] = porUnidade[m.unidade_id] || {})[m.mes] = {
+        empresasBaixo: Number(m.empresas_baixo), empresasMedio: Number(m.empresas_medio), empresasAlto: Number(m.empresas_alto),
+      };
+    });
+    delete state._meses;
+    state.unidades.forEach(u => { u.meses = porUnidade[u.id] || {}; });
     loaded = true;
     loadedAt = Date.now();
     emit();
@@ -303,6 +334,7 @@ const Store = (() => {
             ? await salvarAlocacoes(id, montado.alocacoes)
             : comNomes(atual.alocacoes || []);
         }
+        if (key === 'unidades') item.meses = atual.meses || {};
         state[key] = state[key].map(x => (x.id === id ? item : x));
         if (!silent) emit();
         return item;
@@ -316,6 +348,41 @@ const Store = (() => {
       },
     };
   }
+
+  /* ---------- variação mensal de empresas por unidade ---------- */
+
+  const empresasMes = {
+    /** Define a exceção de um mês (valores) ou remove (null → volta ao padrão). */
+    async definir(unidadeId, mes, valores, { silent = false } = {}) {
+      const u = state.unidades.find(x => x.id === unidadeId);
+      if (!u) throw new Error('Unidade não encontrada.');
+      if (valores) {
+        const row = {
+          unidade_id: unidadeId, mes,
+          empresas_baixo: toInt(valores.empresasBaixo, 0), empresas_medio: toInt(valores.empresasMedio, 0), empresas_alto: toInt(valores.empresasAlto, 0),
+        };
+        const { error } = await db.from('unidade_empresas_mes').upsert(row, { onConflict: 'unidade_id,mes' });
+        if (error) throw falha(error, 'Não foi possível salvar a variação mensal.');
+        u.meses = { ...u.meses, [mes]: { empresasBaixo: row.empresas_baixo, empresasMedio: row.empresas_medio, empresasAlto: row.empresas_alto } };
+      } else {
+        const { error } = await db.from('unidade_empresas_mes').delete().eq('unidade_id', unidadeId).eq('mes', mes);
+        if (error) throw falha(error, 'Não foi possível remover a variação mensal.');
+        const meses = { ...u.meses };
+        delete meses[mes];
+        u.meses = meses;
+      }
+      if (!silent) emit();
+    },
+    /** Remove todas as exceções da unidade (todos os meses voltam ao padrão). */
+    async limpar(unidadeId) {
+      const u = state.unidades.find(x => x.id === unidadeId);
+      if (!u) throw new Error('Unidade não encontrada.');
+      const { error } = await db.from('unidade_empresas_mes').delete().eq('unidade_id', unidadeId);
+      if (error) throw falha(error, 'Não foi possível limpar a variação mensal.');
+      u.meses = {};
+      emit();
+    },
+  };
 
   /* ---------- parâmetros do motor (linha única) ---------- */
 
@@ -374,7 +441,11 @@ const Store = (() => {
       app: APP_ID,
       version: SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
-      unidades: state.unidades,
+      unidades: state.unidades.map(u => ({
+        ...u,
+        meses: undefined,
+        empresasPorMes: Object.entries(u.meses || {}).map(([mes, v]) => ({ mes: Number(mes), ...v })).sort((a, b) => a.mes - b.mes),
+      })),
       documentos: state.documentos,
       colaboradores: state.colaboradores.map(c => ({ ...c, alocacoes: comNomes(c.alocacoes || []) })),
       parametros: state.parametros,
@@ -439,6 +510,7 @@ const Store = (() => {
     documentos: makeCollection('documentos'),
     colaboradores: makeCollection('colaboradores'),
     parametros,
+    empresasMes,
     nomeUnidade,
     descricaoAlocacoes,
     totalAlocado,
