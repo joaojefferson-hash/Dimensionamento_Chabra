@@ -25,13 +25,16 @@ const ViewColaboradores = {
     const capacidadeTotal = colaboradores.reduce((soma, c) => soma + horasEfetivas(c), 0);
 
     const funcaoAtual = editing ? editing.funcao : FUNCAO_TST;
+    const unidades = Store.unidades.list();
+    const unidadeAtual = editing ? editing.unidadeId : (unidades.length === 1 ? unidades[0].id : '');
+    const semUnidade = colaboradores.filter(c => !c.unidadeId).length;
     const horasMesAtual = editing ? editing.horasMes : Store.DEFAULT_COLABORADOR.horasMes;
     const eficienciaAtual = editing ? editing.eficiencia : Store.DEFAULT_COLABORADOR.eficiencia;
 
     el.innerHTML = `
       <header class="page-header">
         <h1>Colaboradores</h1>
-        <p>Equipe que produz os documentos SST. A capacidade produtiva é o total de horas úteis por mês; o fator de eficiência indica a parcela realmente dedicada à produção.</p>
+        <p>Equipe que produz os documentos SST. A capacidade produtiva é o total de horas úteis por mês; o fator de eficiência indica a parcela realmente dedicada à produção. A unidade define em qual programação o colaborador conta.</p>
       </header>
 
       <div class="stats">
@@ -52,6 +55,7 @@ const ViewColaboradores = {
           <div class="value">${UI.fmt(capacidadeTotal)}<small>h/mês</small></div>
         </div>
       </div>
+      ${semUnidade > 0 ? `<p class="alert alert-warn">${UI.plural(semUnidade, 'colaborador está', 'colaboradores estão')} sem unidade e não ${semUnidade === 1 ? 'entra' : 'entram'} no cálculo de capacidade. Edite e informe a unidade.</p>` : ''}
 
       <section class="card">
         <h2>${editing ? 'Editar colaborador' : 'Novo colaborador'}</h2>
@@ -67,6 +71,14 @@ const ViewColaboradores = {
             <select class="input" name="funcao" required>
               ${Store.FUNCOES.map(f => `<option value="${UI.esc(f)}" ${f === funcaoAtual ? 'selected' : ''}>${UI.esc(f)}</option>`).join('')}
             </select>
+          </label>
+          <label class="field span-2">
+            <span>Unidade</span>
+            <select class="input" name="unidadeId" required ${unidades.length === 0 ? 'disabled' : ''}>
+              <option value="" ${!unidadeAtual ? 'selected' : ''}>${unidades.length === 0 ? 'Cadastre uma unidade primeiro' : 'Selecione…'}</option>
+              ${unidades.map(u => `<option value="${u.id}" ${u.id === unidadeAtual ? 'selected' : ''}>${UI.esc(u.nome)}</option>`).join('')}
+            </select>
+            <small>Colaborador sem unidade não entra na capacidade de nenhuma programação.</small>
           </label>
           <label class="field span-2">
             <span>Capacidade produtiva (horas úteis por mês)</span>
@@ -103,6 +115,7 @@ const ViewColaboradores = {
                 <tr>
                   <th>Nome</th>
                   <th>Função</th>
+                  <th>Unidade</th>
                   <th class="num">Horas/mês</th>
                   <th class="num">Eficiência</th>
                   <th class="num">Horas efetivas/mês</th>
@@ -114,6 +127,7 @@ const ViewColaboradores = {
                   <tr class="${c.id === this.editingId ? 'editing' : ''}">
                     <td>${UI.esc(c.nome)}</td>
                     <td><span class="chip ${c.funcao === FUNCAO_TST ? 'chip-green' : 'chip-blue'}">${c.funcao === FUNCAO_TST ? 'Técnico de SST' : 'Administrativo'}</span></td>
+                    <td>${c.unidadeId && Store.nomeUnidade(c.unidadeId) ? UI.esc(Store.nomeUnidade(c.unidadeId)) : '<span class="chip chip-warn">sem unidade</span>'}</td>
                     <td class="num">${UI.fmt(c.horasMes)}</td>
                     <td class="num">${UI.fmt(c.eficiencia)}%</td>
                     <td class="num">${UI.fmt(horasEfetivas(c))}</td>
@@ -125,7 +139,7 @@ const ViewColaboradores = {
               </tbody>
               <tfoot>
                 <tr>
-                  <th colspan="4">Capacidade efetiva total</th>
+                  <th colspan="5">Capacidade efetiva total</th>
                   <th class="num">${UI.fmt(capacidadeTotal)} h</th>
                   <th></th>
                 </tr>
@@ -156,7 +170,13 @@ const ViewColaboradores = {
         return;
       }
 
-      const dados = { nome, funcao, horasMes, eficiencia };
+      const unidadeId = form.unidadeId.value || null;
+      if (!unidadeId && Store.unidades.list().length > 0) {
+        UI.toast('Selecione a unidade do colaborador.', 'error');
+        form.unidadeId.focus();
+        return;
+      }
+      const dados = { nome, funcao, horasMes, eficiencia, unidadeId };
       UI.busy(form, true);
       try {
         if (this.editingId) {

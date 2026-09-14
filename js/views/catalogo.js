@@ -30,7 +30,7 @@ const ViewCatalogo = {
     el.innerHTML = `
       <header class="page-header">
         <h1>Catálogo de Documentos SST</h1>
-        <p>Tipos de documento que a equipe produz, com o tempo médio de elaboração e a periodicidade de renovação. Esses parâmetros alimentarão o cálculo de demanda na próxima fase.</p>
+        <p>Tipos de documento que a equipe produz, com o tempo médio de elaboração, a periodicidade de renovação e quem os produz. Esses parâmetros alimentam o cálculo de demanda das telas de Programação.</p>
       </header>
 
       <section class="card">
@@ -53,7 +53,14 @@ const ViewCatalogo = {
             <input class="input" type="number" name="periodicidadeMeses" required min="0" step="1" inputmode="numeric"
                    placeholder="Ex.: 12"
                    value="${editing ? editing.periodicidadeMeses : ''}">
-            <small>Use 0 para documentos sob demanda (sem renovação periódica).</small>
+            <small>0 = sob demanda (sem renovação periódica; fica fora do cálculo de demanda).</small>
+          </label>
+          <label class="field span-2">
+            <span>Produzido por</span>
+            <select class="input" name="responsavel" required>
+              ${Store.FUNCOES.map(f => `<option value="${UI.esc(f)}" ${(editing ? editing.responsavel : Store.FUNCOES[0]) === f ? 'selected' : ''}>${UI.esc(f)}</option>`).join('')}
+            </select>
+            <small>Define de qual capacidade (técnicos ou administrativos) a demanda deste documento é abatida.</small>
           </label>
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">${editing ? 'Salvar alterações' : 'Adicionar documento'}</button>
@@ -83,6 +90,7 @@ const ViewCatalogo = {
                   <th class="num">Tempo médio (h)</th>
                   <th class="num">Renovação (meses)</th>
                   <th>Periodicidade</th>
+                  <th>Produzido por</th>
                   <th class="actions">Ações</th>
                 </tr>
               </thead>
@@ -93,6 +101,7 @@ const ViewCatalogo = {
                     <td class="num">${UI.fmt(d.horas)}</td>
                     <td class="num">${d.periodicidadeMeses}</td>
                     <td><span class="chip ${d.periodicidadeMeses === 0 ? 'chip-gray' : 'chip-green'}">${this.descPeriodicidade(d.periodicidadeMeses)}</span></td>
+                    <td><span class="chip ${d.responsavel === Store.FUNCOES[1] ? 'chip-blue' : 'chip-green'}">${d.responsavel === Store.FUNCOES[1] ? 'Administrativo' : 'Técnico de SST'}</span></td>
                     <td class="actions">
                       <button type="button" class="btn-link" data-action="edit" data-id="${d.id}">Editar</button>
                       <button type="button" class="btn-link danger" data-action="delete" data-id="${d.id}">Excluir</button>
@@ -130,7 +139,7 @@ const ViewCatalogo = {
         return;
       }
 
-      const dados = { nome, horas, periodicidadeMeses };
+      const dados = { nome, horas, periodicidadeMeses, responsavel: form.responsavel.value };
       UI.busy(form, true);
       try {
         if (this.editingId) {

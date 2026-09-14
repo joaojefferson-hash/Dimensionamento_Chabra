@@ -8,20 +8,25 @@
    - Exportar/Importar JSON continuam disponíveis como backup; a importação
      substitui tudo numa transação (RPC importar_backup).
 
-   Formato em JS (igual ao backup exportado):
-     unidades:      [{ id, nome, empresas }]
-     documentos:    [{ id, nome, horas, periodicidadeMeses }]   // 0 = sob demanda
-     colaboradores: [{ id, nome, funcao, horasMes, eficiencia }] // eficiencia em %
+   Formato em JS (igual ao backup exportado, versão 2):
+     unidades:      [{ id, nome, empresasBaixo, empresasMedio, empresasAlto, empresas (soma) }]
+     documentos:    [{ id, nome, horas, periodicidadeMeses, responsavel }]   // periodicidade 0 = sob demanda
+     colaboradores: [{ id, nome, funcao, horasMes, eficiencia, unidadeId, unidadeNome }] // eficiencia em %
+     parametros:    { diasUteis[12], fatorBaixo, fatorMedio, fatorAlto, diasReferencia, ocupacaoAlvo }
    ========================================================================== */
 
 const Store = (() => {
   const APP_ID = 'chabra-dimensiona';
-  const SCHEMA_VERSION = 1;
+  const SCHEMA_VERSION = 2;
   const LOCAL_KEY = 'chabra-dimensiona:data';            // versão antiga (só localStorage)
   const LOCAL_BACKUP_KEY = 'chabra-dimensiona:backup-local'; // onde os dados locais ficam após a migração
 
   const FUNCOES = ['Técnico de Segurança do Trabalho', 'Administrativo'];
   const DEFAULT_COLABORADOR = { horasMes: 160, eficiencia: 80 };
+  const DEFAULT_PARAMETROS = {
+    diasUteis: [21, 18, 22, 20, 20, 21, 23, 21, 21, 21, 19, 22],
+    fatorBaixo: 1, fatorMedio: 1.3, fatorAlto: 1.6, diasReferencia: 20, ocupacaoAlvo: 85,
+  };
 
   // Mesmos valores do seed da migration 0001 (sugestões, editáveis).
   const DEFAULT_DOCUMENTOS = [
@@ -48,40 +53,74 @@ const Store = (() => {
 
   /* ---------- normalização de registros + mapeamento JS <-> tabela ---------- */
 
-  const buildUnidade = u => ({
-    nome: toStr(u.nome),
-    empresas: toInt(u.empresas, 0),
-  });
+  const buildUnidade = u => {
+    // formato antigo (só "empresas") → tudo no grau baixo (fator 1,0)
+    const legado = u.empresasBaixo == null && u.empresasMedio == null && u.empresasAlto == null ? toInt(u.empresas, 0) : 0;
+    const baixo = toInt(u.empresasBaixo, legado);
+    const medio = toInt(u.empresasMedio, 0);
+    const alto = toInt(u.empresasAlto, 0);
+    return { nome: toStr(u.nome), empresasBaixo: baixo, empresasMedio: medio, empresasAlto: alto, empresas: baixo + medio + alto };
+  };
   const buildDocumento = d => ({
     nome: toStr(d.nome),
     horas: Math.max(0, toNum(d.horas, 0)),
     periodicidadeMeses: toInt(d.periodicidadeMeses, 0),
+    responsavel: FUNCOES.includes(d.responsavel) ? d.responsavel : FUNCOES[0],
   });
   const buildColaborador = c => ({
     nome: toStr(c.nome),
     funcao: FUNCOES.includes(c.funcao) ? c.funcao : FUNCOES[0],
     horasMes: Math.max(0, toNum(c.horasMes, DEFAULT_COLABORADOR.horasMes)),
     eficiencia: clamp(toNum(c.eficiencia, DEFAULT_COLABORADOR.eficiencia), 1, 100),
+    unidadeId: toStr(c.unidadeId) || null,
+    unidadeNome: toStr(c.unidadeNome),
+  });
+  const buildParametros = q => {
+    const base = q || {};
+    const dias = Array.isArray(base.diasUteis) && base.diasUteis.length === 12
+      ? base.diasUteis.map(v => clamp(toInt(v, 21), 0, 31))
+      : DEFAULT_PARAMETROS.diasUteis.slice();
+    const pos = (v, fb) => { const x = toNum(v, fb); return x > 0 ? x : fb; };
+    return {
+      diasUteis: dias,
+      fatorBaixo: pos(base.fatorBaixo, DEFAULT_PARAMETROS.fatorBaixo),
+      fatorMedio: pos(base.fatorMedio, DEFAULT_PARAMETROS.fatorMedio),
+      fatorAlto: pos(base.fatorAlto, DEFAULT_PARAMETROS.fatorAlto),
+      diasReferencia: clamp(toInt(base.diasReferencia, DEFAULT_PARAMETROS.diasReferencia) || DEFAULT_PARAMETROS.diasReferencia, 1, 31),
+      ocupacaoAlvo: clamp(pos(base.ocupacaoAlvo, DEFAULT_PARAMETROS.ocupacaoAlvo), 1, 100),
+    };
+  };
+  const parametrosToRow = q => ({
+    dias_uteis: q.diasUteis, fator_baixo: q.fatorBaixo, fator_medio: q.fatorMedio, fator_alto: q.fatorAlto,
+    dias_referencia: q.diasReferencia, ocupacao_alvo: q.ocupacaoAlvo,
+  });
+  const parametrosFromRow = r => buildParametros({
+    diasUteis: r.dias_uteis, fatorBaixo: r.fator_baixo, fatorMedio: r.fator_medio, fatorAlto: r.fator_alto,
+    diasReferencia: r.dias_referencia, ocupacaoAlvo: r.ocupacao_alvo,
   });
 
   const TABELAS = {
     unidades: {
       table: 'unidades',
       build: buildUnidade,
-      toRow: u => ({ nome: u.nome, empresas: u.empresas }),
-      fromRow: r => ({ id: r.id, nome: r.nome, empresas: Number(r.empresas) }),
+      toRow: u => ({ nome: u.nome, empresas_baixo: u.empresasBaixo, empresas_medio: u.empresasMedio, empresas_alto: u.empresasAlto }),
+      fromRow: r => ({
+        id: r.id, nome: r.nome,
+        empresasBaixo: Number(r.empresas_baixo), empresasMedio: Number(r.empresas_medio), empresasAlto: Number(r.empresas_alto),
+        empresas: Number(r.empresas),
+      }),
     },
     documentos: {
       table: 'documentos',
       build: buildDocumento,
-      toRow: d => ({ nome: d.nome, horas: d.horas, periodicidade_meses: d.periodicidadeMeses }),
-      fromRow: r => ({ id: r.id, nome: r.nome, horas: Number(r.horas), periodicidadeMeses: Number(r.periodicidade_meses) }),
+      toRow: d => ({ nome: d.nome, horas: d.horas, periodicidade_meses: d.periodicidadeMeses, responsavel: d.responsavel }),
+      fromRow: r => ({ id: r.id, nome: r.nome, horas: Number(r.horas), periodicidadeMeses: Number(r.periodicidade_meses), responsavel: r.responsavel || FUNCOES[0] }),
     },
     colaboradores: {
       table: 'colaboradores',
       build: buildColaborador,
-      toRow: c => ({ nome: c.nome, funcao: c.funcao, horas_mes: c.horasMes, eficiencia: c.eficiencia }),
-      fromRow: r => ({ id: r.id, nome: r.nome, funcao: r.funcao, horasMes: Number(r.horas_mes), eficiencia: Number(r.eficiencia) }),
+      toRow: c => ({ nome: c.nome, funcao: c.funcao, horas_mes: c.horasMes, eficiencia: c.eficiencia, unidade_id: c.unidadeId || null }),
+      fromRow: r => ({ id: r.id, nome: r.nome, funcao: r.funcao, horasMes: Number(r.horas_mes), eficiencia: Number(r.eficiencia), unidadeId: r.unidade_id || null }),
     },
   };
 
@@ -100,11 +139,22 @@ const Store = (() => {
         .map(item => build(item || {}))
         .filter(item => item.nome && !vistos.has(chave(item.nome)) && vistos.add(chave(item.nome)));
     };
+    const unidades = lista('unidades', buildUnidade);
+    const colaboradores = lista('colaboradores', buildColaborador).map(c => {
+      // resolve a unidade pelo nome (ids não sobrevivem à importação); se vier só o id, procura o nome no próprio arquivo
+      if (!c.unidadeNome && c.unidadeId && Array.isArray(raw.unidades)) {
+        const u = raw.unidades.find(x => x && x.id === c.unidadeId);
+        if (u) c.unidadeNome = toStr(u.nome);
+      }
+      c.unidadeId = null;
+      return c;
+    });
     return {
-      unidades: lista('unidades', buildUnidade),
+      unidades,
       // Sem a chave "documentos" mantém o catálogo padrão; lista vazia explícita é respeitada.
-      documentos: Array.isArray(raw.documentos) ? lista('documentos', buildDocumento) : DEFAULT_DOCUMENTOS.map(d => ({ ...d })),
-      colaboradores: lista('colaboradores', buildColaborador),
+      documentos: Array.isArray(raw.documentos) ? lista('documentos', buildDocumento) : DEFAULT_DOCUMENTOS.map(d => buildDocumento(d)),
+      colaboradores,
+      parametros: raw.parametros && typeof raw.parametros === 'object' ? buildParametros(raw.parametros) : null,
     };
   }
 
@@ -126,7 +176,7 @@ const Store = (() => {
 
   /* ---------- estado (cache) ---------- */
 
-  let state = { unidades: [], documentos: [], colaboradores: [] };
+  let state = { unidades: [], documentos: [], colaboradores: [], parametros: buildParametros(null) };
   let loaded = false;
   let loadedAt = 0;
 
@@ -142,6 +192,12 @@ const Store = (() => {
           if (error) throw falha(error, `Falha ao carregar ${key}.`);
           return [key, data.map(cfg.fromRow)];
         }));
+    consultas.push(
+      db.from('parametros').select('*').eq('id', 1).single()
+        .then(({ data, error }) => {
+          if (error) throw falha(error, 'Falha ao carregar os parâmetros.');
+          return ['parametros', parametrosFromRow(data)];
+        }));
     const resultados = await Promise.all(consultas);
     state = Object.fromEntries(resultados);
     loaded = true;
@@ -156,7 +212,7 @@ const Store = (() => {
   }
 
   function clear() {
-    state = { unidades: [], documentos: [], colaboradores: [] };
+    state = { unidades: [], documentos: [], colaboradores: [], parametros: buildParametros(null) };
     loaded = false;
     loadedAt = 0;
   }
@@ -198,6 +254,26 @@ const Store = (() => {
     };
   }
 
+  /* ---------- parâmetros do motor (linha única) ---------- */
+
+  const parametros = {
+    get: () => ({ ...state.parametros, diasUteis: state.parametros.diasUteis.slice() }),
+    async update(patch, { silent = false } = {}) {
+      const novo = buildParametros({ ...state.parametros, ...patch });
+      const { data, error } = await db.from('parametros').update(parametrosToRow(novo)).eq('id', 1).select().single();
+      if (error) throw falha(error, 'Não foi possível salvar os parâmetros.');
+      state.parametros = parametrosFromRow(data);
+      if (!silent) emit();
+      return parametros.get();
+    },
+  };
+
+  /** Nome da unidade de um colaborador (ou '' se não alocado). */
+  function nomeUnidade(unidadeId) {
+    const u = unidadeId ? state.unidades.find(x => x.id === unidadeId) : null;
+    return u ? u.nome : '';
+  }
+
   /** Verifica se já existe registro com o mesmo nome (ignora maiúsculas/minúsculas). */
   function nomeDuplicado(key, nome, exceptId = null) {
     const alvo = chave(nome);
@@ -225,7 +301,8 @@ const Store = (() => {
       exportedAt: new Date().toISOString(),
       unidades: state.unidades,
       documentos: state.documentos,
-      colaboradores: state.colaboradores,
+      colaboradores: state.colaboradores.map(c => ({ ...c, unidadeNome: nomeUnidade(c.unidadeId) })),
+      parametros: state.parametros,
     };
     return JSON.stringify(payload, null, 2);
   }
@@ -282,9 +359,12 @@ const Store = (() => {
   return {
     FUNCOES,
     DEFAULT_COLABORADOR,
+    DEFAULT_PARAMETROS,
     unidades: makeCollection('unidades'),
     documentos: makeCollection('documentos'),
     colaboradores: makeCollection('colaboradores'),
+    parametros,
+    nomeUnidade,
     loadAll,
     reloadIfStale,
     clear,
