@@ -51,7 +51,7 @@ const ViewProgramacaoMensal = {
               <tr>
                 <th rowspan="2">Mês</th>
                 <th rowspan="2" class="num">Dias úteis</th>
-                <th rowspan="2" class="num" title="Empresas da carteira no mês (com o peso do grau)">Empresas</th>
+                <th rowspan="2" class="num" title="Empresas que precisam de atendimento no mês (vencendo e a vencer, com o peso de cada situação)">Precisam</th>
                 <th colspan="2" class="th-group">Técnicos</th>
                 <th class="th-group">Administrativos</th>
                 <th rowspan="2">Situação</th>

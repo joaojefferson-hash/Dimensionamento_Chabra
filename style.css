@@ -700,9 +700,9 @@ form.busy { opacity: .7; pointer-events: none; }
 .table-matriz tfoot th { text-align: center; }
 .table-matriz tfoot th.col-nome { text-align: left; }
 .chip-grau { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
-.grau-baixo { background: #e3f2ea; color: #0b5d43; }
-.grau-medio { background: #fff1cc; color: #7a5200; }
-.grau-alto  { background: #fde2df; color: #8f1d17; }
+.sit-em-dia   { background: #e3f2ea; color: #0b5d43; }
+.sit-vencendo { background: #fff1cc; color: #7a5200; }
+.sit-a-vencer { background: #fde2df; color: #8f1d17; }
 
 .input-sufixo { white-space: nowrap; align-self: center; }
 

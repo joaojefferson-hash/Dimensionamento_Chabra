@@ -40,65 +40,7 @@ const ViewCalendario = {
         <p class="note">Exemplo: uma pessoa que faz 2 inspeções por dia, num mês de ${p.diasUteis[0]} dias úteis, faz até ${2 * p.diasUteis[0]} inspeções no mês.</p>
       </section>
 
-      <section class="card">
-        <div class="card-head">
-          <h2>Com que frequência cada empresa é atendida?</h2>
-          <span class="saved-flag" id="freq-saved" aria-hidden="true">salvo ✓</span>
-        </div>
-        <p class="muted">Diga de quanto em quanto tempo uma empresa da carteira recebe cada tipo de atendimento. "A cada 1 mês" = toda empresa é atendida todo mês; "a cada 1 ano" = um doze avos das empresas por mês.</p>
-        <form id="form-frequencia" class="form-grid" autocomplete="off">
-          ${Calculo.ENTREGAS.map(e => { const emAnos = p[e.freq] >= 12 && p[e.freq] % 12 === 0; const valor = emAnos ? p[e.freq] / 12 : p[e.freq]; return `
-            <div class="field">
-              <span>Cada empresa recebe ${e.singular} a cada…</span>
-              <div class="input-group">
-                <input class="input input-num" type="number" name="${e.freq}" min="0.5" max="120" step="0.5" inputmode="decimal" value="${valor}" aria-label="Quantidade">
-                <select class="input input-sm" name="${e.freq}_unidade" aria-label="Unidade de tempo">
-                  <option value="meses" ${emAnos ? '' : 'selected'}>${valor === 1 ? 'mês' : 'meses'}</option>
-                  <option value="anos" ${emAnos ? 'selected' : ''}>${valor === 1 ? 'ano' : 'anos'}</option>
-                </select>
-              </div>
-              <small>${e.id === 'inspecoes' ? 'Visita técnica do técnico de SST.' : e.id === 'relatorios' ? 'Relatório enviado pelo técnico de SST.' : 'Documentação finalizada pelo administrativo.'}</small>
-            </div>`; }).join('')}
-        </form>
-      </section>
     `;
-
-    const formFreq = el.querySelector('#form-frequencia');
-    formFreq.addEventListener('submit', e => e.preventDefault());
-    // valor + unidade (meses/anos) → sempre gravado em meses
-    const salvarFreq = async campo => {
-      const input = formFreq[campo];
-      const sel = formFreq[campo + '_unidade'];
-      const v = UI.parseNum(input.value, NaN);
-      const emAnos = sel.value === 'anos';
-      const meses = emAnos ? v * 12 : v;
-      if (!(v > 0) || meses > 120) {
-        UI.toast(emAnos ? 'Informe entre 0,5 e 10 anos.' : 'Informe entre 0,5 e 120 meses.', 'error');
-        const atual = Store.parametros.get()[campo];
-        input.value = atual >= 12 && atual % 12 === 0 ? atual / 12 : atual;
-        sel.value = atual >= 12 && atual % 12 === 0 ? 'anos' : 'meses';
-        return;
-      }
-      input.disabled = true; sel.disabled = true;
-      try {
-        await Store.parametros.update({ [campo]: meses }, { silent: true });
-      } catch (err) {
-        UI.toast(err.message, 'error');
-        return;
-      } finally {
-        input.disabled = false; sel.disabled = false;
-      }
-      sel.options[0].textContent = v === 1 ? 'mês' : 'meses';
-      sel.options[1].textContent = v === 1 ? 'ano' : 'anos';
-      const flag = el.querySelector('#freq-saved');
-      flag.classList.add('show'); clearTimeout(flag._timer); flag._timer = setTimeout(() => flag.classList.remove('show'), 1500);
-    };
-    Calculo.ENTREGAS.forEach(e => {
-      const input = formFreq[e.freq];
-      input.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); } });
-      input.addEventListener('change', () => salvarFreq(e.freq));
-      formFreq[e.freq + '_unidade'].addEventListener('change', () => salvarFreq(e.freq));
-    });
 
     const piscar = () => {
       const flag = el.querySelector('#cal-saved');

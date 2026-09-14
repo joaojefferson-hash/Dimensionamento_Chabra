@@ -9,21 +9,21 @@
      substitui tudo numa transação (RPC importar_backup).
 
    Formato em JS (igual ao backup exportado, versão 2):
-     unidades:      [{ id, nome, empresasBaixo, empresasMedio, empresasAlto, empresas (soma),
-                       meses: { [1..12]: { empresasBaixo, empresasMedio, empresasAlto } } }]  // exceções mensais (padrão = campos acima)
+     unidades:      [{ id, nome, empresasEmDia, empresasVencendo, empresasAVencer, empresas (soma),
+                       meses: { [1..12]: { empresasEmDia, empresasVencendo, empresasAVencer } } }]  // exceções mensais (padrão = campos acima)
+                    // situação da documentação: em dia (não gera trabalho) / vencendo / a vencer no mês
      documentos:    [{ id, nome, horas, periodicidadeMeses, responsavel }]   // periodicidade 0 = sob demanda
      funcoes:       [{ id, nome, tipoProducao: 'tecnico' | 'administrativo' | 'nenhuma', chefia,
                        coordena: 'todos' | 'tecnicos' | 'administrativos', respondeParaId (função de chefia acima; null = topo), ordem }]
      colaboradores: [{ id, nome, funcaoId, funcao (nome), tipoProducao, chefia, coordena, empresasDia, inspecoesDia, relatoriosDia,
                        alocacoes: [{ unidadeId, unidadeNome, percentual }] }]
                     // produção declarada por dia; alocações somam ≤ 100% (o restante é "não alocado")
-     parametros:    { diasUteis[12], fatorBaixo, fatorMedio, fatorAlto, ocupacaoAlvo,
-                      mesesPorInspecao, mesesPorRelatorio, mesesPorFinalizacao }  // a cada N meses por empresa
+     parametros:    { diasUteis[12], pesoEmDia, pesoVencendo, pesoAVencer, ocupacaoAlvo }  // peso = trabalho que a situação gera no mês
    ========================================================================== */
 
 const Store = (() => {
   const APP_ID = 'chabra-dimensiona';
-  const SCHEMA_VERSION = 6;
+  const SCHEMA_VERSION = 7;
   const LOCAL_KEY = 'chabra-dimensiona:data';            // versão antiga (só localStorage)
   const LOCAL_BACKUP_KEY = 'chabra-dimensiona:backup-local'; // onde os dados locais ficam após a migração
 
@@ -41,9 +41,14 @@ const Store = (() => {
   const DEFAULT_COLABORADOR = { empresasDia: 2, inspecoesDia: 2, relatoriosDia: 2 };
   const DEFAULT_PARAMETROS = {
     diasUteis: [21, 18, 22, 20, 20, 21, 23, 21, 21, 21, 19, 22],
-    fatorBaixo: 1, fatorMedio: 1.3, fatorAlto: 1.6, ocupacaoAlvo: 85,
-    mesesPorInspecao: 1, mesesPorRelatorio: 1, mesesPorFinalizacao: 1,
+    pesoEmDia: 0, pesoVencendo: 0.5, pesoAVencer: 1, ocupacaoAlvo: 85,
   };
+  /** As três situações da documentação de uma empresa (mesma ordem nas telas). */
+  const SITUACOES = [
+    { campo: 'empresasEmDia',    peso: 'pesoEmDia',    coluna: 'empresas_em_dia',   rotulo: 'Em dia',   classe: 'sit-em-dia',   ajuda: 'documentação em dia — não gera trabalho no mês' },
+    { campo: 'empresasVencendo', peso: 'pesoVencendo', coluna: 'empresas_vencendo', rotulo: 'Vencendo', classe: 'sit-vencendo', ajuda: 'documentação vencendo em breve — inspeção e preparação' },
+    { campo: 'empresasAVencer',  peso: 'pesoAVencer',  coluna: 'empresas_a_vencer', rotulo: 'A vencer no mês', classe: 'sit-a-vencer', ajuda: 'vence no mês — atendimento completo (inspeção, relatório e finalização)' },
+  ];
 
   // Mesmos valores do seed da migration 0001 (sugestões, editáveis).
   const DEFAULT_DOCUMENTOS = [
@@ -78,18 +83,25 @@ const Store = (() => {
     entradas.forEach(([k, v]) => {
       const mes = Math.round(toNum(k, 0));
       if (!v || mes < 1 || mes > 12) return;
-      out[mes] = { empresasBaixo: toInt(v.empresasBaixo, 0), empresasMedio: toInt(v.empresasMedio, 0), empresasAlto: toInt(v.empresasAlto, 0) };
+      // chaves antigas (grau baixo/médio/alto) são aceitas: baixo → em dia, médio → vencendo, alto → a vencer
+      out[mes] = {
+        empresasEmDia: toInt(v.empresasEmDia, toInt(v.empresasBaixo, 0)),
+        empresasVencendo: toInt(v.empresasVencendo, toInt(v.empresasMedio, 0)),
+        empresasAVencer: toInt(v.empresasAVencer, toInt(v.empresasAlto, 0)),
+      };
     });
     return out;
   };
   const buildUnidade = u => {
-    // formato antigo (só "empresas") → tudo no grau baixo (fator 1,0)
-    const legado = u.empresasBaixo == null && u.empresasMedio == null && u.empresasAlto == null ? toInt(u.empresas, 0) : 0;
-    const baixo = toInt(u.empresasBaixo, legado);
-    const medio = toInt(u.empresasMedio, 0);
-    const alto = toInt(u.empresasAlto, 0);
+    // formatos antigos: grau baixo/médio/alto → em dia/vencendo/a vencer; só "empresas" → tudo em dia
+    const temNovo = u.empresasEmDia != null || u.empresasVencendo != null || u.empresasAVencer != null;
+    const temGrau = u.empresasBaixo != null || u.empresasMedio != null || u.empresasAlto != null;
+    const legado = !temNovo && !temGrau ? toInt(u.empresas, 0) : 0;
+    const emDia = toInt(u.empresasEmDia, toInt(u.empresasBaixo, legado));
+    const vencendo = toInt(u.empresasVencendo, toInt(u.empresasMedio, 0));
+    const aVencer = toInt(u.empresasAVencer, toInt(u.empresasAlto, 0));
     return {
-      nome: toStr(u.nome), empresasBaixo: baixo, empresasMedio: medio, empresasAlto: alto, empresas: baixo + medio + alto,
+      nome: toStr(u.nome), empresasEmDia: emDia, empresasVencendo: vencendo, empresasAVencer: aVencer, empresas: emDia + vencendo + aVencer,
       meses: buildMeses(u.empresasPorMes !== undefined ? u.empresasPorMes : u.meses),
     };
   };
@@ -146,26 +158,22 @@ const Store = (() => {
       ? base.diasUteis.map(v => clamp(toInt(v, 21), 0, 31))
       : DEFAULT_PARAMETROS.diasUteis.slice();
     const pos = (v, fb) => { const x = toNum(v, fb); return x > 0 ? x : fb; };
+    const naoNeg = (v, fb) => { const x = toNum(v, fb); return x >= 0 ? x : fb; };
     return {
       diasUteis: dias,
-      fatorBaixo: pos(base.fatorBaixo, DEFAULT_PARAMETROS.fatorBaixo),
-      fatorMedio: pos(base.fatorMedio, DEFAULT_PARAMETROS.fatorMedio),
-      fatorAlto: pos(base.fatorAlto, DEFAULT_PARAMETROS.fatorAlto),
+      pesoEmDia: naoNeg(base.pesoEmDia, DEFAULT_PARAMETROS.pesoEmDia),
+      pesoVencendo: naoNeg(base.pesoVencendo, DEFAULT_PARAMETROS.pesoVencendo),
+      pesoAVencer: naoNeg(base.pesoAVencer, DEFAULT_PARAMETROS.pesoAVencer),
       ocupacaoAlvo: clamp(pos(base.ocupacaoAlvo, DEFAULT_PARAMETROS.ocupacaoAlvo), 1, 100),
-      mesesPorInspecao: Math.min(120, pos(base.mesesPorInspecao, DEFAULT_PARAMETROS.mesesPorInspecao)),
-      mesesPorRelatorio: Math.min(120, pos(base.mesesPorRelatorio, DEFAULT_PARAMETROS.mesesPorRelatorio)),
-      mesesPorFinalizacao: Math.min(120, pos(base.mesesPorFinalizacao, DEFAULT_PARAMETROS.mesesPorFinalizacao)),
     };
   };
   const parametrosToRow = q => ({
-    dias_uteis: q.diasUteis, fator_baixo: q.fatorBaixo, fator_medio: q.fatorMedio, fator_alto: q.fatorAlto,
+    dias_uteis: q.diasUteis, peso_em_dia: q.pesoEmDia, peso_vencendo: q.pesoVencendo, peso_a_vencer: q.pesoAVencer,
     ocupacao_alvo: q.ocupacaoAlvo,
-    meses_por_inspecao: q.mesesPorInspecao, meses_por_relatorio: q.mesesPorRelatorio, meses_por_finalizacao: q.mesesPorFinalizacao,
   });
   const parametrosFromRow = r => buildParametros({
-    diasUteis: r.dias_uteis, fatorBaixo: r.fator_baixo, fatorMedio: r.fator_medio, fatorAlto: r.fator_alto,
+    diasUteis: r.dias_uteis, pesoEmDia: r.peso_em_dia, pesoVencendo: r.peso_vencendo, pesoAVencer: r.peso_a_vencer,
     ocupacaoAlvo: r.ocupacao_alvo,
-    mesesPorInspecao: r.meses_por_inspecao, mesesPorRelatorio: r.meses_por_relatorio, mesesPorFinalizacao: r.meses_por_finalizacao,
   });
 
   const TABELAS = {
@@ -178,10 +186,10 @@ const Store = (() => {
     unidades: {
       table: 'unidades',
       build: buildUnidade,
-      toRow: u => ({ nome: u.nome, empresas_baixo: u.empresasBaixo, empresas_medio: u.empresasMedio, empresas_alto: u.empresasAlto }),
+      toRow: u => ({ nome: u.nome, empresas_em_dia: u.empresasEmDia, empresas_vencendo: u.empresasVencendo, empresas_a_vencer: u.empresasAVencer }),
       fromRow: r => ({
         id: r.id, nome: r.nome,
-        empresasBaixo: Number(r.empresas_baixo), empresasMedio: Number(r.empresas_medio), empresasAlto: Number(r.empresas_alto),
+        empresasEmDia: Number(r.empresas_em_dia), empresasVencendo: Number(r.empresas_vencendo), empresasAVencer: Number(r.empresas_a_vencer),
         empresas: Number(r.empresas),
         meses: {},
       }),
@@ -286,7 +294,7 @@ const Store = (() => {
           return ['_alocacoes', data];
         }));
     consultas.push(
-      db.from('unidade_empresas_mes').select('unidade_id, mes, empresas_baixo, empresas_medio, empresas_alto')
+      db.from('unidade_empresas_mes').select('unidade_id, mes, empresas_em_dia, empresas_vencendo, empresas_a_vencer')
         .then(({ data, error }) => {
           if (error) throw falha(error, 'Falha ao carregar a variação mensal de empresas.');
           return ['_meses', data];
@@ -303,7 +311,7 @@ const Store = (() => {
     const porUnidade = {};
     state._meses.forEach(m => {
       (porUnidade[m.unidade_id] = porUnidade[m.unidade_id] || {})[m.mes] = {
-        empresasBaixo: Number(m.empresas_baixo), empresasMedio: Number(m.empresas_medio), empresasAlto: Number(m.empresas_alto),
+        empresasEmDia: Number(m.empresas_em_dia), empresasVencendo: Number(m.empresas_vencendo), empresasAVencer: Number(m.empresas_a_vencer),
       };
     });
     delete state._meses;
@@ -409,11 +417,11 @@ const Store = (() => {
       if (valores) {
         const row = {
           unidade_id: unidadeId, mes,
-          empresas_baixo: toInt(valores.empresasBaixo, 0), empresas_medio: toInt(valores.empresasMedio, 0), empresas_alto: toInt(valores.empresasAlto, 0),
+          empresas_em_dia: toInt(valores.empresasEmDia, 0), empresas_vencendo: toInt(valores.empresasVencendo, 0), empresas_a_vencer: toInt(valores.empresasAVencer, 0),
         };
         const { error } = await db.from('unidade_empresas_mes').upsert(row, { onConflict: 'unidade_id,mes' });
         if (error) throw falha(error, 'Não foi possível salvar a variação mensal.');
-        u.meses = { ...u.meses, [mes]: { empresasBaixo: row.empresas_baixo, empresasMedio: row.empresas_medio, empresasAlto: row.empresas_alto } };
+        u.meses = { ...u.meses, [mes]: { empresasEmDia: row.empresas_em_dia, empresasVencendo: row.empresas_vencendo, empresasAVencer: row.empresas_a_vencer } };
       } else {
         const { error } = await db.from('unidade_empresas_mes').delete().eq('unidade_id', unidadeId).eq('mes', mes);
         if (error) throw falha(error, 'Não foi possível remover a variação mensal.');
@@ -557,6 +565,7 @@ const Store = (() => {
     FUNCOES,
     TIPOS_PRODUCAO,
     COORDENA,
+    SITUACOES,
     DEFAULT_COLABORADOR,
     DEFAULT_PARAMETROS,
     funcoes: makeCollection('funcoes'),

@@ -4,15 +4,16 @@
    Funções puras sobre os cadastros; nada de DOM. Também roda em Node (testes).
 
    Entradas (formato do Store):
-     unidades:      [{ id, nome, empresasBaixo, empresasMedio, empresasAlto, meses?: { [1..12]: {...} } }]
+     unidades:      [{ id, nome, empresasEmDia, empresasVencendo, empresasAVencer, meses?: { [1..12]: {...} } }]
      colaboradores: [{ id, nome, funcao, tipoProducao ('tecnico' | 'administrativo' | 'nenhuma'), chefia,
                        empresasDia, inspecoesDia, relatoriosDia, alocacoes: [{ unidadeId, percentual }] }]
                     // tipoProducao 'nenhuma' = não entra nas contas; chefia = aparece como responsável pelas unidades
-     parametros:    { diasUteis[12], fatorBaixo, fatorMedio, fatorAlto, ocupacaoAlvo, mesesPorInspecao, mesesPorRelatorio, mesesPorFinalizacao }
+     parametros:    { diasUteis[12], pesoEmDia, pesoVencendo, pesoAVencer, ocupacaoAlvo }
      janela:        { de: 0..11, ate: 0..11 }   (meses, inclusive)
 
    Modelo:
-     precisa(unidade, entrega, mês) = empresas do mês (com peso do grau) ÷ meses entre atendimentos
+     precisa(unidade, entrega, mês) = Σ empresas na situação × peso da situação
+                                      (em dia = 0, vencendo = 0,5, a vencer no mês = 1 — editáveis)
                                  (ex.: inspeção a cada 3 meses → 1/3 das empresas por mês)
      produção(colab, entrega, mês) = valor_por_dia × dias úteis do mês × fração alocada na unidade
      consegue(unidade, entrega, mês) = Σ produção × (ocupaçãoAlvo/100)   ← folga para imprevistos
@@ -34,9 +35,9 @@ const Calculo = (() => {
   const FUNCAO_SINGULAR = { [TEC]: 'técnico', [ADM]: 'administrativo' };
 
   const ENTREGAS = [
-    { id: 'inspecoes',  funcao: TEC, campo: 'inspecoesDia',  freq: 'mesesPorInspecao',    rotulo: 'Inspeções',            unidade: 'inspeções',            singular: 'uma inspeção' },
-    { id: 'relatorios', funcao: TEC, campo: 'relatoriosDia', freq: 'mesesPorRelatorio',   rotulo: 'Relatórios',           unidade: 'relatórios',           singular: 'um relatório' },
-    { id: 'empresas',   funcao: ADM, campo: 'empresasDia',   freq: 'mesesPorFinalizacao', rotulo: 'Empresas finalizadas', unidade: 'empresas finalizadas', singular: 'uma finalização' },
+    { id: 'inspecoes',  funcao: TEC, campo: 'inspecoesDia',  rotulo: 'Inspeções',            unidade: 'inspeções',            singular: 'uma inspeção' },
+    { id: 'relatorios', funcao: TEC, campo: 'relatoriosDia', rotulo: 'Relatórios',           unidade: 'relatórios',           singular: 'um relatório' },
+    { id: 'empresas',   funcao: ADM, campo: 'empresasDia',   rotulo: 'Empresas finalizadas', unidade: 'empresas finalizadas', singular: 'uma finalização' },
   ];
   const ENTREGAS_DA_FUNCAO = { [TEC]: ENTREGAS.filter(e => e.funcao === TEC), [ADM]: ENTREGAS.filter(e => e.funcao === ADM) };
 
@@ -50,14 +51,14 @@ const Calculo = (() => {
   function empresasDoMes(u, mes) {
     const exc = u.meses && u.meses[mes + 1];
     return exc
-      ? { empresasBaixo: n(exc.empresasBaixo), empresasMedio: n(exc.empresasMedio), empresasAlto: n(exc.empresasAlto), excecao: true }
-      : { empresasBaixo: n(u.empresasBaixo), empresasMedio: n(u.empresasMedio), empresasAlto: n(u.empresasAlto), excecao: false };
+      ? { empresasEmDia: n(exc.empresasEmDia), empresasVencendo: n(exc.empresasVencendo), empresasAVencer: n(exc.empresasAVencer), excecao: true }
+      : { empresasEmDia: n(u.empresasEmDia), empresasVencendo: n(u.empresasVencendo), empresasAVencer: n(u.empresasAVencer), excecao: false };
   }
 
-  /** Empresas ponderadas pelo peso do grau. Com `mes` (0..11) usa a quantidade daquele mês. */
+  /** Empresas que precisam de atendimento: cada situação × seu peso. Com `mes` (0..11) usa a quantidade daquele mês. */
   function empresasPonderadas(u, p, mes) {
     const q = mes === undefined ? u : empresasDoMes(u, mes);
-    return n(q.empresasBaixo) * n(p.fatorBaixo) + n(q.empresasMedio) * n(p.fatorMedio) + n(q.empresasAlto) * n(p.fatorAlto);
+    return n(q.empresasEmDia) * n(p.pesoEmDia) + n(q.empresasVencendo) * n(p.pesoVencendo) + n(q.empresasAVencer) * n(p.pesoAVencer);
   }
 
   /** Produção de um colaborador numa entrega num mês (100% do tempo). */
@@ -65,10 +66,9 @@ const Calculo = (() => {
     return n(colab[entrega.campo]) * n(p.diasUteis[mes]);
   }
 
-  /** Quantas entregas a carteira da unidade precisa no mês: empresas ponderadas ÷ meses entre atendimentos. */
+  /** Quantas entregas a carteira da unidade precisa no mês (uma por empresa ponderada). */
   function precisaMes(u, entrega, mes, p) {
-    const freq = n(p[entrega.freq]) || 1;
-    return empresasPonderadas(u, p, mes) / freq;
+    return empresasPonderadas(u, p, mes);
   }
 
   function status(sobra, consegue) {
@@ -199,7 +199,7 @@ const Calculo = (() => {
         FUNCOES.forEach(f => { funcoes[f] = resumoFuncao(f, entregas); });
         return {
           mes, nome: MESES[mes], nomeLongo: MESES_LONGO[mes], diasUteis: n(p.diasUteis[mes]),
-          empresas: q.empresasBaixo + q.empresasMedio + q.empresasAlto, precisa, excecao: q.excecao,
+          empresas: q.empresasEmDia + q.empresasVencendo + q.empresasAVencer, precisa, excecao: q.excecao,
           entregas, funcoes, status: piorStatus(FUNCOES.map(f => funcoes[f].status)),
         };
       });
@@ -307,13 +307,10 @@ const Calculo = (() => {
     const dias = Array.isArray(base.diasUteis) && base.diasUteis.length === 12 ? base.diasUteis.map(n) : new Array(12).fill(21);
     return {
       diasUteis: dias,
-      fatorBaixo: n(base.fatorBaixo) || 1,
-      fatorMedio: n(base.fatorMedio) || 1.3,
-      fatorAlto: n(base.fatorAlto) || 1.6,
+      pesoEmDia: Math.max(0, n(base.pesoEmDia)),
+      pesoVencendo: base.pesoVencendo == null ? 0.5 : Math.max(0, n(base.pesoVencendo)),
+      pesoAVencer: base.pesoAVencer == null ? 1 : Math.max(0, n(base.pesoAVencer)),
       ocupacaoAlvo: n(base.ocupacaoAlvo) || 85,
-      mesesPorInspecao: n(base.mesesPorInspecao) || 1,
-      mesesPorRelatorio: n(base.mesesPorRelatorio) || 1,
-      mesesPorFinalizacao: n(base.mesesPorFinalizacao) || 1,
     };
   }
 

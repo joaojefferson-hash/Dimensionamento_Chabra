@@ -104,12 +104,15 @@ const ViewHistorico = {
   MES: ['', 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'],
 
   CAMPOS: {
-    unidades: { nome: 'nome', empresas_baixo: 'grau baixo (padrão)', empresas_medio: 'grau médio (padrão)', empresas_alto: 'grau alto (padrão)' },
-    unidade_empresas_mes: { empresas_baixo: 'grau baixo', empresas_medio: 'grau médio', empresas_alto: 'grau alto' },
+    unidades: { nome: 'nome', empresas_em_dia: 'em dia (padrão)', empresas_vencendo: 'vencendo (padrão)', empresas_a_vencer: 'a vencer no mês (padrão)',
+                empresas_baixo: 'grau baixo (padrão)', empresas_medio: 'grau médio (padrão)', empresas_alto: 'grau alto (padrão)' },
+    unidade_empresas_mes: { empresas_em_dia: 'em dia', empresas_vencendo: 'vencendo', empresas_a_vencer: 'a vencer no mês',
+                            empresas_baixo: 'grau baixo', empresas_medio: 'grau médio', empresas_alto: 'grau alto' },
     colaboradores: { nome: 'nome', funcao: 'função', funcao_id: 'função', empresas_dia: 'empresas por dia', inspecoes_dia: 'inspeções por dia', relatorios_dia: 'relatórios por dia' },
     funcoes: { nome: 'nome', tipo_producao: 'tipo de produção', chefia: 'chefia de equipe', coordena: 'coordena', responde_para: 'responde para', ordem: 'ordem' },
     colaborador_unidades: { percentual: '% do tempo' },
-    parametros: { fator_baixo: 'peso do grau baixo', fator_medio: 'peso do grau médio', fator_alto: 'peso do grau alto', ocupacao_alvo: 'folga para imprevistos', dias_uteis: 'dias úteis', meses_por_inspecao: 'frequência de inspeção', meses_por_relatorio: 'frequência de relatório', meses_por_finalizacao: 'frequência de finalização' },
+    parametros: { peso_em_dia: 'peso de "em dia"', peso_vencendo: 'peso de "vencendo"', peso_a_vencer: 'peso de "a vencer no mês"', ocupacao_alvo: 'folga para imprevistos', dias_uteis: 'dias úteis',
+                  fator_baixo: 'peso do grau baixo', fator_medio: 'peso do grau médio', fator_alto: 'peso do grau alto', meses_por_inspecao: 'frequência de inspeção', meses_por_relatorio: 'frequência de relatório', meses_por_finalizacao: 'frequência de finalização' },
     documentos: { nome: 'nome', horas: 'horas', periodicidade_meses: 'periodicidade', responsavel: 'produzido por' },
   },
 
@@ -158,8 +161,9 @@ const ViewHistorico = {
         return `Alterou a unidade <strong>${nome}</strong>${mudancas()}`;
       case 'unidade_empresas_mes': {
         const mes = this.MES[Number(r.mes)] || `mês ${r.mes}`;
-        const valores = x => x ? `${x.empresas_baixo} / ${x.empresas_medio} / ${x.empresas_alto}` : '';
-        if (h.operacao === 'insert') return `Definiu valor próprio para <strong>${mes}</strong> em <strong>${uni}</strong>: ${valores(d)} (baixo / médio / alto)`;
+        const antigo = x => x && x.empresas_em_dia == null && x.empresas_baixo != null;
+        const valores = x => (x ? (antigo(x) ? `${x.empresas_baixo} / ${x.empresas_medio} / ${x.empresas_alto}` : `${x.empresas_em_dia} / ${x.empresas_vencendo} / ${x.empresas_a_vencer}`) : '');
+        if (h.operacao === 'insert') return `Definiu valor próprio para <strong>${mes}</strong> em <strong>${uni}</strong>: ${valores(d)} (${antigo(d) ? 'baixo / médio / alto' : 'em dia / vencendo / a vencer'})`;
         if (h.operacao === 'delete') return `Voltou <strong>${mes}</strong> de <strong>${uni}</strong> ao padrão (era ${valores(a)})`;
         return `Alterou <strong>${mes}</strong> de <strong>${uni}</strong>${mudancas()}`;
       }

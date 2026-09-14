@@ -1,10 +1,11 @@
 /* ==========================================================================
-   Tela: Empresas por Unidade — matriz unidade × mês, com os três graus.
+   Tela: Empresas por Unidade — matriz unidade × mês, pela situação da
+   documentação: em dia / vencendo / a vencer no mês.
 
-   Cada unidade tem um valor PADRÃO por grau (baixo / médio / alto) e pode ter
-   valores diferentes em meses específicos. A matriz mostra, por unidade, uma
-   linha para cada grau (+ a linha Total da unidade): Padrão | Jan … Dez | Média.
-   Editar um mês grava a exceção daquele mês (os outros graus do mês ficam
+   Cada unidade tem um valor PADRÃO por situação e pode ter valores diferentes
+   em meses específicos. A matriz mostra, por unidade, uma linha para cada
+   situação (+ a linha Total da unidade): Padrão | Jan … Dez | Média.
+   Editar um mês grava a exceção daquele mês (as outras situações do mês ficam
    como estão); apagar a célula volta ao padrão. Tudo salva automaticamente.
    ========================================================================== */
 
@@ -12,13 +13,9 @@ const ViewEmpresas = {
   id: 'empresas',
   title: 'Empresas por Unidade',
 
-  GRAUS: [
-    { campo: 'empresasBaixo', fator: 'fatorBaixo', rotulo: 'Baixo', classe: 'grau-baixo', ajuda: 'empresas simples, com poucos riscos' },
-    { campo: 'empresasMedio', fator: 'fatorMedio', rotulo: 'Médio', classe: 'grau-medio', ajuda: 'empresas de porte ou complexidade média' },
-    { campo: 'empresasAlto',  fator: 'fatorAlto',  rotulo: 'Alto',  classe: 'grau-alto',  ajuda: 'empresas grandes ou com muitos riscos' },
-  ],
+  get GRAUS() { return Store.SITUACOES.map(s => ({ campo: s.campo, fator: s.peso, rotulo: s.rotulo, classe: s.classe, ajuda: s.ajuda })); },
 
-  grauSel: 'todos', // 'todos' | campo de um grau
+  grauSel: 'todos', // 'todos' | campo de uma situação
 
   /* ---------- helpers de valor ---------- */
 
@@ -50,9 +47,9 @@ const ViewEmpresas = {
           <div class="acoes-unidade" data-acoes="${u.id}">${nExc(u) ? `<button type="button" class="btn-link" data-action="limpar-mes" data-id="${u.id}" title="Apagar os valores próprios de mês e usar o padrão o ano todo">usar padrão o ano todo</button>` : ''}</div>
         </td>` : ''}
         <td class="col-grau"><span class="chip-grau ${g.classe}" title="${g.ajuda}">${g.rotulo}</span></td>
-        <td class="col-padrao"><input type="number" class="input input-sm input-num input-padrao" min="0" step="1" inputmode="numeric" data-id="${u.id}" data-campo="${g.campo}" value="${u[g.campo]}" aria-label="Padrão grau ${g.rotulo} de ${UI.esc(u.nome)}"></td>
+        <td class="col-padrao"><input type="number" class="input input-sm input-num input-padrao" min="0" step="1" inputmode="numeric" data-id="${u.id}" data-campo="${g.campo}" value="${u[g.campo]}" aria-label="Padrão ${g.rotulo} de ${UI.esc(u.nome)}"></td>
         ${MESES.map((m, i) => { const mes = i + 1; const exc = (u.meses || {})[mes]; return `
-          <td class="${exc ? 'cel-excecao' : ''}"><input type="number" class="input input-sm input-num input-mes" min="0" step="1" inputmode="numeric" data-id="${u.id}" data-mes="${mes}" data-campo="${g.campo}" value="${exc ? exc[g.campo] : ''}" placeholder="${u[g.campo]}" aria-label="${UI.esc(u.nome)} grau ${g.rotulo} — ${Calculo.MESES_LONGO[i]}"></td>`; }).join('')}
+          <td class="${exc ? 'cel-excecao' : ''}"><input type="number" class="input input-sm input-num input-mes" min="0" step="1" inputmode="numeric" data-id="${u.id}" data-mes="${mes}" data-campo="${g.campo}" value="${exc ? exc[g.campo] : ''}" placeholder="${u[g.campo]}" aria-label="${UI.esc(u.nome)} ${g.rotulo} — ${Calculo.MESES_LONGO[i]}"></td>`; }).join('')}
         <td class="col-media" data-media>${this.fmt(this.media(u, g.campo))}</td>
       </tr>`;
 
@@ -67,30 +64,30 @@ const ViewEmpresas = {
     el.innerHTML = `
       <header class="page-header">
         <h1>Empresas por Unidade</h1>
-        <p>Quantas empresas-cliente cada unidade atende em cada mês do ano, separadas por grau de dificuldade. Preencha o <em>padrão</em> (vale para o ano todo) e, se algum mês for diferente, digite o número naquele mês. Tudo é salvo automaticamente.</p>
+        <p>Quantas empresas-cliente cada unidade tem em cada mês do ano, separadas pela situação da documentação: <strong>em dia</strong>, <strong>vencendo</strong> ou <strong>a vencer no mês</strong>. Preencha o <em>padrão</em> (vale para o ano todo) e, se algum mês for diferente, digite o número naquele mês. Tudo é salvo automaticamente.</p>
       </header>
 
       <div class="stats">
         <div class="stat"><div class="label">Unidades</div><div class="value">${unidades.length}</div></div>
         <div class="stat"><div class="label">Empresas no padrão</div><div class="value" id="stat-empresas">${totalEmpresas}</div></div>
-        <div class="stat" title="Empresas contadas com o peso do grau (ex.: uma de grau alto vale 1,6)"><div class="label">Com peso do grau</div><div class="value" id="stat-ponderadas">${UI.fmt(totalPonderadas, 1)}</div></div>
+        <div class="stat" title="Empresas vencendo e a vencer, com o peso de cada situação (as em dia não contam)"><div class="label">Precisam de atendimento</div><div class="value" id="stat-ponderadas">${UI.fmt(totalPonderadas, 1)}</div></div>
       </div>
 
       <section class="card">
         <div class="card-head">
-          <h2>Peso de cada grau de dificuldade</h2>
-          <span class="muted">Quanto mais difícil a empresa, mais trabalho ela dá</span>
+          <h2>Quanto trabalho cada situação gera no mês</h2>
+          <span class="muted">1 = atendimento completo (inspeção, relatório e finalização)</span>
         </div>
         <form id="form-fatores" class="fatores" autocomplete="off">
           ${this.GRAUS.map(g => `
             <label class="field">
               <span><span class="chip-grau ${g.classe}">${g.rotulo}</span></span>
-              <input class="input input-sm input-num" type="number" name="${g.fator}" min="0.1" step="0.05" inputmode="decimal" value="${p[g.fator]}">
+              <input class="input input-sm input-num" type="number" name="${g.fator}" min="0" step="0.05" inputmode="decimal" value="${p[g.fator]}">
               <small>${g.ajuda}</small>
             </label>`).join('')}
           <span class="saved-flag" id="fatores-saved" aria-hidden="true">salvo ✓</span>
         </form>
-        <p class="note">Sugestão: Baixo 1,0 · Médio 1,3 · Alto 1,6 — ou seja, uma empresa de grau alto dá o trabalho de 1,6 empresa de grau baixo.</p>
+        <p class="note">Sugestão: Em dia 0 · Vencendo 0,5 · A vencer no mês 1 — ou seja, uma empresa em dia não gera trabalho, uma vencendo gera metade e uma que vence no mês gera o atendimento completo.</p>
       </section>
 
       ${unidades.length === 0 ? `
@@ -108,18 +105,18 @@ const ViewEmpresas = {
           <div class="right">
             <span class="muted">Mostrar:</span>
             <div class="seg" role="tablist">
-              <button type="button" class="seg-btn ${this.grauSel === 'todos' ? 'ativo' : ''}" data-action="grau" data-grau="todos">Todos os graus</button>
+              <button type="button" class="seg-btn ${this.grauSel === 'todos' ? 'ativo' : ''}" data-action="grau" data-grau="todos">Todas as situações</button>
               ${this.GRAUS.map(g => `<button type="button" class="seg-btn ${this.grauSel === g.campo ? 'ativo' : ''}" data-action="grau" data-grau="${g.campo}">Só ${g.rotulo}</button>`).join('')}
             </div>
           </div>
         </div>
-        <p class="muted">Cada unidade tem uma linha por grau. A coluna <strong>Padrão</strong> vale para todos os meses; digite um número em um mês só quando ele for diferente. Célula em azul = mês com valor próprio; apague o número para voltar ao padrão.</p>
+        <p class="muted">Cada unidade tem uma linha por situação. A coluna <strong>Padrão</strong> vale para todos os meses; digite um número em um mês só quando ele for diferente. Célula em azul = mês com valor próprio; apague o número para voltar ao padrão.</p>
         <div class="table-wrap">
           <table class="table table-matriz">
             <thead>
               <tr>
                 <th class="col-nome">Unidade</th>
-                <th class="col-grau">Grau</th>
+                <th class="col-grau">Situação</th>
                 <th class="col-padrao">Padrão</th>
                 ${MESES.map(m => `<th>${m}</th>`).join('')}
                 <th class="col-media" title="Média dos 12 meses">Média</th>
@@ -141,7 +138,7 @@ const ViewEmpresas = {
             </tfoot>
           </table>
         </div>
-        <p class="note">Os números da coluna Padrão são os mesmos usados quando o mês não tem valor próprio. A programação usa o número de cada mês, com o peso de cada grau.</p>
+        <p class="note">Os números da coluna Padrão são os mesmos usados quando o mês não tem valor próprio. A programação usa o número de cada mês, com o peso de cada situação.</p>
       </section>`}
     `;
 
@@ -154,8 +151,8 @@ const ViewEmpresas = {
       input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
       input.addEventListener('change', async () => {
         const valor = UI.parseNum(input.value, NaN);
-        if (!(valor > 0)) {
-          UI.toast('O peso precisa ser maior que zero.', 'error');
+        if (!(valor >= 0)) {
+          UI.toast('O peso precisa ser zero ou maior.', 'error');
           input.value = Store.parametros.get()[input.name];
           return;
         }
@@ -227,11 +224,11 @@ const ViewEmpresas = {
         const excAtual = (u.meses || {})[mes];
         let novo = null;
         if (!vazio) {
-          const base = excAtual || { empresasBaixo: u.empresasBaixo, empresasMedio: u.empresasMedio, empresasAlto: u.empresasAlto };
+          const base = excAtual || { empresasEmDia: u.empresasEmDia, empresasVencendo: u.empresasVencendo, empresasAVencer: u.empresasAVencer };
           novo = { ...base, [campo]: Math.max(0, Math.floor(UI.parseNum(input.value, 0))) };
           input.value = novo[campo];
         } else if (excAtual) {
-          // apagou este grau: se os outros graus do mês ainda diferem do padrão, mantém a exceção com o padrão neste grau
+          // apagou esta situação: se as outras do mês ainda diferem do padrão, mantém a exceção com o padrão nesta
           const resto = { ...excAtual, [campo]: u[campo] };
           const igualPadrao = this.GRAUS.every(g => resto[g.campo] === u[g.campo]);
           novo = igualPadrao ? null : resto;
