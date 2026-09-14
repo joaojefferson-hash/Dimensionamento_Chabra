@@ -4,10 +4,11 @@
    ========================================================================== */
 
 const App = (() => {
-  const views = [ViewUnidades, ViewEmpresas, ViewCatalogo, ViewColaboradores];
+  const views = [ViewUnidades, ViewEmpresas, ViewCatalogo, ViewColaboradores, ViewUsuarios];
   const content = document.getElementById('content');
   let current = null;
   let appReady = false;
+  let entering = false; // evita enterApp() concorrente (login + evento SIGNED_IN)
 
   /* ---------- telas de estado (fora da app) ---------- */
 
@@ -19,7 +20,9 @@ const App = (() => {
     if (name === 'error') document.getElementById('error-message').textContent = message || 'Erro desconhecido.';
     if (name === 'login') {
       const form = document.getElementById('form-login');
+      UI.busy(form, false); // o submit deixa o form ocupado até a app abrir; ao voltar (logout) precisa liberar
       form.password.value = '';
+      document.getElementById('login-error').hidden = true;
       setTimeout(() => (form.email.value ? form.password : form.email).focus(), 0);
     }
   }
@@ -27,7 +30,9 @@ const App = (() => {
   /* ---------- navegação ---------- */
 
   function findView(id) {
-    return views.find(v => v.id === id) || views[0];
+    const view = views.find(v => v.id === id) || views[0];
+    // telas só de admin caem na tela inicial para quem não é admin
+    return view.adminOnly && !Auth.isAdmin() ? views[0] : view;
   }
 
   function viewFromHash() {
@@ -71,17 +76,22 @@ const App = (() => {
   /* ---------- sessão ---------- */
 
   async function enterApp() {
+    if (entering || appReady) return;
+    entering = true;
     showScreen('loading');
     try {
       await Store.loadAll();
     } catch (err) {
+      entering = false;
       showScreen('error', err.message);
       return;
     }
+    entering = false;
     appReady = true;
     const user = Auth.user();
     document.getElementById('user-email').textContent = user ? user.email : '';
     document.getElementById('user-email').title = user ? user.email : '';
+    document.querySelectorAll('[data-admin-only]').forEach(el => { el.hidden = !Auth.isAdmin(); });
     showScreen('app');
     navigate(viewFromHash().id);
     await oferecerMigracaoLocal();
@@ -112,6 +122,21 @@ const App = (() => {
       UI.busy(form, false);
       form.password.focus();
       form.password.select();
+    }
+  }
+
+  async function alterarMinhaSenha() {
+    const senha = await UI.askPassword({
+      title: 'Alterar minha senha',
+      description: 'Escolha uma nova senha para o seu acesso.',
+      confirmText: 'Alterar',
+    });
+    if (senha === null) return;
+    try {
+      await Auth.alterarSenha(senha);
+      UI.toast('Senha alterada.');
+    } catch (err) {
+      UI.toast(err.message, 'error');
     }
   }
 
@@ -213,8 +238,10 @@ const App = (() => {
     });
 
     window.addEventListener('hashchange', () => {
+      if (!appReady) return;
       const view = viewFromHash();
-      if (appReady && view !== current) navigate(view.id);
+      // navega se mudou de tela OU se o hash aponta para uma tela redirecionada (ex.: admin-only)
+      if (view !== current || location.hash !== '#/' + view.id) navigate(view.id);
     });
 
     document.addEventListener('store:change', render);
@@ -237,6 +264,11 @@ const App = (() => {
     const formLogin = document.getElementById('form-login');
     formLogin.addEventListener('submit', e => { e.preventDefault(); login(formLogin); });
     document.getElementById('btn-logout').addEventListener('click', logout);
+    document.getElementById('btn-senha').addEventListener('click', alterarMinhaSenha);
+    document.getElementById('password-show').addEventListener('change', e => {
+      document.querySelectorAll('#password-dialog input[name=senha], #password-dialog input[name=confirmar]')
+        .forEach(inp => { inp.type = e.target.checked ? 'text' : 'password'; });
+    });
     document.getElementById('btn-retry').addEventListener('click', () => (Auth.user() ? enterApp() : showScreen('login')));
 
     if (!Auth.configOk()) {

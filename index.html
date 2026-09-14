@@ -90,6 +90,10 @@
           <span>Colaboradores</span>
           <span class="badge" data-badge="colaboradores">0</span>
         </button>
+        <button class="nav-item" data-view="usuarios" type="button" data-admin-only hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9.5 12l1.8 1.8L14.5 10"/></svg>
+          <span>Usuários</span>
+        </button>
       </nav>
 
       <div class="sidebar-footer">
@@ -105,7 +109,10 @@
         <input type="file" id="file-import" accept="application/json,.json" hidden>
         <div class="user-row">
           <span class="user-email" id="user-email"></span>
-          <button type="button" class="btn-link light" id="btn-logout">Sair</button>
+          <span class="user-actions">
+            <button type="button" class="btn-link light" id="btn-senha" title="Alterar minha senha">Senha</button>
+            <button type="button" class="btn-link light" id="btn-logout">Sair</button>
+          </span>
         </div>
         <div class="version">Fase 1 · Cadastros na nuvem</div>
       </div>
@@ -115,6 +122,32 @@
   </div>
 
   <div id="toast-container" aria-live="assertive"></div>
+
+  <dialog id="password-dialog" class="dialog">
+    <form method="dialog" autocomplete="off">
+      <h3 id="password-title">Definir senha</h3>
+      <p id="password-description"></p>
+      <div class="form-stack">
+        <label class="field">
+          <span>Nova senha</span>
+          <input class="input" type="password" name="senha" minlength="8" required autocomplete="new-password">
+        </label>
+        <label class="field">
+          <span>Confirmar senha</span>
+          <input class="input" type="password" name="confirmar" minlength="8" required autocomplete="new-password">
+        </label>
+        <label class="field-check">
+          <input type="checkbox" id="password-show">
+          <span>Mostrar senha</span>
+        </label>
+        <p class="form-error" id="password-error" hidden></p>
+      </div>
+      <div class="dialog-actions">
+        <button type="submit" value="cancel" class="btn btn-ghost" formnovalidate>Cancelar</button>
+        <button type="submit" value="ok" class="btn btn-primary" id="password-ok">Salvar</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="confirm-dialog" class="dialog">
     <form method="dialog">
@@ -137,6 +170,7 @@
   <script src="js/views/empresas.js"></script>
   <script src="js/views/catalogo.js"></script>
   <script src="js/views/colaboradores.js"></script>
+  <script src="js/views/usuarios.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

@@ -81,5 +81,59 @@ const UI = (() => {
     });
   }
 
-  return { esc, fmt, parseNum, plural, busy, toast, confirm };
+  /**
+   * Diálogo para definir uma senha (nova + confirmação). Resolve com a senha
+   * ou null se cancelado. Valida tamanho mínimo e igualdade antes de fechar.
+   */
+  function askPassword({ title = 'Definir senha', description = '', confirmText = 'Salvar', minLength = 8 } = {}) {
+    return new Promise(resolve => {
+      const dlg = document.getElementById('password-dialog');
+      const form = dlg.querySelector('form');
+      const erro = dlg.querySelector('#password-error');
+      dlg.querySelector('#password-title').textContent = title;
+      dlg.querySelector('#password-description').textContent = description;
+      dlg.querySelector('#password-ok').textContent = confirmText;
+      form.reset();
+      form.senha.type = form.confirmar.type = 'password';
+      erro.hidden = true;
+      form.senha.minLength = minLength;
+
+      let done = false;
+      const finish = value => {
+        if (done) return;
+        done = true;
+        form.removeEventListener('submit', onSubmit);
+        dlg.removeEventListener('close', onClose);
+        resolve(value);
+      };
+      const onSubmit = e => {
+        const ok = e.submitter && e.submitter.value === 'ok';
+        if (!ok) return finish(null); // Cancelar fecha via method=dialog
+        e.preventDefault();
+        const senha = form.senha.value;
+        if (senha.length < minLength) { mostrar(`A senha precisa ter pelo menos ${minLength} caracteres.`); return; }
+        if (senha !== form.confirmar.value) { mostrar('As senhas não conferem.'); return; }
+        finish(senha);
+        dlg.close('ok');
+      };
+      const onClose = () => finish(null);
+      const mostrar = msg => { erro.textContent = msg; erro.hidden = false; form.senha.focus(); };
+
+      form.addEventListener('submit', onSubmit);
+      dlg.addEventListener('close', onClose);
+      dlg.returnValue = '';
+      dlg.showModal();
+      form.senha.focus();
+    });
+  }
+
+  /** Senha aleatória legível (sem caracteres ambíguos) para cadastro inicial. */
+  function gerarSenha(tamanho = 12) {
+    const alfabeto = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    const bytes = new Uint8Array(tamanho);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, b => alfabeto[b % alfabeto.length]).join('');
+  }
+
+  return { esc, fmt, parseNum, plural, busy, toast, confirm, askPassword, gerarSenha };
 })();

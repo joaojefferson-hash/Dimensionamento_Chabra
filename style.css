@@ -476,3 +476,28 @@ form.busy { opacity: .7; pointer-events: none; }
 @media (max-width: 820px) {
   .user-row { padding: 0; }
 }
+
+/* --------------------------------------------------------------------------
+   Usuários / senha
+   -------------------------------------------------------------------------- */
+
+.input-group { display: flex; gap: 8px; }
+.input-group .input { flex: 1; min-width: 0; }
+
+.field-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  padding-top: 6px;
+}
+.field-check input { width: 16px; height: 16px; accent-color: var(--primary); }
+
+.user-actions { display: flex; gap: 2px; flex-shrink: 0; }
+
+.btn-link:disabled { opacity: .4; cursor: not-allowed; }
+.btn-link:disabled:hover { background: none; }
+
+.dialog .form-stack { margin-top: 14px; }
+.dialog .form-stack .field-check { padding-top: 0; }

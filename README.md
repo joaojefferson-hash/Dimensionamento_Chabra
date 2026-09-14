@@ -31,10 +31,30 @@ Nginx…). Nenhuma configuração extra.
    nunca use a secret/service_role no app.
 3. **Auth:** Authentication → Sign In / Providers → Email → desligue
    **"Allow new users to sign up"** (obrigatório: com signup aberto, qualquer
-   pessoa com a chave publishable viraria `authenticated`). Crie os usuários da
-   equipe em Authentication → Users → *Add user* (marque *Auto Confirm User*).
-4. Reset de senha: por enquanto é feito pelo admin no dashboard (não há fluxo
-   "esqueci a senha" no app).
+   pessoa com a chave publishable viraria `authenticated`). Crie o **primeiro**
+   usuário em Authentication → Users → *Add user* (marque *Auto Confirm User*)
+   e torne-o administrador:
+   ```sql
+   update auth.users set raw_app_meta_data = coalesce(raw_app_meta_data,'{}') || '{"admin": true}'
+   where email = 'admin@chabra.com.br';
+   ```
+4. **Edge Function `usuarios`:** faça o deploy de `supabase/functions/usuarios`
+   (`supabase functions deploy usuarios` ou MCP `deploy_edge_function`, com
+   `verify_jwt` ligado). Ela usa a chave secreta do ambiente da função
+   (`SUPABASE_SECRET_KEYS` / `SUPABASE_SERVICE_ROLE_KEY`) — nada disso vai ao
+   navegador.
+
+## Usuários e papéis
+
+- Papel de administrador = `app_metadata.admin = true` (só o servidor altera;
+  o usuário não consegue editar `app_metadata`). A mudança de papel vale no
+  próximo login do usuário afetado.
+- Administradores veem a tela **Usuários**: listar, criar (e-mail + senha
+  inicial, opcionalmente admin), redefinir senha, promover/rebaixar, remover.
+  A função recusa remover a si mesmo, alterar o próprio papel e remover o último
+  admin.
+- Qualquer usuário logado troca a própria senha em **Senha** (menu lateral).
+- Não há fluxo "esqueci a senha": um admin redefine pela tela Usuários.
 
 ## Estrutura
 
@@ -49,8 +69,10 @@ js/views/unidades.js        tela Unidades (CRUD)
 js/views/empresas.js        tela Empresas por Unidade (quantidade por unidade)
 js/views/catalogo.js        tela Catálogo de Documentos SST (CRUD, pré-carregado)
 js/views/colaboradores.js   tela Colaboradores (CRUD)
+js/views/usuarios.js        tela Usuários (só admin) — chama a Edge Function `usuarios`
 js/app.js               inicialização, navegação por hash (#/unidades …), badges, backup
-supabase/migrations/    SQL do banco (0001_init.sql)
+supabase/migrations/    SQL do banco (0001_init, 0002_tighten_grants)
+supabase/functions/usuarios/index.ts   Edge Function de gestão de usuários (chave secreta só no servidor)
 ```
 
 ## Modelo de dados
