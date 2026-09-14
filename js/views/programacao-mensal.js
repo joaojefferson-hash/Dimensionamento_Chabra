@@ -12,37 +12,45 @@ const ViewProgramacaoMensal = {
   id: 'programacao-mensal',
   title: 'Programação Mensal',
 
-  /** "contratar 2 técnicos" / "sobram 3 administrativos" / "técnicos ok" (texto puro, para tooltips). */
+  /** "faltam 2 técnicos" / "sobram 3 administrativos" / "técnicos ok" (texto puro, para tooltips). */
   textoPessoas(resumo, singular) {
     const plural = q => (q === 1 ? singular : singular + 's');
-    if (resumo.faltam > 0) return `contratar ${resumo.faltam} ${plural(resumo.faltam)}`;
+    if (resumo.faltam > 0) return `${resumo.faltam === 1 ? 'falta' : 'faltam'} ${resumo.faltam} ${plural(resumo.faltam)}`;
     if (resumo.sobram > 0) return `${resumo.sobram === 1 ? 'sobra' : 'sobram'} ${resumo.sobram} ${plural(resumo.sobram)}`;
     return `${singular}s ok`;
   },
 
   /**
-   * Leitura mês a mês de uma função: "Mês a mês: contratar 2 em setembro e outubro, 3 em dezembro."
-   * ou "Mês a mês: sobra 1 em setembro…". Vazio quando todos os meses estão ok.
+   * Leitura mês a mês de uma função, sempre em relação à equipe de hoje (não acumula):
+   * "Mês a mês: faltam 2 em setembro, outubro e novembro; sobra 1 em dezembro.
+   *  Contratando 2 administrativos a partir de setembro, nenhum mês do período fica descoberto."
+   * Vazio quando todos os meses estão ok.
    */
   leituraMensal(meses, funcao) {
     const singular = Calculo.FUNCAO_SINGULAR[funcao];
-    const grupos = new Map(); // "contratar 2" → [meses]
+    const plural = q => (q === 1 ? singular : singular + 's');
+    const grupos = new Map(); // "falta 2" → [meses]
+    let pico = 0, primeiroComFalta = null;
     meses.forEach(m => {
       const r = m.funcoes[funcao];
-      const chave = r.faltam > 0 ? `contratar ${r.faltam}` : r.sobram > 0 ? `sobra ${r.sobram}` : null;
+      const chave = r.faltam > 0 ? `falta ${r.faltam}` : r.sobram > 0 ? `sobra ${r.sobram}` : null;
+      if (r.faltam > pico) pico = r.faltam;
+      if (r.faltam > 0 && !primeiroComFalta) primeiroComFalta = m.nomeLongo.toLowerCase();
       if (!chave) return;
       if (!grupos.has(chave)) grupos.set(chave, []);
       grupos.get(chave).push(m.nomeLongo.toLowerCase());
     });
     if (!grupos.size) return '';
-    const partes = [...grupos.entries()].map(([chave, lista]) => {
-      const [verbo, q] = chave.split(' ');
+    const lista = l => (l.length > 1 ? l.slice(0, -1).join(', ') + ' e ' + l[l.length - 1] : l[0]);
+    const partes = [...grupos.entries()].map(([chave, l]) => {
+      const [tipo, q] = chave.split(' ');
       const n = Number(q);
-      const rot = n === 1 ? singular : singular + 's';
-      const quando = lista.length > 1 ? lista.slice(0, -1).join(', ') + ' e ' + lista[lista.length - 1] : lista[0];
-      return `${verbo === 'sobra' ? (n === 1 ? 'sobra' : 'sobram') : 'contratar'} ${n} ${rot} em ${quando}`;
+      return `${tipo === 'sobra' ? (n === 1 ? 'sobra' : 'sobram') : (n === 1 ? 'falta' : 'faltam')} ${n} ${plural(n)} em ${lista(l)}`;
     });
-    return `<span class="muted">Mês a mês: ${partes.join('; ')}.</span>`;
+    const conclusao = pico > 0
+      ? ` <strong>Contratando ${pico} ${plural(pico)} a partir de ${primeiroComFalta}, nenhum mês do período fica descoberto</strong> — os números de cada mês são em relação à equipe de hoje e não somam entre si.`
+      : '';
+    return `<span class="muted">Mês a mês: ${partes.join('; ')}.${conclusao}</span>`;
   },
 
   render(el) {
@@ -84,7 +92,7 @@ const ViewProgramacaoMensal = {
                 <th class="num" title="Empresas que precisam de atendimento no mês (vencendo e a vencer, com o peso de cada situação)">Precisam</th>
                 <th class="num" title="Pessoas do grupo contadas no mês (com a simulação, se houver)">Equipe</th>
                 ${entregas.map(e => `<th class="num">${e.rotulo}</th>`).join('')}
-                <th class="num th-pessoas" title="Quantas pessoas contratar (ou quantas sobram) para dar conta do mês">Contratar / sobra</th>
+                <th class="num th-pessoas" title="Quantas pessoas faltam (ou sobram) para dar conta do mês, em relação à equipe de hoje. Não é acumulado: contratar o maior valor cobre todos os meses.">Faltam / sobram</th>
                 <th>Situação</th>
               </tr>
             </thead>
@@ -107,7 +115,7 @@ const ViewProgramacaoMensal = {
                 <th class="num">${Programacao.num(alvo.janela.precisa)}</th>
                 <th class="num" title="Média do período">${Programacao.numFte(resumo.pessoas)}</th>
                 ${entregas.map(e => { const b = alvo.janela.entregas[e.id]; return `<th class="num cel-${b.status}">${Programacao.num(b.consegue)}<small> de ${Programacao.num(b.precisa)}</small></th>`; }).join('')}
-                <th class="num col-pessoas" title="No período inteiro; para não faltar em nenhum mês, vale o maior valor mensal">${Programacao.pessoasHTML(resumo, singular)}</th>
+                <th class="num col-pessoas" title="Conta do período inteiro (meses folgados compensam meses apertados). Para não faltar em nenhum mês, vale o maior valor mensal.">${Programacao.pessoasHTML(resumo, singular)}</th>
                 <th>${Programacao.statusChip(resumo.status)}</th>
               </tr>
             </tfoot>
@@ -149,7 +157,7 @@ const ViewProgramacaoMensal = {
     el.innerHTML = `
       <header class="page-header">
         <h1>Programação Mensal</h1>
-        <p>Mês a mês, para técnicos e para administrativos: quanto a equipe consegue entregar, quanto a carteira precisa e quantas pessoas contratar (ou quantas sobram) em cada mês. Em cada célula de entrega, o primeiro número é o que a equipe consegue e o segundo o que precisa.</p>
+        <p>Mês a mês, para técnicos e para administrativos: quanto a equipe consegue entregar, quanto a carteira precisa e quantas pessoas faltam (ou sobram) em cada mês — sempre em relação à equipe de hoje. Em cada célula de entrega, o primeiro número é o que a equipe consegue e o segundo o que precisa.</p>
       </header>
 
       ${Programacao.barraHTML({ janela, ocupacaoAlvo: p.ocupacaoAlvo, unidades, unidadeSel })}

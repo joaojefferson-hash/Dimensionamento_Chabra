@@ -277,16 +277,18 @@ const Programacao = (() => {
   }
 
   /**
-   * Quantas pessoas contratar (ou quantas sobram) num mês ou período, a partir do
-   * resumo de uma função ({ status, faltam, sobram }). Curto, para caber numa célula.
+   * Quantas pessoas faltam (ou sobram) num mês ou período, SEMPRE em relação à equipe
+   * de hoje — não é acumulado: contratar o maior valor mensal cobre todos os meses.
+   * A partir do resumo de uma função ({ status, faltam, sobram }). Curto, para caber numa célula.
    */
   function pessoasHTML(resumo, singular) {
     if (!resumo) return '';
     const plural = q => (q === 1 ? singular : singular + 's');
-    if (resumo.faltam > 0) return `<span class="delta delta-falta" title="Faltam aproximadamente ${resumo.faltam} ${plural(resumo.faltam)} para dar conta do mês">contratar ${resumo.faltam}</span>`;
-    if (resumo.sobram > 0) return `<span class="delta delta-sobra" title="Sobra o equivalente a ${resumo.sobram} ${plural(resumo.sobram)} no mês">${resumo.sobram === 1 ? 'sobra' : 'sobram'} ${resumo.sobram}</span>`;
+    const nota = 'em relação à equipe de hoje (não é acumulado com os outros meses)';
+    if (resumo.faltam > 0) return `<span class="delta delta-falta" title="Faltam aproximadamente ${resumo.faltam} ${plural(resumo.faltam)} para dar conta do mês, ${nota}">${resumo.faltam === 1 ? 'falta' : 'faltam'} ${resumo.faltam}</span>`;
+    if (resumo.sobram > 0) return `<span class="delta delta-sobra" title="Sobra o equivalente a ${resumo.sobram} ${plural(resumo.sobram)} no mês, ${nota}">${resumo.sobram === 1 ? 'sobra' : 'sobram'} ${resumo.sobram}</span>`;
     if (resumo.status === 'atencao') return '<span class="delta delta-limite" title="Dá conta, mas com menos de 10% de sobra">no limite</span>';
-    if (resumo.status === 'deficit') return '<span class="delta delta-falta" title="Falta menos de uma pessoa inteira">contratar 1</span>';
+    if (resumo.status === 'deficit') return `<span class="delta delta-falta" title="Falta menos de uma pessoa inteira, ${nota}">falta 1</span>`;
     return '<span class="delta delta-ok" title="A equipe dá conta do mês">ok</span>';
   }
 

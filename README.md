@@ -103,8 +103,9 @@ pessoas que faltam/sobram    = sobra ÷ produção de uma pessoa inteira no per�
   de backup vira um único evento. Escrita só pelos gatilhos (security definer, fora da API).
 - Telas: **Programação Anual** (um cartão por unidade + total), **Programação Mensal**
   (uma grade para técnicos e outra para administrativos: mês a mês consegue / precisa
-  por entrega, equipe do mês, coluna **Contratar / sobra**, leitura "Mês a mês: …" e a
-  grade unidade × mês só com sinais) e
+  por entrega, equipe do mês, coluna **Faltam / sobram** — sempre em relação à equipe de
+  hoje, não acumulado —, leitura "Mês a mês: … Contratando N a partir de X, nenhum mês
+  fica descoberto" e a grade unidade × mês só com sinais) e
 - **Simulação "E se…?"** (card nas duas programações): linhas com unidade, grupo,
   quantidade (+ contratar / − desligar), meses e ritmo por dia; viram pessoas virtuais
   no motor (`simulacoes` em `Calculo.calcular`), ativas só nos meses escolhidos; a
