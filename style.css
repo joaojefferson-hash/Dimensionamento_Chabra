@@ -837,3 +837,5 @@ form.busy { opacity: .7; pointer-events: none; }
   body.imprimindo-organograma .org-tree li::before, body.imprimindo-organograma .org-tree li::after, body.imprimindo-organograma .org-tree ul::before { border-color: #9bb8ad; }
   body.imprimindo-organograma * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+.print-orientacao { display: inline-flex; align-items: center; gap: 6px; }
+.print-orientacao .input-sm { width: auto; padding-top: 4px; padding-bottom: 4px; }

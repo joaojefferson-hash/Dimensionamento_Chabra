@@ -21,6 +21,14 @@ const ViewColaboradores = {
   set modo(v) {
     try { localStorage.setItem(this.MODO_KEY, v); } catch (_) { /* sem localStorage: só não lembra */ }
   },
+  ORIENTACAO_KEY: 'chabra-dimensiona:organograma-folha',
+  /** Orientação da folha na impressão: 'auto' (a que couber melhor), 'portrait' ou 'landscape'. */
+  get orientacao() {
+    try { const v = localStorage.getItem(this.ORIENTACAO_KEY); return ['portrait', 'landscape'].includes(v) ? v : 'auto'; } catch (_) { return 'auto'; }
+  },
+  set orientacao(v) {
+    try { localStorage.setItem(this.ORIENTACAO_KEY, v); } catch (_) { /* idem */ }
+  },
 
   /** Cabeçalho com a alternância Cadastro | Organograma. */
   cabecalhoHTML(modo) {
@@ -41,7 +49,9 @@ const ViewColaboradores = {
 
   /**
    * Imprime só o organograma (ou salva em PDF pelo diálogo do navegador).
-   * A árvore é reduzida para caber na largura de uma folha A4 deitada.
+   * A folha é a escolhida no seletor (ou a que couber melhor, no automático) e a
+   * árvore é reduzida para caber numa página; se ficasse pequena demais, ajusta
+   * só à largura e segue em mais páginas.
    */
   imprimirOrganograma(el) {
     const tree = el.querySelector('.org-tree');
@@ -51,9 +61,10 @@ const ViewColaboradores = {
     const CABECALHO = 40;
     const w = Math.max(1, tree.scrollWidth), h = Math.max(1, tree.scrollHeight);
     const cabeEm = o => Math.min(1, PAGINA[o].w / w, (PAGINA[o].h - CABECALHO) / h);
-    let orientacao = cabeEm('portrait') >= cabeEm('landscape') ? 'portrait' : 'landscape';
+    const escolha = this.orientacao;
+    const orientacao = escolha === 'auto' ? (cabeEm('portrait') >= cabeEm('landscape') ? 'portrait' : 'landscape') : escolha;
     let zoom = cabeEm(orientacao);
-    if (zoom < 0.6) { orientacao = 'landscape'; zoom = Math.min(1, PAGINA.landscape.w / w); } // grande demais: cabe na largura e segue em mais páginas
+    if (zoom < 0.6) zoom = Math.min(1, PAGINA[orientacao].w / w); // grande demais para uma página: cabe na largura e segue em mais páginas
     const pagina = document.createElement('style');
     pagina.id = 'print-page';
     pagina.textContent = `@page { size: A4 ${orientacao}; margin: 10mm; }`;
@@ -105,6 +116,14 @@ const ViewColaboradores = {
           <h2>Organograma</h2>
           <div class="right">
             <span class="muted">chefias pela hierarquia das funções → equipes por unidade</span>
+            <label class="print-orientacao" title="Orientação da folha na impressão">
+              <span class="muted">Folha</span>
+              <select class="input input-sm" id="print-orientacao" aria-label="Orientação da folha">
+                <option value="auto" ${this.orientacao === 'auto' ? 'selected' : ''}>Automática</option>
+                <option value="portrait" ${this.orientacao === 'portrait' ? 'selected' : ''}>Retrato</option>
+                <option value="landscape" ${this.orientacao === 'landscape' ? 'selected' : ''}>Paisagem</option>
+              </select>
+            </label>
             <button type="button" class="btn btn-ghost btn-sm" data-action="imprimir" title="Imprimir ou salvar em PDF só o organograma">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="6" y="14" width="12" height="7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/></svg>
               Imprimir
@@ -122,6 +141,9 @@ const ViewColaboradores = {
     const wrap = el.querySelector('.org-wrap');
     const dica = el.querySelector('.org-dica');
     if (wrap && dica) requestAnimationFrame(() => { dica.hidden = wrap.scrollWidth <= wrap.clientWidth + 2; });
+
+    const selOrient = el.querySelector('#print-orientacao');
+    if (selOrient) selOrient.addEventListener('change', () => { this.orientacao = selOrient.value; });
 
     el.addEventListener('click', e => {
       const btn = e.target.closest('[data-action]');
