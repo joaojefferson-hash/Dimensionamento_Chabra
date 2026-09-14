@@ -10,6 +10,6 @@
    ========================================================================== */
 
 const CONFIG = {
-  SUPABASE_URL: 'https://pahyhdhuxfxxbleygntg.supabase.co',
-  SUPABASE_KEY: 'sb_publishable_its2Jul9JMEdeh6UGfZVLg_mLGUTwHE',
+  SUPABASE_URL: 'https://wdlxpbusyuieftnxemot.supabase.co',
+  SUPABASE_KEY: 'COLE_AQUI_A_CHAVE_PUBLISHABLE',
 };
