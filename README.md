@@ -64,9 +64,8 @@ Tudo roda no navegador, em [js/calculo.js](js/calculo.js) (funções puras; tamb
 roda em Node para testes). O modelo é declarado pelo usuário, sem horas:
 
 ```
-precisa(unidade, entrega, mês) = Σ empresas na situação × peso da situação
-                               (situação da documentação no mês: em dia = 0,
-                                vencendo = 0,5, a vencer no mês = 1 — pesos editáveis)
+precisa(unidade, entrega, mês) = empresas com documentos vencidos no mês
+                               (cada uma exige uma inspeção, um relatório e uma finalização)
 produção(pessoa, entrega, mês) = ritmo por dia × dias úteis do mês × % do tempo na unidade
 consegue(unidade, entrega)   = Σ produção × (1 − folga para imprevistos)
 sobra                        = consegue − precisa      (negativa = falta)
@@ -139,7 +138,7 @@ js/views/historico.js       tela Histórico de alterações
 js/calculo.js           motor de dimensionamento (puro)
 js/programacao.js       utilitários das telas de programação (janela, barra, formatação)
 js/app.js               inicialização, navegação por hash (#/unidades …), badges, backup
-supabase/migrations/    SQL do banco (0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico, 0012 = funções cadastráveis, 0013 = chefia, 0014 = coordena/responde_para, 0015 = situação da documentação no lugar do grau)
+supabase/migrations/    SQL do banco (0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico, 0012 = funções cadastráveis, 0013 = chefia, 0014 = coordena/responde_para, 0015 = situação da documentação no lugar do grau, 0016 = só documentos vencidos)
 supabase/functions/usuarios/index.ts   Edge Function de gestão de usuários (chave secreta só no servidor)
 ```
 
@@ -150,17 +149,17 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
 
 | tabela          | colunas                                                                                   |
 |-----------------|-------------------------------------------------------------------------------------------|
-| `unidades`      | `id, nome (único), empresas_em_dia/vencendo/a_vencer (int ≥ 0), empresas (gerada = soma)`   |
+| `unidades`      | `id, nome (único), empresas_vencidas (int ≥ 0) — padrão do ano`                             |
 | `documentos`    | `id, nome (único), horas, periodicidade_meses (int ≥ 0), responsavel (função)`             |
 | `funcoes`       | `id, nome (único), tipo_producao (tecnico/administrativo/nenhuma), chefia (bool), coordena (todos/tecnicos/administrativos), responde_para → funcoes, ordem` |
 | `colaboradores` | `id, nome, funcao_id → funcoes, empresas_dia, inspecoes_dia, relatorios_dia` (ritmo por dia) |
 | `colaborador_unidades` | `colaborador_id, unidade_id, percentual (0–100; soma por colaborador ≤ 100, gatilho)` |
-| `unidade_empresas_mes` | `unidade_id, mes (1–12), empresas_em_dia/vencendo/a_vencer` — exceção mensal; sem linha = padrão |
-| `parametros`    | linha única: `dias_uteis[12], peso_em_dia/vencendo/a_vencer (≥ 0), ocupacao_alvo` |
+| `unidade_empresas_mes` | `unidade_id, mes (1–12), empresas_vencidas` — exceção mensal; sem linha = padrão |
+| `parametros`    | linha única: `dias_uteis[12], ocupacao_alvo` |
 
 - `periodicidade_meses = 0` significa **sob demanda** (documento sem renovação periódica).
-- A quantidade de empresas pode **variar por mês**: os campos da unidade são o padrão e a
-  tabela `unidade_empresas_mes` guarda as exceções (as três situações daquele mês). O motor
+- A quantidade de empresas com documentos vencidos pode **variar por mês**: o campo da unidade
+  é o padrão e a tabela `unidade_empresas_mes` guarda as exceções. O motor
   usa a quantidade de cada mês na demanda; a Programação Anual mostra a média na janela
   e marca "varia".
 - Um colaborador pode atuar em várias unidades: `alocacoes = [{ unidadeId, percentual }]`.
@@ -168,12 +167,13 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
   menor que 100% (o restante é "não alocado" e não conta) mas nunca maior. Salvo pela RPC
   `definir_alocacoes(colaborador, jsonb)` numa transação.
 - No JS/backup as chaves são camelCase (`periodicidadeMeses`, `horasMes`, `empresasBaixo`…);
-  o backup v6 inclui `funcoes[{nome, tipoProducao, chefia, coordena, respondePara (nome), ordem}]`, `parametros`,
-  `empresasPorMes[{mes, empresasEmDia…}]` nas unidades e `alocacoes[{unidadeNome, percentual}]`
+  o backup v8 inclui `funcoes[{nome, tipoProducao, chefia, coordena, respondePara (nome), ordem}]`, `parametros`,
+  `empresasVencidas` + `empresasPorMes[{mes, empresasVencidas}]` nas unidades e `alocacoes[{unidadeNome, percentual}]`
   + `funcao` (nome) nos colaboradores (a importação resolve unidade e função pelo nome;
   função desconhecida → função técnica padrão; funções do backup são criadas/atualizadas,
-  nunca apagadas). Backups antigos: `empresasBaixo/Medio/Alto` → em dia / vencendo / a vencer;
-  só `empresas` → em dia; `unidadeNome` único → 100%; `fator*` e `mesesPor*` são ignorados.
+  nunca apagadas). Backups antigos: `empresasVencendo + empresasAVencer` → vencidas;
+  `empresasBaixo + Medio + Alto` → vencidas; só `empresas` → vencidas; `unidadeNome` único → 100%;
+  `fator*`, `peso*` e `mesesPor*` são ignorados.
 
 ## Backup e migração
 
