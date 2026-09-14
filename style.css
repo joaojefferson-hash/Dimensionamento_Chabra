@@ -686,3 +686,20 @@ form.busy { opacity: .7; pointer-events: none; }
   .content { padding: 24px 24px 48px; }
   .table-matriz .input-padrao, .table-matriz .input-mes { min-width: 48px; }
 }
+
+/* matriz: centralização e linhas por grau */
+.table-matriz th, .table-matriz td { text-align: center; vertical-align: middle; }
+.table-matriz th.col-nome, .table-matriz td.col-nome, .table-matriz th.col-grau, .table-matriz td.col-grau { text-align: left; }
+.table-matriz td.col-nome { vertical-align: top; padding-top: 10px; background: #fff; border-right: 1px solid var(--border); }
+.table-matriz .nome-unidade { font-weight: 600; }
+.table-matriz .acoes-unidade { margin-top: 4px; }
+.table-matriz .acoes-unidade .btn-link { font-size: 12px; padding: 2px 4px; }
+.table-matriz .col-grau { white-space: nowrap; }
+.table-matriz .col-padrao { background: var(--primary-light); }
+.table-matriz tr.linha-total-unidade td { background: #f3f6f4; border-bottom: 2px solid #cfd8d3; }
+.table-matriz tfoot th { text-align: center; }
+.table-matriz tfoot th.col-nome { text-align: left; }
+.chip-grau { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+.grau-baixo { background: #e3f2ea; color: #0b5d43; }
+.grau-medio { background: #fff1cc; color: #7a5200; }
+.grau-alto  { background: #fde2df; color: #8f1d17; }
