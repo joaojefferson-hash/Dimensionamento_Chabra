@@ -50,6 +50,7 @@ const ViewColaboradores = {
               <th>Função</th>
               <th>Ritmo por dia</th>
               <th>Unidades</th>
+              <th class="num" title="Parte do tempo da pessoa dedicada a cada unidade">Tempo</th>
               <th class="actions">Ações</th>
             </tr>
           </thead>
@@ -59,7 +60,15 @@ const ViewColaboradores = {
                 <td>${UI.esc(c.nome)}</td>
                 <td><span class="chip ${c.funcao === TEC ? 'chip-green' : 'chip-blue'}">${c.funcao === TEC ? 'Técnico de SST' : 'Administrativo'}</span></td>
                 <td>${UI.esc(Calculo.ritmoTexto(c))}</td>
-                <td>${(() => { const t = Store.totalAlocado(c); if (t <= 0) return '<span class="chip chip-warn">sem unidade</span>'; const d = UI.esc(Store.descricaoAlocacoes(c)); return t < 99.999 ? `${d} <span class="chip chip-warn" title="Parte do tempo sem unidade">${fmtPct(Math.round((100 - t) * 10) / 10)}% livre</span>` : d; })()}</td>
+                ${(() => {
+                  const t = Store.totalAlocado(c);
+                  if (t <= 0) return '<td><span class="chip chip-warn">sem unidade</span></td><td class="num muted">—</td>';
+                  const alocs = (c.alocacoes || []).filter(a => a.percentual > 0);
+                  const nomes = alocs.map(a => `<div>${UI.esc(Store.nomeUnidade(a.unidadeId) || a.unidadeNome || '?')}</div>`).join('');
+                  const tempos = alocs.map(a => `<div>${fmtPct(a.percentual)}%</div>`).join('');
+                  const livre = t < 99.999 ? `<div><span class="chip chip-warn" title="Parte do tempo sem unidade">${fmtPct(Math.round((100 - t) * 10) / 10)}% livre</span></div>` : '';
+                  return `<td class="col-unidades">${nomes}</td><td class="num col-tempo">${tempos}${livre}</td>`;
+                })()}
                 <td class="actions">
                   <button type="button" class="btn-link" data-action="edit" data-id="${c.id}">Editar</button>
                   <button type="button" class="btn-link danger" data-action="delete" data-id="${c.id}">Excluir</button>
