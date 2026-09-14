@@ -141,6 +141,20 @@ const Programacao = (() => {
       </div>`;
   }
 
+  /**
+   * Quantas pessoas contratar (ou quantas sobram) num mês ou período, a partir do
+   * resumo de uma função ({ status, faltam, sobram }). Curto, para caber numa célula.
+   */
+  function pessoasHTML(resumo, singular) {
+    if (!resumo) return '';
+    const plural = q => (q === 1 ? singular : singular + 's');
+    if (resumo.faltam > 0) return `<span class="delta delta-falta" title="Faltam aproximadamente ${resumo.faltam} ${plural(resumo.faltam)} para dar conta do mês">contratar ${resumo.faltam}</span>`;
+    if (resumo.sobram > 0) return `<span class="delta delta-sobra" title="Sobra o equivalente a ${resumo.sobram} ${plural(resumo.sobram)} no mês">${resumo.sobram === 1 ? 'sobra' : 'sobram'} ${resumo.sobram}</span>`;
+    if (resumo.status === 'atencao') return '<span class="delta delta-limite" title="Dá conta, mas com menos de 10% de sobra">no limite</span>';
+    if (resumo.status === 'deficit') return '<span class="delta delta-falta" title="Falta menos de uma pessoa inteira">contratar 1</span>';
+    return '<span class="delta delta-ok" title="A equipe dá conta do mês">ok</span>';
+  }
+
   /** Linha "Chefia: Fulano (Supervisor ADM) · Beltrano (Supervisor Geral)" de uma unidade (ou do total). */
   function chefiaHTML(lista) {
     const l = Array.isArray(lista) ? lista : [];
@@ -163,6 +177,6 @@ const Programacao = (() => {
   return {
     lerJanela, salvarJanela, lerFiltros, salvarFiltros, descricaoJanela,
     barraHTML, bindBarra,
-    num, numFte, statusChip, statusDot, classeLinha, fraseEntrega, recomendacaoHTML, legendaHTML, avisosHTML, chefiaHTML,
+    num, numFte, statusChip, statusDot, classeLinha, fraseEntrega, recomendacaoHTML, legendaHTML, avisosHTML, chefiaHTML, pessoasHTML,
   };
 })();

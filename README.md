@@ -102,7 +102,9 @@ pessoas que faltam/sobram    = sobra ÷ produção de uma pessoa inteira no per�
   quando, antes/depois); a tela Histórico mostra frases simples, com filtro. Importação
   de backup vira um único evento. Escrita só pelos gatilhos (security definer, fora da API).
 - Telas: **Programação Anual** (um cartão por unidade + total), **Programação Mensal**
-  (mês a mês: consegue / precisa por entrega + grade unidade × mês só com sinais) e
+  (mês a mês: consegue / precisa por entrega, coluna **Pessoas** com "contratar N" /
+  "sobram N" por mês e por função, leitura "Mês a mês: …" no resumo, grade unidade × mês
+  só com sinais) e
   **Calendário** (dias úteis por mês). Período e unidade ficam no navegador; folga,
   pesos e calendário são compartilhados (tabela `parametros`).
 - O Catálogo de Documentos ficou oculto (não entra no cálculo neste modelo); a tela e a

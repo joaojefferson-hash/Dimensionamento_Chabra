@@ -8,6 +8,39 @@ const ViewProgramacaoMensal = {
   id: 'programacao-mensal',
   title: 'Programação Mensal',
 
+  /** "contratar 2 técnicos" / "sobram 3 administrativos" / "técnicos ok" (texto puro, para tooltips). */
+  textoPessoas(resumo, singular) {
+    const plural = q => (q === 1 ? singular : singular + 's');
+    if (resumo.faltam > 0) return `contratar ${resumo.faltam} ${plural(resumo.faltam)}`;
+    if (resumo.sobram > 0) return `${resumo.sobram === 1 ? 'sobra' : 'sobram'} ${resumo.sobram} ${plural(resumo.sobram)}`;
+    return `${singular}s ok`;
+  },
+
+  /**
+   * Leitura mês a mês de uma função: "Mês a mês: contratar 2 em setembro e outubro, 3 em dezembro."
+   * ou "Mês a mês: sobra 1 em setembro…". Vazio quando todos os meses estão ok.
+   */
+  leituraMensal(meses, funcao) {
+    const singular = Calculo.FUNCAO_SINGULAR[funcao];
+    const grupos = new Map(); // "contratar 2" → [meses]
+    meses.forEach(m => {
+      const r = m.funcoes[funcao];
+      const chave = r.faltam > 0 ? `contratar ${r.faltam}` : r.sobram > 0 ? `sobra ${r.sobram}` : null;
+      if (!chave) return;
+      if (!grupos.has(chave)) grupos.set(chave, []);
+      grupos.get(chave).push(m.nomeLongo.toLowerCase());
+    });
+    if (!grupos.size) return '';
+    const partes = [...grupos.entries()].map(([chave, lista]) => {
+      const [verbo, q] = chave.split(' ');
+      const n = Number(q);
+      const rot = n === 1 ? singular : singular + 's';
+      const quando = lista.length > 1 ? lista.slice(0, -1).join(', ') + ' e ' + lista[lista.length - 1] : lista[0];
+      return `${verbo === 'sobra' ? (n === 1 ? 'sobra' : 'sobram') : 'contratar'} ${n} ${rot} em ${quando}`;
+    });
+    return `<span class="muted">Mês a mês: ${partes.join('; ')}.</span>`;
+  },
+
   render(el) {
     const janela = Programacao.lerJanela();
     const filtros = Programacao.lerFiltros();
@@ -18,7 +51,6 @@ const ViewProgramacaoMensal = {
     const alvo = unidadeSel ? r.unidades.find(u => u.id === unidadeSel) : r.total;
     const titulo = unidadeSel ? alvo.nome : 'Todas as unidades';
     const TEC = Calculo.TEC, ADM = Calculo.ADM;
-    const ENT = Calculo.ENTREGAS;
 
     const celula = (b, e) => `<td class="num cel-${b.status}" title="${e.rotulo}: consegue ${Programacao.num(b.consegue)}, precisa ${Programacao.num(b.precisa)}">
         <strong>${Programacao.num(b.consegue)}</strong><small> de ${Programacao.num(b.precisa)}</small></td>`;
@@ -26,7 +58,7 @@ const ViewProgramacaoMensal = {
     el.innerHTML = `
       <header class="page-header">
         <h1>Programação Mensal</h1>
-        <p>Mês a mês: quanto a equipe consegue entregar e quanto a carteira precisa. Em cada célula, o primeiro número é o que a equipe consegue e o segundo o que precisa.</p>
+        <p>Mês a mês: quanto a equipe consegue entregar, quanto a carteira precisa e quantas pessoas contratar (ou quantas sobram) em cada mês. Em cada célula de entrega, o primeiro número é o que a equipe consegue e o segundo o que precisa.</p>
       </header>
 
       ${Programacao.barraHTML({ janela, ocupacaoAlvo: p.ocupacaoAlvo, unidades, unidadeSel })}
@@ -52,12 +84,15 @@ const ViewProgramacaoMensal = {
                 <th rowspan="2">Mês</th>
                 <th rowspan="2" class="num">Dias úteis</th>
                 <th rowspan="2" class="num" title="Empresas que precisam de atendimento no mês (vencendo e a vencer, com o peso de cada situação)">Precisam</th>
-                <th colspan="2" class="th-group">Técnicos</th>
-                <th class="th-group">Administrativos</th>
+                <th colspan="3" class="th-group">Técnicos</th>
+                <th colspan="2" class="th-group">Administrativos</th>
                 <th rowspan="2">Situação</th>
               </tr>
               <tr class="sub">
-                ${ENT.map(e => `<th class="num">${e.rotulo}</th>`).join('')}
+                ${Calculo.ENTREGAS_DA_FUNCAO[TEC].map(e => `<th class="num">${e.rotulo}</th>`).join('')}
+                <th class="num th-pessoas" title="Quantas pessoas contratar (ou quantas sobram) para dar conta do mês">Pessoas</th>
+                ${Calculo.ENTREGAS_DA_FUNCAO[ADM].map(e => `<th class="num">${e.rotulo}</th>`).join('')}
+                <th class="num th-pessoas" title="Quantas pessoas contratar (ou quantas sobram) para dar conta do mês">Pessoas</th>
               </tr>
             </thead>
             <tbody>
@@ -66,7 +101,10 @@ const ViewProgramacaoMensal = {
                   <td>${m.nomeLongo}</td>
                   <td class="num">${m.diasUteis}</td>
                   <td class="num">${Programacao.num(m.precisa)}${m.excecao ? ' <span class="chip chip-blue" title="Quantidade própria deste mês">mês</span>' : ''}</td>
-                  ${ENT.map(e => celula(m.entregas[e.id], e)).join('')}
+                  ${Calculo.ENTREGAS_DA_FUNCAO[TEC].map(e => celula(m.entregas[e.id], e)).join('')}
+                  <td class="num col-pessoas">${Programacao.pessoasHTML(m.funcoes[TEC], Calculo.FUNCAO_SINGULAR[TEC])}</td>
+                  ${Calculo.ENTREGAS_DA_FUNCAO[ADM].map(e => celula(m.entregas[e.id], e)).join('')}
+                  <td class="num col-pessoas">${Programacao.pessoasHTML(m.funcoes[ADM], Calculo.FUNCAO_SINGULAR[ADM])}</td>
                   <td>${Programacao.statusChip(m.status)}</td>
                 </tr>`).join('')}
             </tbody>
@@ -75,14 +113,17 @@ const ViewProgramacaoMensal = {
                 <th>Período (${alvo.janela.nMeses} ${alvo.janela.nMeses === 1 ? 'mês' : 'meses'})</th>
                 <th class="num">${alvo.meses.reduce((s, m) => s + m.diasUteis, 0)}</th>
                 <th class="num">${Programacao.num(alvo.janela.precisa)}</th>
-                ${ENT.map(e => { const b = alvo.janela.entregas[e.id]; return `<th class="num cel-${b.status}">${Programacao.num(b.consegue)}<small> de ${Programacao.num(b.precisa)}</small></th>`; }).join('')}
+                ${Calculo.ENTREGAS_DA_FUNCAO[TEC].map(e => { const b = alvo.janela.entregas[e.id]; return `<th class="num cel-${b.status}">${Programacao.num(b.consegue)}<small> de ${Programacao.num(b.precisa)}</small></th>`; }).join('')}
+                <th class="num col-pessoas" title="No período: quem faltar no mês mais apertado precisa ser contratado; a sobra é a do período todo">${Programacao.pessoasHTML(alvo.janela.funcoes[TEC], Calculo.FUNCAO_SINGULAR[TEC])}</th>
+                ${Calculo.ENTREGAS_DA_FUNCAO[ADM].map(e => { const b = alvo.janela.entregas[e.id]; return `<th class="num cel-${b.status}">${Programacao.num(b.consegue)}<small> de ${Programacao.num(b.precisa)}</small></th>`; }).join('')}
+                <th class="num col-pessoas">${Programacao.pessoasHTML(alvo.janela.funcoes[ADM], Calculo.FUNCAO_SINGULAR[ADM])}</th>
                 <th>${Programacao.statusChip(alvo.janela.status)}</th>
               </tr>
             </tfoot>
           </table>
         </div>
         <div class="frases-resumo">
-          ${[TEC, ADM].map(f => `<p class="rec-linha">${Programacao.statusDot(alvo.janela.funcoes[f].status)} ${Programacao.recomendacaoHTML(alvo.janela.funcoes[f].recomendacao)}</p>`).join('')}
+          ${[TEC, ADM].map(f => `<p class="rec-linha">${Programacao.statusDot(alvo.janela.funcoes[f].status)} ${Programacao.recomendacaoHTML(alvo.janela.funcoes[f].recomendacao)} ${ViewProgramacaoMensal.leituraMensal(alvo.meses, f)}</p>`).join('')}
         </div>
         ${Programacao.legendaHTML()}
       </section>
@@ -106,7 +147,7 @@ const ViewProgramacaoMensal = {
               ${r.unidades.map(u => `
                 <tr>
                   <td><button type="button" class="btn-link" data-action="ver-unidade" data-id="${u.id}">${UI.esc(u.nome)}</button></td>
-                  ${u.meses.map(m => `<td class="num">${Programacao.statusDot(m.status, `${m.nomeLongo}: técnicos ${Programacao.num(m.funcoes[TEC].atendeEmpresas)} / administrativos ${Programacao.num(m.funcoes[ADM].atendeEmpresas)} de ${Programacao.num(m.precisa)} empresas`)}</td>`).join('')}
+                  ${u.meses.map(m => `<td class="num">${Programacao.statusDot(m.status, `${m.nomeLongo}: técnicos ${Programacao.num(m.funcoes[TEC].atendeEmpresas)} / administrativos ${Programacao.num(m.funcoes[ADM].atendeEmpresas)} de ${Programacao.num(m.precisa)} empresas · ${ViewProgramacaoMensal.textoPessoas(m.funcoes[TEC], 'técnico')} · ${ViewProgramacaoMensal.textoPessoas(m.funcoes[ADM], 'administrativo')}`)}</td>`).join('')}
                   <td class="num">${Programacao.statusChip(u.janela.status)}</td>
                 </tr>`).join('')}
             </tbody>

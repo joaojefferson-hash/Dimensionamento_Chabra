@@ -839,3 +839,12 @@ form.busy { opacity: .7; pointer-events: none; }
 }
 .print-orientacao { display: inline-flex; align-items: center; gap: 6px; }
 .print-orientacao .input-sm { width: auto; padding-top: 4px; padding-bottom: 4px; }
+
+/* pessoas a contratar / sobrando por mês (Programação Mensal) */
+.th-pessoas { white-space: nowrap; }
+.col-pessoas { white-space: nowrap; }
+.delta { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.delta-falta  { background: #fde2df; color: #8f1d17; }
+.delta-sobra  { background: #e3f2ea; color: #0b5d43; }
+.delta-limite { background: #fff1cc; color: #7a5200; }
+.delta-ok { color: var(--text-muted); font-weight: 500; }
