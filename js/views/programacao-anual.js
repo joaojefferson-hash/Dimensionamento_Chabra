@@ -14,7 +14,8 @@ const ViewProgramacaoAnual = {
     const p = Store.parametros.get();
     const unidades = Store.unidades.list();
     const colaboradores = Store.colaboradores.list();
-    const r = Calculo.calcular({ unidades, colaboradores, parametros: p, janela });
+    const simulacoes = Programacao.lerSimulacao();
+    const r = Calculo.calcular({ unidades, colaboradores, parametros: p, janela, simulacoes });
     const periodo = Programacao.descricaoJanela(janela);
     const TEC = Calculo.TEC, ADM = Calculo.ADM;
 
@@ -25,7 +26,7 @@ const ViewProgramacaoAnual = {
         <div class="bloco-funcao ${Programacao.classeLinha(res.status)}">
           <div class="bloco-head">
             <strong>${Calculo.FUNCAO_CURTA[funcao]}</strong>
-            <span class="muted">${Programacao.numFte(res.pessoas)} ${res.pessoas === 1 ? 'pessoa' : 'pessoas'}</span>
+            <span class="muted">${Programacao.pessoasTexto(item.pessoas[funcao], item.pessoasSimuladas[funcao], item.pessoas[funcao] === 1 ? 'pessoa' : 'pessoas')}</span>
             ${Programacao.statusChip(res.status)}
           </div>
           <ul class="frases">
@@ -70,7 +71,9 @@ const ViewProgramacaoAnual = {
       ${unidades.length === 0 ? `
         <section class="card"><div class="empty"><strong>Nenhuma unidade cadastrada</strong>Cadastre unidades, empresas por unidade e colaboradores para ver a programação.</div></section>` : `
 
-      ${cartaoUnidade(r.total, 'Todas as unidades', subtituloDe(r.total) + ` · ${Programacao.numFte(r.total.pessoas[TEC])} técnicos e ${Programacao.numFte(r.total.pessoas[ADM])} administrativos`)}
+      ${Programacao.simulacaoHTML({ unidades, janela })}
+
+      ${cartaoUnidade(r.total, 'Todas as unidades', subtituloDe(r.total) + ` · ${Programacao.pessoasTexto(r.total.pessoas[TEC], r.total.pessoasSimuladas[TEC], 'técnicos')} e ${Programacao.pessoasTexto(r.total.pessoas[ADM], r.total.pessoasSimuladas[ADM], 'administrativos')}`)}
 
       ${Programacao.avisosHTML(r.avisos)}
 
@@ -83,5 +86,6 @@ const ViewProgramacaoAnual = {
     `;
 
     Programacao.bindBarra(el, { onJanela: () => App.render() });
+    Programacao.bindSimulacao(el, { unidades, janela });
   },
 };

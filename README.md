@@ -102,9 +102,14 @@ pessoas que faltam/sobram    = sobra ÷ produção de uma pessoa inteira no per�
   quando, antes/depois); a tela Histórico mostra frases simples, com filtro. Importação
   de backup vira um único evento. Escrita só pelos gatilhos (security definer, fora da API).
 - Telas: **Programação Anual** (um cartão por unidade + total), **Programação Mensal**
-  (mês a mês: consegue / precisa por entrega, coluna **Pessoas** com "contratar N" /
-  "sobram N" por mês e por função, leitura "Mês a mês: …" no resumo, grade unidade × mês
-  só com sinais) e
+  (uma grade para técnicos e outra para administrativos: mês a mês consegue / precisa
+  por entrega, equipe do mês, coluna **Contratar / sobra**, leitura "Mês a mês: …" e a
+  grade unidade × mês só com sinais) e
+- **Simulação "E se…?"** (card nas duas programações): linhas com unidade, grupo,
+  quantidade (+ contratar / − desligar), meses e ritmo por dia; viram pessoas virtuais
+  no motor (`simulacoes` em `Calculo.calcular`), ativas só nos meses escolhidos; a
+  equipe nunca fica negativa. Guardada só no navegador (`localStorage`), não entra no
+  cadastro nem no backup; as contagens mostram "(+2 simulados)".
   **Calendário** (dias úteis por mês). Período e unidade ficam no navegador; folga,
   pesos e calendário são compartilhados (tabela `parametros`).
 - O Catálogo de Documentos ficou oculto (não entra no cálculo neste modelo); a tela e a

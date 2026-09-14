@@ -848,3 +848,22 @@ form.busy { opacity: .7; pointer-events: none; }
 .delta-sobra  { background: #e3f2ea; color: #0b5d43; }
 .delta-limite { background: #fff1cc; color: #7a5200; }
 .delta-ok { color: var(--text-muted); font-weight: 500; }
+
+/* simulação "e se…" */
+.card-simulacao.ativa { border-color: #b9a4e6; box-shadow: 0 0 0 3px rgba(74, 44, 128, .08); }
+.card-simulacao.ativa .card-head h2::after { content: 'ativa'; display: inline-block; margin-left: 10px; padding: 1px 8px; border-radius: 999px; background: #4a2c80; color: #fff; font-size: 11px; font-weight: 600; vertical-align: middle; }
+.table-sim td { vertical-align: middle; }
+.table-sim .input-sm { width: auto; }
+.table-sim .sim-qtd { width: 76px; text-align: right; }
+.table-sim .sim-ritmo .input-num { width: 64px; }
+.sim-rodape { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 10px; }
+.sim-saldo { color: #4a2c80; font-weight: 600; }
+.grade-grupos { display: grid; gap: 20px; }
+.sub-head { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.sub-head h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+.grade-grupo .card-head h2 { margin-bottom: 2px; }
+.resumo-prog .legenda { margin-top: 10px; }
+.grade-grupo { border-left: 5px solid var(--border); }
+.grade-grupo.row-ok      { border-left-color: #2e9e6e; }
+.grade-grupo.row-atencao { border-left-color: #e0a800; }
+.grade-grupo.row-deficit { border-left-color: #d0413a; }

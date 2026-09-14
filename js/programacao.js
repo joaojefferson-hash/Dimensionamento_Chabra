@@ -7,6 +7,7 @@
 const Programacao = (() => {
   const KEY_JANELA = 'chabra-dimensiona:janela';
   const KEY_FILTROS = 'chabra-dimensiona:filtros-programacao';
+  const KEY_SIM = 'chabra-dimensiona:simulacao';
 
   /* ---------- período (de/até em meses 0..11), por navegador ---------- */
 
@@ -100,6 +101,140 @@ const Programacao = (() => {
     });
   }
 
+  /* ---------- simulação "e se…" (só neste navegador; não mexe no cadastro) ---------- */
+
+  function lerSimulacao() {
+    try { const s = JSON.parse(localStorage.getItem(KEY_SIM)); return Array.isArray(s) ? s : []; } catch (_) { return []; }
+  }
+  function salvarSimulacao(lista) { try { localStorage.setItem(KEY_SIM, JSON.stringify(lista)); } catch (_) { /* ignora */ } }
+
+  /** Ritmo por dia sugerido para uma pessoa simulada: média do grupo na unidade; senão da equipe; senão o padrão. */
+  function ritmoSugerido(grupo, unidadeId) {
+    const todos = Store.colaboradores.list().filter(c => c.tipoProducao === grupo);
+    const naUnidade = todos.filter(c => (c.alocacoes || []).some(a => a.unidadeId === unidadeId && a.percentual > 0));
+    const ref = naUnidade.length ? naUnidade : todos;
+    const media = campo => (ref.length ? Math.round((ref.reduce((s, c) => s + Number(c[campo] || 0), 0) / ref.length) * 10) / 10 : Calculo.COLAB_PADRAO[campo]);
+    return grupo === Calculo.ADM
+      ? { empresasDia: media('empresasDia') }
+      : { inspecoesDia: media('inspecoesDia'), relatoriosDia: media('relatoriosDia') };
+  }
+
+  /** Texto curto de uma simulação: "+2 técnicos em Teresópolis (set–dez)". */
+  function descricaoSimulacao(s, unidades) {
+    const u = unidades.find(x => x.id === s.unidadeId);
+    const q = Math.round(Number(s.quantidade) || 0);
+    const sing = Calculo.FUNCAO_SINGULAR[s.grupo] || 'pessoa';
+    const rot = Math.abs(q) === 1 ? sing : sing + 's';
+    const quando = s.de === 0 && s.ate === 11 ? 'ano todo' : s.de === s.ate ? Calculo.MESES[s.de].toLowerCase() : `${Calculo.MESES[s.de].toLowerCase()}–${Calculo.MESES[s.ate].toLowerCase()}`;
+    return `${q > 0 ? '+' : '−'}${Math.abs(q)} ${rot} em ${u ? u.nome : '?'} (${quando})`;
+  }
+
+  /** Card da simulação: linhas editáveis (unidade, grupo, quantidade, meses, ritmo). */
+  function simulacaoHTML({ unidades, janela }) {
+    const sims = lerSimulacao();
+    if (!unidades.length) return '';
+    const opcoesMes = sel => Calculo.MESES.map((m, i) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${m}</option>`).join('');
+    const linha = (s, i) => `
+      <tr data-sim="${i}">
+        <td><select class="input input-sm" name="unidadeId" aria-label="Unidade">${unidades.map(u => `<option value="${u.id}" ${u.id === s.unidadeId ? 'selected' : ''}>${UI.esc(u.nome)}</option>`).join('')}</select></td>
+        <td><select class="input input-sm" name="grupo" aria-label="Grupo">
+          <option value="${Calculo.TEC}" ${s.grupo === Calculo.TEC ? 'selected' : ''}>Técnicos</option>
+          <option value="${Calculo.ADM}" ${s.grupo === Calculo.ADM ? 'selected' : ''}>Administrativos</option>
+        </select></td>
+        <td><input class="input input-sm input-num sim-qtd" type="number" name="quantidade" step="1" inputmode="numeric" value="${Math.round(Number(s.quantidade) || 0)}" aria-label="Pessoas a mais (positivo) ou a menos (negativo)" title="Positivo = contratar; negativo = desligar"></td>
+        <td><div class="param-inline"><select class="input input-sm" name="de" aria-label="Mês inicial">${opcoesMes(s.de)}</select><span class="muted">a</span><select class="input input-sm" name="ate" aria-label="Mês final">${opcoesMes(s.ate)}</select></div></td>
+        <td><div class="param-inline sim-ritmo">
+          ${s.grupo === Calculo.ADM
+            ? `<input class="input input-sm input-num" type="number" name="empresasDia" min="0" step="0.5" inputmode="decimal" value="${s.empresasDia}" aria-label="Empresas finalizadas por dia"><span class="muted">empresas/dia</span>`
+            : `<input class="input input-sm input-num" type="number" name="inspecoesDia" min="0" step="0.5" inputmode="decimal" value="${s.inspecoesDia}" aria-label="Inspeções por dia"><span class="muted">insp.</span>
+               <input class="input input-sm input-num" type="number" name="relatoriosDia" min="0" step="0.5" inputmode="decimal" value="${s.relatoriosDia}" aria-label="Relatórios por dia"><span class="muted">relat./dia</span>`}
+        </div></td>
+        <td class="actions"><button type="button" class="btn-link danger" data-action="sim-remover" data-sim="${i}">Remover</button></td>
+      </tr>`;
+    return `
+      <section class="card card-simulacao ${sims.length ? 'ativa' : ''}">
+        <div class="card-head">
+          <h2>E se…? Simular pessoas a mais ou a menos</h2>
+          <div class="right">
+            <span class="muted">só neste navegador — não mexe no cadastro</span>
+            ${sims.length ? '<button type="button" class="btn btn-ghost btn-sm" data-action="sim-limpar">Limpar simulação</button>' : ''}
+          </div>
+        </div>
+        <p class="muted">Teste contratações (quantidade positiva) ou desligamentos (negativa) numa unidade, num período. As programações abaixo passam a contar com essas pessoas${sims.length ? '' : ' assim que você adicionar uma linha'}.</p>
+        ${sims.length ? `
+        <form class="sim-form" id="form-simulacao" autocomplete="off">
+          <div class="table-wrap">
+            <table class="table table-sim">
+              <thead><tr><th>Unidade</th><th>Grupo</th><th class="num">Pessoas (+/−)</th><th>Meses</th><th>Ritmo por dia de cada pessoa</th><th class="actions"></th></tr></thead>
+              <tbody>${sims.map(linha).join('')}</tbody>
+            </table>
+          </div>
+        </form>` : ''}
+        <div class="sim-rodape">
+          <button type="button" class="btn btn-ghost btn-sm" data-action="sim-adicionar">+ Adicionar pessoas para simular</button>
+          ${sims.length ? `<span class="muted">Simulando: ${sims.map(s => UI.esc(descricaoSimulacao(s, unidades))).join(' · ')}</span>` : ''}
+        </div>
+      </section>`;
+  }
+
+  /** Liga os eventos do card da simulação (cada mudança salva e re-renderiza a tela). */
+  function bindSimulacao(el, { unidades, janela, unidadeSel = '' }) {
+    const card = el.querySelector('.card-simulacao');
+    if (!card) return;
+    const form = card.querySelector('#form-simulacao');
+    if (form) form.addEventListener('submit', e => e.preventDefault());
+    card.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const sims = lerSimulacao();
+      if (btn.dataset.action === 'sim-adicionar') {
+        const unidadeId = unidades.some(u => u.id === unidadeSel) ? unidadeSel : unidades[0].id;
+        sims.push({ unidadeId, grupo: Calculo.TEC, quantidade: 1, de: janela.de, ate: janela.ate, ...ritmoSugerido(Calculo.TEC, unidadeId) });
+      } else if (btn.dataset.action === 'sim-remover') {
+        sims.splice(Number(btn.dataset.sim), 1);
+      } else if (btn.dataset.action === 'sim-limpar') {
+        sims.length = 0;
+      } else return;
+      salvarSimulacao(sims);
+      App.render();
+    });
+    card.querySelectorAll('tr[data-sim]').forEach(tr => {
+      const i = Number(tr.dataset.sim);
+      tr.querySelectorAll('input, select').forEach(campo => {
+        campo.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); campo.blur(); } });
+        campo.addEventListener('change', () => {
+          const sims = lerSimulacao();
+          const s = sims[i];
+          if (!s) return;
+          if (campo.name === 'quantidade') {
+            const q = Math.round(UI.parseNum(campo.value, 0));
+            if (q === 0) { UI.toast('Informe quantas pessoas a mais (positivo) ou a menos (negativo).', 'error'); campo.value = s.quantidade; return; }
+            s.quantidade = q;
+          } else if (campo.name === 'de' || campo.name === 'ate') {
+            s[campo.name] = Number(campo.value);
+            if (s.de > s.ate) [s.de, s.ate] = [s.ate, s.de];
+          } else if (campo.name === 'grupo' || campo.name === 'unidadeId') {
+            s[campo.name] = campo.value;
+            Object.assign(s, ritmoSugerido(s.grupo, s.unidadeId)); // ritmo sugerido acompanha o grupo/unidade
+          } else {
+            const v = UI.parseNum(campo.value, NaN);
+            if (!(v >= 0)) { UI.toast('Informe um ritmo por dia válido (zero ou mais).', 'error'); campo.value = s[campo.name]; return; }
+            s[campo.name] = v;
+          }
+          salvarSimulacao(sims);
+          App.render();
+        });
+      });
+    });
+  }
+
+  /** "11 técnicos (+2 simulados)" — contagem real com o saldo da simulação ao lado. */
+  function pessoasTexto(reais, simuladas, plural) {
+    const s = Math.round((simuladas || 0) * 10) / 10;
+    const extra = s ? ` <span class="sim-saldo" title="Pessoas da simulação (não estão no cadastro)">(${s > 0 ? '+' : '−'}${numFte(Math.abs(s))} ${Math.abs(s) === 1 ? 'simulado' : 'simulados'})</span>` : '';
+    return `${numFte(reais)} ${plural}${extra}`;
+  }
+
   /* ---------- formatação e sinais ---------- */
 
   const num = v => (Number.isFinite(v) ? UI.fmt(v, 0) : '—');
@@ -178,5 +313,6 @@ const Programacao = (() => {
     lerJanela, salvarJanela, lerFiltros, salvarFiltros, descricaoJanela,
     barraHTML, bindBarra,
     num, numFte, statusChip, statusDot, classeLinha, fraseEntrega, recomendacaoHTML, legendaHTML, avisosHTML, chefiaHTML, pessoasHTML,
+    lerSimulacao, salvarSimulacao, simulacaoHTML, bindSimulacao, descricaoSimulacao, pessoasTexto,
   };
 })();

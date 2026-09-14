@@ -9,6 +9,8 @@
                        empresasDia, inspecoesDia, relatoriosDia, alocacoes: [{ unidadeId, percentual }] }]
                     // tipoProducao 'nenhuma' = não entra nas contas; chefia = aparece como responsável pelas unidades
      parametros:    { diasUteis[12], pesoEmDia, pesoVencendo, pesoAVencer, ocupacaoAlvo }
+     simulacoes:    [{ unidadeId, grupo: 'tecnico' | 'administrativo', quantidade (≠ 0; negativa = a menos), de, ate (0..11),
+                       inspecoesDia?, relatoriosDia?, empresasDia? }]   // "e se…": pessoas virtuais só nas contas
      janela:        { de: 0..11, ate: 0..11 }   (meses, inclusive)
 
    Modelo:
@@ -151,7 +153,7 @@ const Calculo = (() => {
    *   parametros: p
    * }
    */
-  function calcular({ unidades = [], colaboradores = [], parametros, janela }) {
+  function calcular({ unidades = [], colaboradores = [], parametros, janela, simulacoes = [] }) {
     const p = normalizarParametros(parametros);
     const de = clampMes(janela && janela.de, 0);
     const ate = clampMes(janela && janela.ate, 11);
@@ -161,12 +163,16 @@ const Calculo = (() => {
     const idsUnidades = new Set(unidades.map(u => u.id));
     const alocValidas = c => (c.alocacoes || []).filter(a => a && idsUnidades.has(a.unidadeId) && n(a.percentual) > 0);
     const fracaoEm = (c, unidadeId) => alocValidas(c).filter(a => a.unidadeId === unidadeId).reduce((s, a) => s + n(a.percentual), 0) / 100;
+    // simulações viram pessoas virtuais (quantidade inteira, podendo ser negativa) ativas só em alguns meses
+    const simulados = colaboradoresSimulados(simulacoes).filter(c => idsUnidades.has(c.unidadeId));
+    const ativoNoMes = (c, mes) => !c.mesesAtivos || c.mesesAtivos.includes(mes);
     // quem não produz fica fora das contas; se for chefia, aparece como responsável pelas unidades
     const chefes = colaboradores.filter(c => c.chefia)
       .map(c => ({ id: c.id, nome: c.nome, funcao: c.funcao || '', coordena: c.coordena || 'todos', ordem: n(c.funcaoOrdem) || 9999, unidades: alocValidas(c).map(a => a.unidadeId) }))
       .sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR')); // chefia mais alta primeiro (ordem do cadastro de funções)
     const colabSemProducao = colaboradores.filter(c => !FUNCOES.includes(c.tipoProducao) && !c.chefia).map(c => `${c.nome}${c.funcao ? ' (' + c.funcao + ')' : ''}`);
     const produtivos = colaboradores.filter(c => FUNCOES.includes(c.tipoProducao));
+    const produtivosESimulados = produtivos.concat(simulados);
     const colabSemUnidade = colaboradores.filter(c => (FUNCOES.includes(c.tipoProducao) || c.chefia) && alocValidas(c).length === 0).map(c => c.nome);
     const colabParcial = produtivos
       .map(c => ({ nome: c.nome, pct: alocValidas(c).reduce((s, a) => s + n(a.percentual), 0) }))
@@ -178,35 +184,45 @@ const Calculo = (() => {
     FUNCOES.forEach(f => { const l = produtivos.filter(c => c.tipoProducao === f); globalPorFuncao[f] = l.length ? l : [COLAB_PADRAO]; });
 
     const calcUnidade = u => {
-      const colabs = produtivos.map(c => ({ ...c, fracao: fracaoEm(c, u.id) })).filter(c => c.fracao > 0);
+      const colabs = produtivosESimulados
+        .map(c => ({ ...c, fracao: c.simulado ? (c.unidadeId === u.id ? c.quantidade : 0) : fracaoEm(c, u.id) }))
+        .filter(c => c.fracao !== 0);
       const porFuncao = {};
       FUNCOES.forEach(f => { porFuncao[f] = colabs.filter(c => c.tipoProducao === f); });
-      const pessoas = {};
-      FUNCOES.forEach(f => { pessoas[f] = porFuncao[f].reduce((s, c) => s + c.fracao, 0); });
+      const pessoas = {}, pessoasSimuladas = {};
+      FUNCOES.forEach(f => {
+        pessoas[f] = porFuncao[f].filter(c => !c.simulado).reduce((s, c) => s + c.fracao, 0);          // pessoas reais
+        pessoasSimuladas[f] = porFuncao[f].filter(c => c.simulado).reduce((s, c) => s + c.fracao, 0);  // saldo simulado (pode ser negativo)
+      });
 
       const mesesCalc = meses.map(mes => {
         const q = empresasDoMes(u, mes);
         const precisa = empresasPonderadas(u, p, mes);
         const entregas = {};
+        const pessoasMes = {};
+        FUNCOES.forEach(f => { pessoasMes[f] = Math.max(0, porFuncao[f].filter(c => ativoNoMes(c, mes)).reduce((s, c) => s + c.fracao, 0)); });
         ENTREGAS.forEach(e => {
-          const cf = porFuncao[e.funcao];
-          const consegueMax = cf.reduce((s, c) => s + producaoMes(c, e, mes, p) * c.fracao, 0);
-          const ref = cf.length ? cf : globalPorFuncao[e.funcao];
+          const cf = porFuncao[e.funcao].filter(c => ativoNoMes(c, mes));
+          // desligamento simulado além do que existe não fica negativo: a equipe vai a zero
+          const consegueMax = Math.max(0, cf.reduce((s, c) => s + producaoMes(c, e, mes, p) * c.fracao, 0));
+          const presentes = cf.filter(c => c.fracao > 0);
+          const ref = presentes.length ? presentes : globalPorFuncao[e.funcao];
           const producaoPessoaMax = ref.reduce((s, c) => s + producaoMes(c, e, mes, p), 0) / ref.length;
-          entregas[e.id] = bloco(precisaMes(u, e, mes, p), consegueMax, pessoas[e.funcao], producaoPessoaMax, p);
+          entregas[e.id] = bloco(precisaMes(u, e, mes, p), consegueMax, pessoasMes[e.funcao], producaoPessoaMax, p);
         });
         const funcoes = {};
         FUNCOES.forEach(f => { funcoes[f] = resumoFuncao(f, entregas); });
         return {
           mes, nome: MESES[mes], nomeLongo: MESES_LONGO[mes], diasUteis: n(p.diasUteis[mes]),
           empresas: q.empresasEmDia + q.empresasVencendo + q.empresasAVencer, precisa, excecao: q.excecao,
+          pessoas: pessoasMes,
           entregas, funcoes, status: piorStatus(FUNCOES.map(f => funcoes[f].status)),
         };
       });
 
       return {
-        id: u.id, nome: u.nome, pessoas,
-        colaboradores: colabs.map(c => ({ id: c.id, nome: c.nome, funcao: c.funcao, tipoProducao: c.tipoProducao, fracao: c.fracao })),
+        id: u.id, nome: u.nome, pessoas, pessoasSimuladas,
+        colaboradores: colabs.filter(c => !c.simulado).map(c => ({ id: c.id, nome: c.nome, funcao: c.funcao, tipoProducao: c.tipoProducao, fracao: c.fracao })),
         chefia: chefes.filter(ch => ch.unidades.includes(u.id)).map(ch => ({ id: ch.id, nome: ch.nome, funcao: ch.funcao, coordena: ch.coordena })),
         meses: mesesCalc,
         janela: consolidar(mesesCalc, p),
@@ -233,14 +249,20 @@ const Calculo = (() => {
       });
       const funcoes = {};
       FUNCOES.forEach(f => { funcoes[f] = resumoFuncao(f, entregas); });
+      const pessoasMes = {};
+      FUNCOES.forEach(f => { pessoasMes[f] = linhas.reduce((s, l) => s + l.pessoas[f], 0); });
       return {
         mes, nome: MESES[mes], nomeLongo: MESES_LONGO[mes], diasUteis: n(p.diasUteis[mes]),
         empresas: linhas.reduce((s, l) => s + l.empresas, 0), precisa: linhas.reduce((s, l) => s + l.precisa, 0), excecao: linhas.some(l => l.excecao),
+        pessoas: pessoasMes,
         entregas, funcoes, status: piorStatus(FUNCOES.map(f => funcoes[f].status)),
       };
     });
-    const pessoasTotal = {};
-    FUNCOES.forEach(f => { pessoasTotal[f] = resultadoUnidades.reduce((s, u) => s + u.pessoas[f], 0); });
+    const pessoasTotal = {}, pessoasSimuladasTotal = {};
+    FUNCOES.forEach(f => {
+      pessoasTotal[f] = resultadoUnidades.reduce((s, u) => s + u.pessoas[f], 0);
+      pessoasSimuladasTotal[f] = resultadoUnidades.reduce((s, u) => s + u.pessoasSimuladas[f], 0);
+    });
 
     // No total, faltas e sobras são a SOMA das unidades (folga numa unidade não cobre falta em outra)
     // e a situação é a pior entre as unidades.
@@ -263,7 +285,8 @@ const Calculo = (() => {
     return {
       janela: { de: Math.min(de, ate), ate: Math.max(de, ate), meses },
       unidades: resultadoUnidades,
-      total: { pessoas: pessoasTotal, meses: totalMeses, janela: totalJanela, chefia: chefes.map(ch => ({ id: ch.id, nome: ch.nome, funcao: ch.funcao, coordena: ch.coordena })) },
+      total: { pessoas: pessoasTotal, pessoasSimuladas: pessoasSimuladasTotal, meses: totalMeses, janela: totalJanela, chefia: chefes.map(ch => ({ id: ch.id, nome: ch.nome, funcao: ch.funcao, coordena: ch.coordena })) },
+      simulacao: simulados.length > 0,
       avisos: {
         colabSemProducao,
         colabSemUnidade,
@@ -273,6 +296,29 @@ const Calculo = (() => {
       },
       parametros: p,
     };
+  }
+
+  /**
+   * Transforma simulações em pessoas virtuais: quantidade inteira (positiva = a mais,
+   * negativa = a menos) numa unidade e num grupo, ativas só entre `de` e `ate`.
+   * Ritmo por dia: o informado ou o padrão.
+   */
+  function colaboradoresSimulados(simulacoes) {
+    return (simulacoes || [])
+      .filter(s => s && FUNCOES.includes(s.grupo) && s.unidadeId && Math.round(n(s.quantidade)) !== 0)
+      .map((s, i) => {
+        const de = clampMes(s.de, 0), ate = clampMes(s.ate, 11);
+        const mesesAtivos = [];
+        for (let m = Math.min(de, ate); m <= Math.max(de, ate); m++) mesesAtivos.push(m);
+        return {
+          id: `sim-${i}`, nome: `Simulação ${i + 1}`, simulado: true, chefia: false,
+          tipoProducao: s.grupo, unidadeId: s.unidadeId, quantidade: Math.round(n(s.quantidade)), mesesAtivos,
+          inspecoesDia: s.inspecoesDia == null ? COLAB_PADRAO.inspecoesDia : Math.max(0, n(s.inspecoesDia)),
+          relatoriosDia: s.relatoriosDia == null ? COLAB_PADRAO.relatoriosDia : Math.max(0, n(s.relatoriosDia)),
+          empresasDia: s.empresasDia == null ? COLAB_PADRAO.empresasDia : Math.max(0, n(s.empresasDia)),
+          alocacoes: [],
+        };
+      });
   }
 
   /** Consolida uma lista de meses (de uma unidade ou do total) na janela. */
@@ -285,7 +331,7 @@ const Calculo = (() => {
       const precisa = blocos.reduce((s, b) => s + b.precisa, 0);
       const consegueMax = blocos.reduce((s, b) => s + b.consegueMax, 0);
       const producaoPessoaMax = blocos.reduce((s, b) => s + b.producaoPessoa / alvo, 0);
-      const pessoas = blocos.length ? blocos[0].pessoas : 0;
+      const pessoas = blocos.length ? blocos.reduce((s, b) => s + b.pessoas, 0) / blocos.length : 0; // média (a simulação pode mudar por mês)
       const b = bloco(precisa, consegueMax, pessoas, producaoPessoaMax, p);
       entregas[e.id] = { ...b, porMes: { precisa: precisa / nMeses, consegue: b.consegue / nMeses } };
     });
@@ -328,7 +374,7 @@ const Calculo = (() => {
   }
 
   return {
-    MESES, MESES_LONGO, TEC, ADM, FUNCOES, FUNCAO_CURTA, FUNCAO_SINGULAR, ENTREGAS, ENTREGAS_DA_FUNCAO, COLAB_PADRAO, MARGEM_ATENCAO,
+    MESES, MESES_LONGO, TEC, ADM, FUNCOES, FUNCAO_CURTA, FUNCAO_SINGULAR, ENTREGAS, ENTREGAS_DA_FUNCAO, COLAB_PADRAO, MARGEM_ATENCAO, colaboradoresSimulados,
     empresasDoMes, empresasPonderadas, producaoMes, precisaMes, calcular, normalizarParametros, ritmoTexto, piorStatus,
   };
 })();
