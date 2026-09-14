@@ -129,9 +129,9 @@ const Store = (() => {
       fatorMedio: pos(base.fatorMedio, DEFAULT_PARAMETROS.fatorMedio),
       fatorAlto: pos(base.fatorAlto, DEFAULT_PARAMETROS.fatorAlto),
       ocupacaoAlvo: clamp(pos(base.ocupacaoAlvo, DEFAULT_PARAMETROS.ocupacaoAlvo), 1, 100),
-      mesesPorInspecao: pos(base.mesesPorInspecao, DEFAULT_PARAMETROS.mesesPorInspecao),
-      mesesPorRelatorio: pos(base.mesesPorRelatorio, DEFAULT_PARAMETROS.mesesPorRelatorio),
-      mesesPorFinalizacao: pos(base.mesesPorFinalizacao, DEFAULT_PARAMETROS.mesesPorFinalizacao),
+      mesesPorInspecao: Math.min(120, pos(base.mesesPorInspecao, DEFAULT_PARAMETROS.mesesPorInspecao)),
+      mesesPorRelatorio: Math.min(120, pos(base.mesesPorRelatorio, DEFAULT_PARAMETROS.mesesPorRelatorio)),
+      mesesPorFinalizacao: Math.min(120, pos(base.mesesPorFinalizacao, DEFAULT_PARAMETROS.mesesPorFinalizacao)),
     };
   };
   const parametrosToRow = q => ({

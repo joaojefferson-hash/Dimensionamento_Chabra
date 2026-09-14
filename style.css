@@ -705,3 +705,18 @@ form.busy { opacity: .7; pointer-events: none; }
 .grau-alto  { background: #fde2df; color: #8f1d17; }
 
 .input-sufixo { white-space: nowrap; align-self: center; }
+
+/* histórico */
+.hist-dia { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); margin: 14px 0 6px; }
+.hist-dia:first-child { margin-top: 0; }
+.hist-item { display: grid; grid-template-columns: 52px 160px 1fr; gap: 10px; padding: 7px 8px; border-left: 3px solid var(--border); border-radius: 4px; font-size: 14px; line-height: 1.45; }
+.hist-item + .hist-item { margin-top: 3px; }
+.hist-insert { border-left-color: #2e9e6e; background: #f6fbf8; }
+.hist-update { border-left-color: #3b6fb6; background: #f5f8fc; }
+.hist-delete { border-left-color: #d0413a; background: #fdf4f3; }
+.hist-importacao { border-left-color: #7a5200; background: #fff9e8; }
+.hist-hora { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.hist-quem { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-frase s { color: var(--text-muted); }
+.hist-rodape { text-align: center; margin-top: 12px; }
+@media (max-width: 700px) { .hist-item { grid-template-columns: 52px 1fr; } .hist-quem { grid-column: 2; } .hist-frase { grid-column: 1 / -1; } }

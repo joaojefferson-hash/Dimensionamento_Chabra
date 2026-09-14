@@ -81,6 +81,10 @@ pessoas que faltam/sobram    = sobra ÷ produção de uma pessoa inteira no per�
   números crus. O total soma as faltas das unidades (folga numa não cobre outra).
 - "Folga para imprevistos" (padrão 15%) é o parâmetro `ocupacao_alvo` (85) visto pelo
   lado do usuário.
+- Frequência de atendimento (Calendário): a cada N meses **ou anos** por tipo de entrega.
+- **Histórico**: gatilhos em todas as tabelas de cadastro gravam em `historico` (quem,
+  quando, antes/depois); a tela Histórico mostra frases simples, com filtro. Importação
+  de backup vira um único evento. Escrita só pelos gatilhos (security definer, fora da API).
 - Telas: **Programação Anual** (um cartão por unidade + total), **Programação Mensal**
   (mês a mês: consegue / precisa por entrega + grade unidade × mês só com sinais) e
   **Calendário** (dias úteis por mês). Período e unidade ficam no navegador; folga,
@@ -105,10 +109,11 @@ js/views/usuarios.js        tela Usuários (só admin) — chama a Edge Function
 js/views/calendario.js      tela Calendário (dias úteis por mês, dias de referência)
 js/views/programacao-mensal.js  tela Programação Mensal
 js/views/programacao-anual.js   tela Programação Anual
+js/views/historico.js       tela Histórico de alterações
 js/calculo.js           motor de dimensionamento (puro)
 js/programacao.js       utilitários das telas de programação (janela, barra, formatação)
 js/app.js               inicialização, navegação por hash (#/unidades …), badges, backup
-supabase/migrations/    SQL do banco (0001…0008; 0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência de atendimento)
+supabase/migrations/    SQL do banco (0001…0008; 0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico)
 supabase/functions/usuarios/index.ts   Edge Function de gestão de usuários (chave secreta só no servidor)
 ```
 
