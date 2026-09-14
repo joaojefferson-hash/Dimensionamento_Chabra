@@ -54,10 +54,8 @@ const ViewProgramacaoAnual = {
 
     const subtituloDe = item => {
       const media = Programacao.numFte(item.janela.empresasMedia);
-      const precisam = UI.fmt(item.janela.precisaMedia, 0);
-      return `Carteira: <strong>${media}</strong> ${item.janela.empresasMedia === 1 ? 'empresa' : 'empresas'} por mês` +
-        (item.janela.mesesComExcecao ? ` <span class="chip chip-blue" title="A quantidade muda em ${item.janela.mesesComExcecao} ${item.janela.mesesComExcecao === 1 ? 'mês' : 'meses'} do período">varia no período</span>` : '') +
-        ` <span class="muted" title="Empresas vencendo ou a vencer, com o peso de cada situação">· precisam de atendimento: <strong>${precisam}</strong></span>`;
+      return `Documentos vencidos: <strong>${media}</strong> ${item.janela.empresasMedia === 1 ? 'empresa' : 'empresas'} por mês` +
+        (item.janela.mesesComExcecao ? ` <span class="chip chip-blue" title="A quantidade muda em ${item.janela.mesesComExcecao} ${item.janela.mesesComExcecao === 1 ? 'mês' : 'meses'} do período">varia no período</span>` : '');
     };
 
     el.innerHTML = `

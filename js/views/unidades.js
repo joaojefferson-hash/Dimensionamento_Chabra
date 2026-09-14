@@ -21,7 +21,7 @@ const ViewUnidades = {
     el.innerHTML = `
       <header class="page-header">
         <h1>Unidades</h1>
-        <p>Cadastre as unidades ou filiais da consultoria. A quantidade de empresas-cliente de cada uma é informada na tela <em>Empresas por Unidade</em>.</p>
+        <p>Cadastre as unidades ou filiais da consultoria. Quantas empresas de cada uma estão com documentos vencidos é informado na tela <em>Empresas por Unidade</em>.</p>
       </header>
 
       <section class="card">
@@ -55,7 +55,7 @@ const ViewUnidades = {
               <thead>
                 <tr>
                   <th>Nome</th>
-                  <th class="num">Empresas-cliente</th>
+                  <th class="num" title="Padrão do ano; a variação por mês fica em Empresas por Unidade">Docs. vencidos (padrão)</th>
                   <th class="actions">Ações</th>
                 </tr>
               </thead>
@@ -122,7 +122,7 @@ const ViewUnidades = {
         const u = Store.unidades.get(id);
         if (!u) return;
         const extra = u.empresas > 0
-          ? `\n\nEsta unidade tem ${UI.plural(u.empresas, 'empresa-cliente vinculada', 'empresas-cliente vinculadas')}; esse número será perdido.`
+          ? `\n\nEsta unidade tem ${UI.plural(u.empresas, 'empresa com documentos vencidos', 'empresas com documentos vencidos')} no padrão; esse número (e a variação por mês) será perdido.`
           : '';
         const ok = await UI.confirm({
           title: 'Excluir unidade',
