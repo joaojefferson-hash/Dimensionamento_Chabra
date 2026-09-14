@@ -1,14 +1,14 @@
 /* ==========================================================================
    Programacao — utilitários compartilhados pelas telas Programação Mensal e
-   Programação Anual: seletor de janela (persistido por navegador), barra de
-   parâmetros, formatação de indicadores e chips de status.
+   Programação Anual: período (salvo no navegador), barra de opções, frases
+   em linguagem simples e sinais de situação (verde / amarelo / vermelho).
    ========================================================================== */
 
 const Programacao = (() => {
   const KEY_JANELA = 'chabra-dimensiona:janela';
   const KEY_FILTROS = 'chabra-dimensiona:filtros-programacao';
 
-  /* ---------- janela (de/até em meses 0..11), por navegador ---------- */
+  /* ---------- período (de/até em meses 0..11), por navegador ---------- */
 
   function lerJanela() {
     try {
@@ -17,38 +17,26 @@ const Programacao = (() => {
     } catch (_) { /* ignora */ }
     return { de: 0, ate: 11 };
   }
-
-  function salvarJanela(j) {
-    try { localStorage.setItem(KEY_JANELA, JSON.stringify(j)); } catch (_) { /* ignora */ }
-  }
-
-  function lerFiltros() {
-    try { return JSON.parse(localStorage.getItem(KEY_FILTROS)) || {}; } catch (_) { return {}; }
-  }
-
-  function salvarFiltros(f) {
-    try { localStorage.setItem(KEY_FILTROS, JSON.stringify(f)); } catch (_) { /* ignora */ }
-  }
+  function salvarJanela(j) { try { localStorage.setItem(KEY_JANELA, JSON.stringify(j)); } catch (_) { /* ignora */ } }
+  function lerFiltros() { try { return JSON.parse(localStorage.getItem(KEY_FILTROS)) || {}; } catch (_) { return {}; } }
+  function salvarFiltros(f) { try { localStorage.setItem(KEY_FILTROS, JSON.stringify(f)); } catch (_) { /* ignora */ } }
 
   function descricaoJanela(j) {
-    if (j.de === 0 && j.ate === 11) return 'Ano completo';
+    if (j.de === 0 && j.ate === 11) return 'ano completo';
     if (j.de === j.ate) return Calculo.MESES_LONGO[j.de];
     return `${Calculo.MESES_LONGO[j.de]} a ${Calculo.MESES_LONGO[j.ate]}`;
   }
 
-  /* ---------- barra de parâmetros ---------- */
+  /* ---------- barra de opções ---------- */
 
-  /**
-   * HTML da barra. opções: { janela, ocupacaoAlvo, unidades?, unidadeSel?, funcaoSel? }
-   * - unidades: se informado, mostra o seletor de unidade ('' = todas)
-   * - funcaoSel: '' (total) | nome da função
-   */
-  function barraHTML({ janela, ocupacaoAlvo, unidades = null, unidadeSel = '', funcaoSel = '' }) {
+  /** HTML da barra. opções: { janela, ocupacaoAlvo, unidades?, unidadeSel? } */
+  function barraHTML({ janela, ocupacaoAlvo, unidades = null, unidadeSel = '' }) {
     const opcoesMes = sel => Calculo.MESES_LONGO.map((m, i) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${m}</option>`).join('');
+    const folga = Math.round((100 - ocupacaoAlvo) * 10) / 10;
     return `
       <form class="barra-params" id="barra-params" autocomplete="off">
         <div class="param">
-          <span class="param-label">Janela</span>
+          <span class="param-label">Período</span>
           <div class="param-inline">
             <select class="input input-sm" name="de" aria-label="Mês inicial">${opcoesMes(janela.de)}</select>
             <span class="muted">a</span>
@@ -65,28 +53,18 @@ const Programacao = (() => {
           </select>
         </div>` : ''}
         <div class="param">
-          <span class="param-label">Função</span>
-          <select class="input input-sm" name="funcao">
-            <option value="" ${!funcaoSel ? 'selected' : ''}>Total (todas)</option>
-            ${Calculo.FUNCOES.map(f => `<option value="${UI.esc(f)}" ${f === funcaoSel ? 'selected' : ''}>${Calculo.FUNCAO_CURTA[f]}</option>`).join('')}
-          </select>
-        </div>
-        <div class="param">
-          <span class="param-label">Ocupação-alvo</span>
+          <span class="param-label">Folga para imprevistos</span>
           <div class="param-inline">
-            <input class="input input-sm input-num input-pct" type="number" name="ocupacaoAlvo" min="1" max="100" step="1" inputmode="numeric" value="${ocupacaoAlvo}" aria-label="Ocupação-alvo (%)">
+            <input class="input input-sm input-num input-pct" type="number" name="folga" min="0" max="90" step="1" inputmode="numeric" value="${folga}" aria-label="Folga para imprevistos (%)">
             <span class="muted">%</span>
-            <span class="saved-flag" id="alvo-saved" aria-hidden="true">salvo ✓</span>
+            <span class="param-ajuda" title="Parte do tempo da equipe reservada para imprevistos (faltas, retrabalho, urgências). Com 15%, contamos que cada pessoa entrega até 85% do que declarou.">?</span>
           </div>
         </div>
       </form>`;
   }
 
-  /**
-   * Liga os eventos da barra. callbacks: { onJanela(j), onUnidade(id), onFuncao(f) }
-   * A ocupação-alvo é salva no Supabase (parâmetro compartilhado) e re-renderiza via store:change.
-   */
-  function bindBarra(el, { onJanela, onUnidade, onFuncao }) {
+  /** Liga os eventos da barra. callbacks: { onJanela(j), onUnidade(id) }. A folga é salva no Supabase (vale para toda a equipe). */
+  function bindBarra(el, { onJanela, onUnidade }) {
     const form = el.querySelector('#barra-params');
     if (!form) return;
     form.addEventListener('submit', e => e.preventDefault());
@@ -94,107 +72,81 @@ const Programacao = (() => {
     const aplicarJanela = () => {
       let de = Number(form.de.value), ate = Number(form.ate.value);
       if (de > ate) [de, ate] = [ate, de];
-      const j = { de, ate };
-      salvarJanela(j);
-      onJanela(j);
+      salvarJanela({ de, ate });
+      onJanela({ de, ate });
     };
     form.de.addEventListener('change', aplicarJanela);
     form.ate.addEventListener('change', aplicarJanela);
-    form.querySelector('[data-action="ano-completo"]').addEventListener('click', () => {
-      salvarJanela({ de: 0, ate: 11 });
-      onJanela({ de: 0, ate: 11 });
-    });
+    form.querySelector('[data-action="ano-completo"]').addEventListener('click', () => { salvarJanela({ de: 0, ate: 11 }); onJanela({ de: 0, ate: 11 }); });
     if (form.unidade && onUnidade) form.unidade.addEventListener('change', () => onUnidade(form.unidade.value));
-    if (form.funcao && onFuncao) form.funcao.addEventListener('change', () => onFuncao(form.funcao.value));
 
-    const alvo = form.ocupacaoAlvo;
-    alvo.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); alvo.blur(); } });
-    alvo.addEventListener('change', async () => {
-      const v = UI.parseNum(alvo.value, NaN);
-      if (!(v > 0 && v <= 100)) {
-        UI.toast('A ocupação-alvo deve estar entre 1% e 100%.', 'error');
-        alvo.value = Store.parametros.get().ocupacaoAlvo;
+    const folga = form.folga;
+    folga.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); folga.blur(); } });
+    folga.addEventListener('change', async () => {
+      const v = UI.parseNum(folga.value, NaN);
+      if (!(v >= 0 && v <= 90)) {
+        UI.toast('A folga deve ficar entre 0% e 90%.', 'error');
+        folga.value = Math.round(100 - Store.parametros.get().ocupacaoAlvo);
         return;
       }
-      alvo.disabled = true;
+      folga.disabled = true;
       try {
-        await Store.parametros.update({ ocupacaoAlvo: v }); // dispara store:change → re-render
+        await Store.parametros.update({ ocupacaoAlvo: 100 - v }); // dispara store:change → re-render
       } catch (err) {
         UI.toast(err.message, 'error');
-        alvo.value = Store.parametros.get().ocupacaoAlvo;
-        alvo.disabled = false;
+        folga.value = Math.round(100 - Store.parametros.get().ocupacaoAlvo);
+        folga.disabled = false;
       }
     });
   }
 
-  /* ---------- formatação ---------- */
+  /* ---------- formatação e sinais ---------- */
 
-  const fmtH = h => (Number.isFinite(h) ? UI.fmt(h, 0) : '—');
-  const fmtH1 = h => (Number.isFinite(h) ? UI.fmt(h, 1) : '—');
-  const fmtPct = x => (x === Infinity ? '∞' : Number.isFinite(x) ? UI.fmt(x * 100, 0) + '%' : '—');
-  const fmtColab = g => {
-    if (!Number.isFinite(g)) return '—';
-    const s = UI.fmt(Math.abs(g), 1);
-    return g < -1e-9 ? `−${s}` : g > 1e-9 ? `+${s}` : '0';
-  };
-  /** Colaboradores equivalentes (FTE): inteiro sem decimais; senão 1 casa. */
-  const fmtFte = v => (!Number.isFinite(v) ? '—' : Math.abs(v - Math.round(v)) < 1e-9 ? String(Math.round(v)) : UI.fmt(v, 1));
-  const fmtGap = h => {
-    if (!Number.isFinite(h)) return '—';
-    const s = UI.fmt(Math.abs(h), 0);
-    return h < -0.5 ? `−${s}` : h > 0.5 ? `+${s}` : '0';
-  };
+  const num = v => (Number.isFinite(v) ? UI.fmt(v, 0) : '—');
+  const numFte = v => (!Number.isFinite(v) ? '—' : Math.abs(v - Math.round(v)) < 1e-9 ? String(Math.round(v)) : UI.fmt(v, 1));
 
   const STATUS = {
-    ok: { rotulo: 'Suficiente', classe: 'status-ok' },
-    atencao: { rotulo: 'Próximo do limite', classe: 'status-atencao' },
-    deficit: { rotulo: 'Déficit', classe: 'status-deficit' },
+    ok:      { rotulo: 'Dá conta',         classe: 'status-ok' },
+    atencao: { rotulo: 'No limite',        classe: 'status-atencao' },
+    deficit: { rotulo: 'Precisa contratar', classe: 'status-deficit' },
   };
-
   function statusChip(status) {
     const s = STATUS[status] || STATUS.ok;
     return `<span class="status ${s.classe}">${s.rotulo}</span>`;
   }
+  function statusDot(status, titulo = '') {
+    const s = STATUS[status] || STATUS.ok;
+    return `<span class="dot dot-${status}" title="${UI.esc(titulo || s.rotulo)}" aria-label="${s.rotulo}"></span>`;
+  }
+  const classeLinha = status => 'row-' + (STATUS[status] ? status : 'ok');
 
-  function classeLinha(status) {
-    return 'row-' + (STATUS[status] ? status : 'ok');
+  /** Frase "consegue X, precisa Y" de uma entrega, por mês (valores médios quando é um período). */
+  function fraseEntrega(entrega, bloco, porMes = true) {
+    const consegue = porMes && bloco.porMes ? bloco.porMes.consegue : bloco.consegue;
+    const precisa = porMes && bloco.porMes ? bloco.porMes.precisa : bloco.precisa;
+    const sufixo = porMes ? ' por mês' : '';
+    return `A equipe consegue até <strong>${num(consegue)}</strong> ${entrega.unidade}${sufixo}; a carteira precisa de <strong>${num(precisa)}</strong>.`;
   }
 
-  /** Seleciona o bloco (total ou de uma função) de um item com { total, porFuncao }. */
-  function blocoDe(item, funcao) {
-    return funcao ? item.porFuncao[funcao] : item.total;
-  }
-
-  /**
-   * Recomendação para um item { total, porFuncao }: com função selecionada, a dela;
-   * na visão Total, a combinação por função (técnico não produz documento
-   * administrativo, então as necessidades não se compensam entre funções).
-   */
-  function recomendacaoHTML(item, funcao) {
-    const rec = r => `<span class="rec rec-${r.tipo}">${r.texto}</span>`;
-    if (funcao) return rec(item.porFuncao[funcao].recomendacao);
-    const partes = Calculo.FUNCOES
-      .map(f => item.porFuncao[f].recomendacao)
-      .filter(r => r.tipo !== 'adequado');
-    if (partes.length === 0) return rec({ tipo: 'adequado', texto: 'Quadro adequado' });
-    return partes.map(rec).join('<span class="muted"> · </span>');
+  function recomendacaoHTML(rec) {
+    return `<span class="rec rec-${rec.tipo}">${rec.texto}</span>`;
   }
 
   function legendaHTML() {
     return `
       <div class="legenda">
-        <span><span class="status status-ok">Suficiente</span> demanda cabe na capacidade planejável</span>
-        <span><span class="status status-atencao">Próximo do limite</span> folga menor que ${Math.round(Calculo.MARGEM_ATENCAO * 100)}%</span>
-        <span><span class="status status-deficit">Déficit</span> demanda maior que a capacidade planejável</span>
+        <span><span class="status status-ok">Dá conta</span> a equipe atende a carteira</span>
+        <span><span class="status status-atencao">No limite</span> atende, mas com menos de ${Math.round(Calculo.MARGEM_ATENCAO * 100)}% de sobra</span>
+        <span><span class="status status-deficit">Precisa contratar</span> a carteira é maior do que a equipe consegue</span>
       </div>`;
   }
 
   function avisosHTML(avisos) {
     const itens = [];
-    if (avisos.docsSobDemanda.length) itens.push(`<strong>Fora do cálculo (sob demanda):</strong> ${avisos.docsSobDemanda.map(UI.esc).join(', ')}. Defina uma periodicidade no Catálogo para incluí-los.`);
-    if (avisos.colabSemUnidade.length) itens.push(`<strong>Sem unidade (não contam na capacidade):</strong> ${avisos.colabSemUnidade.map(UI.esc).join(', ')}. Informe a alocação em Colaboradores.`);
-    if (avisos.colabParcial && avisos.colabParcial.length) itens.push(`<strong>Alocação parcial (só a parte alocada conta):</strong> ${avisos.colabParcial.map(UI.esc).join(', ')}.`);
-    if (avisos.unidadesSemColab.length) itens.push(`<strong>Unidades com empresas e sem colaboradores:</strong> ${avisos.unidadesSemColab.map(UI.esc).join(', ')}.`);
+    if (avisos.colabSemUnidade.length) itens.push(`<strong>Sem unidade (não entram na programação):</strong> ${avisos.colabSemUnidade.map(UI.esc).join(', ')}. Em Colaboradores, marque onde cada um atua.`);
+    if (avisos.colabParcial && avisos.colabParcial.length) itens.push(`<strong>Parte do tempo sem unidade:</strong> ${avisos.colabParcial.map(UI.esc).join(', ')} — só a parte marcada conta.`);
+    if (avisos.unidadesSemColab.length) itens.push(`<strong>Unidades com empresas e sem equipe:</strong> ${avisos.unidadesSemColab.map(UI.esc).join(', ')}.`);
+    if (avisos.unidadesSemFuncao && avisos.unidadesSemFuncao.length) itens.push(`<strong>Unidades sem alguém da função:</strong> ${avisos.unidadesSemFuncao.map(x => `${UI.esc(x.unidade)} (sem ${Calculo.FUNCAO_CURTA[x.funcao].toLowerCase()})`).join(', ')}.`);
     if (!itens.length) return '';
     return `<div class="alert alert-warn"><ul>${itens.map(i => `<li>${i}</li>`).join('')}</ul></div>`;
   }
@@ -202,6 +154,6 @@ const Programacao = (() => {
   return {
     lerJanela, salvarJanela, lerFiltros, salvarFiltros, descricaoJanela,
     barraHTML, bindBarra,
-    fmtH, fmtH1, fmtPct, fmtColab, fmtGap, fmtFte, statusChip, classeLinha, blocoDe, recomendacaoHTML, legendaHTML, avisosHTML,
+    num, numFte, statusChip, statusDot, classeLinha, fraseEntrega, recomendacaoHTML, legendaHTML, avisosHTML,
   };
 })();

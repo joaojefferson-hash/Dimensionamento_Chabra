@@ -12,22 +12,22 @@
      unidades:      [{ id, nome, empresasBaixo, empresasMedio, empresasAlto, empresas (soma),
                        meses: { [1..12]: { empresasBaixo, empresasMedio, empresasAlto } } }]  // exceções mensais (padrão = campos acima)
      documentos:    [{ id, nome, horas, periodicidadeMeses, responsavel }]   // periodicidade 0 = sob demanda
-     colaboradores: [{ id, nome, funcao, horasMes, eficiencia, alocacoes: [{ unidadeId, unidadeNome, percentual }] }]
-                    // eficiencia em %; alocações somam ≤ 100% (o restante é "não alocado")
-     parametros:    { diasUteis[12], fatorBaixo, fatorMedio, fatorAlto, diasReferencia, ocupacaoAlvo }
+     colaboradores: [{ id, nome, funcao, empresasDia, inspecoesDia, relatoriosDia, alocacoes: [{ unidadeId, unidadeNome, percentual }] }]
+                    // produção declarada por dia; alocações somam ≤ 100% (o restante é "não alocado")
+     parametros:    { diasUteis[12], fatorBaixo, fatorMedio, fatorAlto, ocupacaoAlvo }
    ========================================================================== */
 
 const Store = (() => {
   const APP_ID = 'chabra-dimensiona';
-  const SCHEMA_VERSION = 4;
+  const SCHEMA_VERSION = 5;
   const LOCAL_KEY = 'chabra-dimensiona:data';            // versão antiga (só localStorage)
   const LOCAL_BACKUP_KEY = 'chabra-dimensiona:backup-local'; // onde os dados locais ficam após a migração
 
   const FUNCOES = ['Técnico de Segurança do Trabalho', 'Administrativo'];
-  const DEFAULT_COLABORADOR = { horasMes: 160, eficiencia: 80 };
+  const DEFAULT_COLABORADOR = { empresasDia: 2, inspecoesDia: 2, relatoriosDia: 2 };
   const DEFAULT_PARAMETROS = {
     diasUteis: [21, 18, 22, 20, 20, 21, 23, 21, 21, 21, 19, 22],
-    fatorBaixo: 1, fatorMedio: 1.3, fatorAlto: 1.6, diasReferencia: 20, ocupacaoAlvo: 85,
+    fatorBaixo: 1, fatorMedio: 1.3, fatorAlto: 1.6, ocupacaoAlvo: 85,
   };
 
   // Mesmos valores do seed da migration 0001 (sugestões, editáveis).
@@ -108,8 +108,9 @@ const Store = (() => {
   const buildColaborador = c => ({
     nome: toStr(c.nome),
     funcao: FUNCOES.includes(c.funcao) ? c.funcao : FUNCOES[0],
-    horasMes: Math.max(0, toNum(c.horasMes, DEFAULT_COLABORADOR.horasMes)),
-    eficiencia: clamp(toNum(c.eficiencia, DEFAULT_COLABORADOR.eficiencia), 1, 100),
+    empresasDia: Math.max(0, toNum(c.empresasDia, DEFAULT_COLABORADOR.empresasDia)),
+    inspecoesDia: Math.max(0, toNum(c.inspecoesDia, DEFAULT_COLABORADOR.inspecoesDia)),
+    relatoriosDia: Math.max(0, toNum(c.relatoriosDia, DEFAULT_COLABORADOR.relatoriosDia)),
     // formato legado (unidadeId/unidadeNome únicos) vira uma alocação de 100%
     alocacoes: buildAlocacoes(Array.isArray(c.alocacoes) ? c.alocacoes
       : (c.unidadeId || c.unidadeNome) ? [{ unidadeId: c.unidadeId, unidadeNome: c.unidadeNome, percentual: 100 }] : []),
@@ -125,17 +126,16 @@ const Store = (() => {
       fatorBaixo: pos(base.fatorBaixo, DEFAULT_PARAMETROS.fatorBaixo),
       fatorMedio: pos(base.fatorMedio, DEFAULT_PARAMETROS.fatorMedio),
       fatorAlto: pos(base.fatorAlto, DEFAULT_PARAMETROS.fatorAlto),
-      diasReferencia: clamp(toInt(base.diasReferencia, DEFAULT_PARAMETROS.diasReferencia) || DEFAULT_PARAMETROS.diasReferencia, 1, 31),
       ocupacaoAlvo: clamp(pos(base.ocupacaoAlvo, DEFAULT_PARAMETROS.ocupacaoAlvo), 1, 100),
     };
   };
   const parametrosToRow = q => ({
     dias_uteis: q.diasUteis, fator_baixo: q.fatorBaixo, fator_medio: q.fatorMedio, fator_alto: q.fatorAlto,
-    dias_referencia: q.diasReferencia, ocupacao_alvo: q.ocupacaoAlvo,
+    ocupacao_alvo: q.ocupacaoAlvo,
   });
   const parametrosFromRow = r => buildParametros({
     diasUteis: r.dias_uteis, fatorBaixo: r.fator_baixo, fatorMedio: r.fator_medio, fatorAlto: r.fator_alto,
-    diasReferencia: r.dias_referencia, ocupacaoAlvo: r.ocupacao_alvo,
+    ocupacaoAlvo: r.ocupacao_alvo,
   });
 
   const TABELAS = {
@@ -159,8 +159,8 @@ const Store = (() => {
     colaboradores: {
       table: 'colaboradores',
       build: buildColaborador,
-      toRow: c => ({ nome: c.nome, funcao: c.funcao, horas_mes: c.horasMes, eficiencia: c.eficiencia }),
-      fromRow: r => ({ id: r.id, nome: r.nome, funcao: r.funcao, horasMes: Number(r.horas_mes), eficiencia: Number(r.eficiencia), alocacoes: [] }),
+      toRow: c => ({ nome: c.nome, funcao: c.funcao, empresas_dia: c.empresasDia, inspecoes_dia: c.inspecoesDia, relatorios_dia: c.relatoriosDia }),
+      fromRow: r => ({ id: r.id, nome: r.nome, funcao: r.funcao, empresasDia: Number(r.empresas_dia), inspecoesDia: Number(r.inspecoes_dia), relatoriosDia: Number(r.relatorios_dia), alocacoes: [] }),
     },
   };
 

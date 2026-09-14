@@ -31,7 +31,8 @@ const App = (() => {
 
   function findView(id) {
     const view = views.find(v => v.id === id) || views[0];
-    // telas só de admin caem na tela inicial para quem não é admin
+    // telas ocultas ou só de admin (para quem não é) caem na tela inicial
+    if (view.oculta) return views[0];
     return view.adminOnly && !Auth.isAdmin() ? views[0] : view;
   }
 

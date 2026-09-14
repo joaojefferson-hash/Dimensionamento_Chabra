@@ -1,8 +1,11 @@
 /* ==========================================================================
-   Tela: Empresas por Unidade — quantidade de empresas-cliente por unidade,
-   segmentada por grau de dificuldade (baixo / médio / alto).
-   Edição inline, salva automaticamente ao alterar o campo.
-   Os fatores de tempo por grau (parâmetros do motor) também são editados aqui.
+   Tela: Empresas por Unidade — matriz unidade × mês.
+
+   Cada unidade tem um valor PADRÃO por grau (baixo / médio / alto) e pode ter
+   valores diferentes em meses específicos. A matriz mostra, para o grau
+   escolhido, uma linha por unidade: Padrão | Jan … Dez | Média. Editar um mês
+   grava a exceção daquele mês (os outros graus do mês ficam como estão);
+   apagar a célula volta ao padrão. Tudo salva automaticamente.
    ========================================================================== */
 
 const ViewEmpresas = {
@@ -10,149 +13,133 @@ const ViewEmpresas = {
   title: 'Empresas por Unidade',
 
   GRAUS: [
-    { campo: 'empresasBaixo', fator: 'fatorBaixo', rotulo: 'Baixo' },
-    { campo: 'empresasMedio', fator: 'fatorMedio', rotulo: 'Médio' },
-    { campo: 'empresasAlto',  fator: 'fatorAlto',  rotulo: 'Alto' },
+    { campo: 'empresasBaixo', fator: 'fatorBaixo', rotulo: 'Baixo', ajuda: 'empresas simples, com poucos riscos' },
+    { campo: 'empresasMedio', fator: 'fatorMedio', rotulo: 'Médio', ajuda: 'empresas de porte ou complexidade média' },
+    { campo: 'empresasAlto',  fator: 'fatorAlto',  rotulo: 'Alto',  ajuda: 'empresas grandes ou com muitos riscos' },
   ],
 
-  unidadeMesSel: null, // unidade aberta no card de variação mensal
+  grauSel: 'empresasBaixo', // grau mostrado na matriz ('total' = só leitura)
 
   render(el) {
     const unidades = Store.unidades.list();
     const p = Store.parametros.get();
-    const totais = this.totais(unidades, p);
-    if (!unidades.some(u => u.id === this.unidadeMesSel)) this.unidadeMesSel = unidades.length ? unidades[0].id : null;
-    const uMes = unidades.find(u => u.id === this.unidadeMesSel) || null;
+    const grau = this.GRAUS.find(g => g.campo === this.grauSel) || null; // null = total
+    const MESES = Calculo.MESES;
+
+    // valor efetivo de uma unidade num mês (1..12) para um campo
+    const efetivo = (u, mes, campo) => { const exc = (u.meses || {})[mes]; return exc ? exc[campo] : u[campo]; };
+    const totalMes = (u, mes) => efetivo(u, mes, 'empresasBaixo') + efetivo(u, mes, 'empresasMedio') + efetivo(u, mes, 'empresasAlto');
+    const valorCelula = (u, mes) => (grau ? efetivo(u, mes, grau.campo) : totalMes(u, mes));
+    const valorPadrao = u => (grau ? u[grau.campo] : u.empresas);
+    const media = u => { let s = 0; for (let m = 1; m <= 12; m++) s += valorCelula(u, m); return s / 12; };
+    const temExcecao = (u, mes) => !!(u.meses || {})[mes];
     const nExc = u => Object.keys(u.meses || {}).length;
+    const fmt = v => (Number.isInteger(v) ? String(v) : UI.fmt(v, 1));
+
+    const totais = { padrao: 0, meses: new Array(12).fill(0), media: 0 };
+    unidades.forEach(u => {
+      totais.padrao += valorPadrao(u);
+      for (let m = 1; m <= 12; m++) totais.meses[m - 1] += valorCelula(u, m);
+      totais.media += media(u);
+    });
+    const totalEmpresas = unidades.reduce((s, u) => s + u.empresas, 0);
+    const totalPonderadas = unidades.reduce((s, u) => s + Calculo.empresasPonderadas(u, p), 0);
 
     el.innerHTML = `
       <header class="page-header">
         <h1>Empresas por Unidade</h1>
-        <p>Informe quantas empresas-cliente cada unidade atende, por grau de dificuldade — esse é o <em>padrão</em> da unidade. Se a carteira varia ao longo do ano, use a <em>variação mensal</em> abaixo. Tudo é salvo automaticamente. O grau multiplica o tempo de elaboração dos documentos no cálculo de demanda.</p>
+        <p>Quantas empresas-cliente cada unidade atende em cada mês do ano. Preencha o <em>padrão</em> (vale para o ano todo) e, se algum mês for diferente, digite o número naquele mês. Tudo é salvo automaticamente.</p>
       </header>
 
       <div class="stats">
         <div class="stat"><div class="label">Unidades</div><div class="value">${unidades.length}</div></div>
-        <div class="stat"><div class="label">Empresas-cliente (total)</div><div class="value" id="empresas-total-stat">${totais.empresas}</div></div>
-        <div class="stat"><div class="label">Empresas ponderadas</div><div class="value" id="empresas-ponderadas-stat">${UI.fmt(totais.ponderadas, 1)}</div></div>
+        <div class="stat"><div class="label">Empresas no padrão</div><div class="value" id="stat-empresas">${totalEmpresas}</div></div>
+        <div class="stat" title="Empresas contadas com o peso do grau (ex.: uma de grau alto vale 1,6)"><div class="label">Com peso do grau</div><div class="value" id="stat-ponderadas">${UI.fmt(totalPonderadas, 1)}</div></div>
       </div>
 
       <section class="card">
         <div class="card-head">
-          <h2>Fator de tempo por grau de dificuldade</h2>
-          <span class="muted">Multiplica o tempo médio de cada documento</span>
+          <h2>Peso de cada grau de dificuldade</h2>
+          <span class="muted">Quanto mais difícil a empresa, mais trabalho ela dá</span>
         </div>
         <form id="form-fatores" class="fatores" autocomplete="off">
           ${this.GRAUS.map(g => `
             <label class="field">
               <span>Grau ${g.rotulo}</span>
               <input class="input input-sm input-num" type="number" name="${g.fator}" min="0.1" step="0.05" inputmode="decimal" value="${p[g.fator]}">
+              <small>${g.ajuda}</small>
             </label>`).join('')}
           <span class="saved-flag" id="fatores-saved" aria-hidden="true">salvo ✓</span>
         </form>
-        <p class="note">Padrão sugerido: Baixo 1,0 · Médio 1,3 · Alto 1,6. Ex.: uma empresa de grau alto conta como 1,6 empresa de grau baixo na demanda.</p>
+        <p class="note">Sugestão: Baixo 1,0 · Médio 1,3 · Alto 1,6 — ou seja, uma empresa de grau alto dá o trabalho de 1,6 empresa de grau baixo.</p>
       </section>
 
+      ${unidades.length === 0 ? `
       <section class="card">
-        ${unidades.length === 0 ? `
-          <div class="empty">
-            <strong>Nenhuma unidade cadastrada</strong>
-            Cadastre as unidades primeiro para informar a quantidade de empresas de cada uma.
-            <br>
-            <button type="button" class="btn btn-primary" data-action="go-unidades">Ir para Unidades</button>
-          </div>` : `
-          <div class="table-wrap">
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Unidade</th>
-                  ${this.GRAUS.map(g => `<th class="num">Grau ${g.rotulo}</th>`).join('')}
-                  <th class="num">Total</th>
-                  <th class="num" title="Soma ponderada pelos fatores de grau">Ponderadas</th>
-                  <th>Variação mensal</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${unidades.map(u => `
-                  <tr data-unidade="${u.id}">
-                    <td>${UI.esc(u.nome)}</td>
-                    ${this.GRAUS.map(g => `
-                      <td class="num">
-                        <input type="number" class="input input-sm input-num input-grau" min="0" step="1" inputmode="numeric"
-                               data-id="${u.id}" data-campo="${g.campo}" value="${u[g.campo]}"
-                               aria-label="Empresas de grau ${g.rotulo} — ${UI.esc(u.nome)}">
-                      </td>`).join('')}
-                    <td class="num" data-total>${u.empresas}</td>
-                    <td class="num" data-ponderadas>${UI.fmt(this.ponderadas(u, p), 1)} <span class="saved-flag" aria-hidden="true">salvo ✓</span></td>
-                    <td>${nExc(u) ? `<button type="button" class="btn-link" data-action="abrir-mes" data-id="${u.id}">${UI.plural(nExc(u), 'mês', 'meses')} com exceção</button>` : `<button type="button" class="btn-link" data-action="abrir-mes" data-id="${u.id}">Definir</button>`}</td>
-                  </tr>`).join('')}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <th>Total</th>
-                  ${this.GRAUS.map(g => `<th class="num" data-total-grau="${g.campo}">${totais[g.campo]}</th>`).join('')}
-                  <th class="num" id="empresas-total">${totais.empresas}</th>
-                  <th class="num" id="empresas-ponderadas">${UI.fmt(totais.ponderadas, 1)}</th>
-                  <th></th>
-                </tr>
-              </tfoot>
-            </table>
-          </div>`}
-      </section>
-
-      ${uMes ? `
-      <section class="card" id="card-mes">
+        <div class="empty">
+          <strong>Nenhuma unidade cadastrada</strong>
+          Cadastre as unidades primeiro para informar a quantidade de empresas de cada uma.
+          <br>
+          <button type="button" class="btn btn-primary" data-action="go-unidades">Ir para Unidades</button>
+        </div>
+      </section>` : `
+      <section class="card">
         <div class="card-head">
-          <h2>Variação mensal</h2>
+          <h2>Empresas por mês</h2>
           <div class="right">
-            <select class="input input-sm" id="mes-unidade" aria-label="Unidade">
-              ${unidades.map(u => `<option value="${u.id}" ${u.id === uMes.id ? 'selected' : ''}>${UI.esc(u.nome)}</option>`).join('')}
-            </select>
-            <button type="button" class="btn btn-ghost btn-sm" data-action="limpar-mes" data-id="${uMes.id}" ${nExc(uMes) ? '' : 'disabled'}>Voltar todos ao padrão</button>
+            <span class="muted">Mostrar:</span>
+            <div class="seg" role="tablist">
+              ${this.GRAUS.map(g => `<button type="button" class="seg-btn ${this.grauSel === g.campo ? 'ativo' : ''}" data-action="grau" data-grau="${g.campo}">Grau ${g.rotulo}</button>`).join('')}
+              <button type="button" class="seg-btn ${this.grauSel === 'total' ? 'ativo' : ''}" data-action="grau" data-grau="total">Total</button>
+            </div>
           </div>
         </div>
-        <p class="muted">Célula vazia usa o padrão da unidade (${uMes.empresasBaixo} / ${uMes.empresasMedio} / ${uMes.empresasAlto}). Preencha só os meses que diferem. Ao editar um mês, os três graus daquele mês ficam fixos (os vazios recebem o padrão atual).</p>
+        <p class="muted">${grau
+          ? `Grau <strong>${grau.rotulo}</strong> (${grau.ajuda}). A coluna <strong>Padrão</strong> vale para todos os meses; digite um número em um mês só quando ele for diferente. Célula em azul = mês com valor próprio; apague o número para voltar ao padrão.`
+          : 'Soma dos três graus em cada mês (somente leitura — escolha um grau para editar).'}</p>
         <div class="table-wrap">
-          <table class="table table-mes">
+          <table class="table table-matriz">
             <thead>
               <tr>
-                <th>Mês</th>
-                ${this.GRAUS.map(g => `<th class="num">Grau ${g.rotulo}</th>`).join('')}
-                <th class="num">Total</th>
-                <th class="num">Ponderadas</th>
+                <th>Unidade</th>
+                <th class="num col-padrao">Padrão</th>
+                ${MESES.map(m => `<th class="num">${m}</th>`).join('')}
+                <th class="num" title="Média dos 12 meses">Média</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              ${Calculo.MESES_LONGO.map((nome, i) => {
-                const mes = i + 1;
-                const exc = (uMes.meses || {})[mes];
-                const q = exc || { empresasBaixo: uMes.empresasBaixo, empresasMedio: uMes.empresasMedio, empresasAlto: uMes.empresasAlto };
-                const pond = q.empresasBaixo * p.fatorBaixo + q.empresasMedio * p.fatorMedio + q.empresasAlto * p.fatorAlto;
-                return `
-                  <tr data-mes="${mes}" class="${exc ? 'mes-excecao' : ''}">
-                    <td>${nome}</td>
-                    ${this.GRAUS.map(g => `
-                      <td class="num">
-                        <input type="number" class="input input-sm input-num input-mes" min="0" step="1" inputmode="numeric"
-                               data-mes="${mes}" data-campo="${g.campo}" value="${exc ? exc[g.campo] : ''}" placeholder="${uMes[g.campo]}"
-                               aria-label="${nome} — grau ${g.rotulo}">
-                      </td>`).join('')}
-                    <td class="num" data-mes-total>${q.empresasBaixo + q.empresasMedio + q.empresasAlto}</td>
-                    <td class="num" data-mes-pond>${UI.fmt(pond, 1)}</td>
-                    <td class="actions">${exc ? `<button type="button" class="btn-link" data-action="padrao-mes" data-mes="${mes}" title="Voltar este mês ao padrão">padrão</button>` : '<span class="muted">padrão</span>'}</td>
-                  </tr>`;
-              }).join('')}
+              ${unidades.map(u => `
+                <tr data-unidade="${u.id}">
+                  <td class="col-nome">${UI.esc(u.nome)}</td>
+                  <td class="num col-padrao">${grau
+                    ? `<input type="number" class="input input-sm input-num input-padrao" min="0" step="1" inputmode="numeric" data-id="${u.id}" data-campo="${grau.campo}" value="${u[grau.campo]}" aria-label="Padrão de ${UI.esc(u.nome)}">`
+                    : `<strong>${u.empresas}</strong>`}</td>
+                  ${MESES.map((m, i) => { const mes = i + 1; const exc = temExcecao(u, mes); return grau
+                    ? `<td class="num ${exc ? 'cel-excecao' : ''}"><input type="number" class="input input-sm input-num input-mes" min="0" step="1" inputmode="numeric" data-id="${u.id}" data-mes="${mes}" data-campo="${grau.campo}" value="${exc ? efetivo(u, mes, grau.campo) : ''}" placeholder="${u[grau.campo]}" aria-label="${UI.esc(u.nome)} — ${Calculo.MESES_LONGO[i]}"></td>`
+                    : `<td class="num ${exc ? 'cel-excecao' : ''}">${totalMes(u, mes)}</td>`; }).join('')}
+                  <td class="num col-media" data-media>${fmt(media(u))}</td>
+                  <td class="actions">${nExc(u) ? `<button type="button" class="btn-link" data-action="limpar-mes" data-id="${u.id}" title="Apagar os valores próprios de mês e usar o padrão o ano todo">usar padrão</button>` : ''}</td>
+                </tr>`).join('')}
             </tbody>
+            <tfoot>
+              <tr>
+                <th>Total</th>
+                <th class="num col-padrao" data-total-padrao>${fmt(totais.padrao)}</th>
+                ${totais.meses.map((v, i) => `<th class="num" data-total-mes="${i + 1}">${fmt(v)}</th>`).join('')}
+                <th class="num" data-total-media>${fmt(totais.media)}</th>
+                <th></th>
+              </tr>
+            </tfoot>
           </table>
         </div>
-      </section>` : ''}
+        <p class="note">Os números da coluna Padrão são os mesmos usados quando o mês não tem valor próprio. A programação usa o número de cada mês.</p>
+      </section>`}
     `;
 
-    el.querySelector('[data-action="go-unidades"]')
-      ?.addEventListener('click', () => App.navigate('unidades'));
+    el.querySelector('[data-action="go-unidades"]')?.addEventListener('click', () => App.navigate('unidades'));
 
-    // ---- fatores (parâmetros) ----
+    // ---- pesos ----
     const formFatores = el.querySelector('#form-fatores');
     formFatores.addEventListener('submit', e => e.preventDefault());
     formFatores.querySelectorAll('input').forEach(input => {
@@ -160,7 +147,7 @@ const ViewEmpresas = {
       input.addEventListener('change', async () => {
         const valor = UI.parseNum(input.value, NaN);
         if (!(valor > 0)) {
-          UI.toast('O fator precisa ser maior que zero.', 'error');
+          UI.toast('O peso precisa ser maior que zero.', 'error');
           input.value = Store.parametros.get()[input.name];
           return;
         }
@@ -174,71 +161,33 @@ const ViewEmpresas = {
         } finally {
           input.disabled = false;
         }
-        this.atualizarTotais(el);
+        const st = el.querySelector('#stat-ponderadas');
+        if (st) st.textContent = UI.fmt(Store.unidades.list().reduce((s, u) => s + Calculo.empresasPonderadas(u, Store.parametros.get()), 0), 1);
         this.piscar(el.querySelector('#fatores-saved'));
       });
     });
 
-    // ---- variação mensal ----
+    // ---- seletor de grau / usar padrão ----
     el.addEventListener('click', async e => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
-      const { action, id, mes } = btn.dataset;
-      if (action === 'abrir-mes') {
-        this.unidadeMesSel = id;
+      if (btn.dataset.action === 'grau') {
+        this.grauSel = btn.dataset.grau;
         App.render();
-        const card = document.getElementById('card-mes');
-        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else if (action === 'limpar-mes') {
-        const ok = await UI.confirm({ title: 'Voltar todos os meses ao padrão', message: 'Remover todas as exceções mensais desta unidade?', confirmText: 'Remover' });
+      } else if (btn.dataset.action === 'limpar-mes') {
+        const u = Store.unidades.get(btn.dataset.id);
+        const ok = await UI.confirm({ title: 'Usar o padrão o ano todo', message: `Apagar os valores próprios de mês de "${u ? u.nome : ''}"? Todos os meses passam a usar o padrão.`, confirmText: 'Apagar' });
         if (!ok) return;
-        try { await Store.empresasMes.limpar(id); UI.toast('Meses voltaram ao padrão.'); }
-        catch (err) { UI.toast(err.message, 'error'); }
-      } else if (action === 'padrao-mes') {
-        try { await Store.empresasMes.definir(this.unidadeMesSel, Number(mes), null); }
+        try { await Store.empresasMes.limpar(btn.dataset.id); UI.toast('Meses voltaram ao padrão.'); }
         catch (err) { UI.toast(err.message, 'error'); }
       }
     });
-    el.querySelector('#mes-unidade')?.addEventListener('change', e => { this.unidadeMesSel = e.target.value; App.render(); });
-    el.querySelectorAll('input.input-mes').forEach(input => {
-      input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
-      input.addEventListener('change', async () => {
-        const tr = input.closest('tr');
-        const mes = Number(input.dataset.mes);
-        const u = Store.unidades.get(this.unidadeMesSel);
-        if (!u) return;
-        const inputs = [...tr.querySelectorAll('input.input-mes')];
-        const todosVazios = inputs.every(i => i.value.trim() === '');
-        const valores = {};
-        inputs.forEach(i => { valores[i.dataset.campo] = i.value.trim() === '' ? u[i.dataset.campo] : Math.max(0, Math.floor(UI.parseNum(i.value, 0))); });
-        inputs.forEach(i => { i.disabled = true; });
-        try {
-          await Store.empresasMes.definir(u.id, mes, todosVazios ? null : valores, { silent: true });
-        } catch (err) {
-          UI.toast(err.message, 'error');
-          inputs.forEach(i => { i.disabled = false; });
-          return;
-        }
-        inputs.forEach(i => { i.disabled = false; });
-        // atualiza a linha sem re-renderizar (mantém o foco); os vazios passam a mostrar o valor fixado
-        const pAtual = Store.parametros.get();
-        const q = todosVazios ? { empresasBaixo: u.empresasBaixo, empresasMedio: u.empresasMedio, empresasAlto: u.empresasAlto } : valores;
-        if (!todosVazios) inputs.forEach(i => { i.value = valores[i.dataset.campo]; });
-        tr.classList.toggle('mes-excecao', !todosVazios);
-        tr.querySelector('[data-mes-total]').textContent = q.empresasBaixo + q.empresasMedio + q.empresasAlto;
-        tr.querySelector('[data-mes-pond]').textContent = UI.fmt(q.empresasBaixo * pAtual.fatorBaixo + q.empresasMedio * pAtual.fatorMedio + q.empresasAlto * pAtual.fatorAlto, 1);
-        tr.querySelector('td.actions').innerHTML = todosVazios ? '<span class="muted">padrão</span>' : `<button type="button" class="btn-link" data-action="padrao-mes" data-mes="${mes}" title="Voltar este mês ao padrão">padrão</button>`;
-        const n = Object.keys(Store.unidades.get(u.id).meses || {}).length;
-        const btnLimpar = el.querySelector('[data-action="limpar-mes"]');
-        if (btnLimpar) btnLimpar.disabled = n === 0;
-        const btnLinha = el.querySelector(`[data-action="abrir-mes"][data-id="${u.id}"]`);
-        if (btnLinha) btnLinha.textContent = n ? `${UI.plural(n, 'mês', 'meses')} com exceção` : 'Definir';
-      });
-    });
 
-    // ---- quantidades por grau ----
-    el.querySelectorAll('input.input-grau').forEach(input => {
-      input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+    const enterBlur = input => input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+
+    // ---- padrão da unidade (grau selecionado) ----
+    el.querySelectorAll('input.input-padrao').forEach(input => {
+      enterBlur(input);
       input.addEventListener('change', async () => {
         const valor = Math.max(0, Math.floor(UI.parseNum(input.value, 0)));
         input.value = valor;
@@ -253,60 +202,86 @@ const ViewEmpresas = {
         } finally {
           input.disabled = false;
         }
-        this.atualizarTotais(el);
+        this.atualizarLinha(el, input.dataset.id);
         App.updateBadges();
-        this.piscar(input.closest('tr').querySelector('.saved-flag'));
       });
     });
-  },
 
-  ponderadas(u, p) {
-    return u.empresasBaixo * p.fatorBaixo + u.empresasMedio * p.fatorMedio + u.empresasAlto * p.fatorAlto;
-  },
-
-  totais(unidades, p) {
-    const t = { empresasBaixo: 0, empresasMedio: 0, empresasAlto: 0, empresas: 0, ponderadas: 0 };
-    unidades.forEach(u => {
-      t.empresasBaixo += u.empresasBaixo;
-      t.empresasMedio += u.empresasMedio;
-      t.empresasAlto += u.empresasAlto;
-      t.empresas += u.empresas;
-      t.ponderadas += this.ponderadas(u, p);
-    });
-    return t;
-  },
-
-  /** Atualiza totais e ponderadas na tabela sem re-renderizar (mantém o foco nos inputs). */
-  atualizarTotais(el) {
-    const p = Store.parametros.get();
-    const unidades = Store.unidades.list();
-    unidades.forEach(u => {
-      const tr = el.querySelector(`tr[data-unidade="${u.id}"]`);
-      if (!tr) return;
-      tr.querySelector('[data-total]').textContent = u.empresas;
-      const cel = tr.querySelector('[data-ponderadas]');
-      cel.firstChild.textContent = UI.fmt(this.ponderadas(u, p), 1) + ' ';
-    });
-    const t = this.totais(unidades, p);
-    this.GRAUS.forEach(g => { const th = el.querySelector(`[data-total-grau="${g.campo}"]`); if (th) th.textContent = t[g.campo]; });
-    const set = (id, v) => { const x = el.querySelector('#' + id); if (x) x.textContent = v; };
-    set('empresas-total', t.empresas);
-    set('empresas-total-stat', t.empresas);
-    set('empresas-ponderadas', UI.fmt(t.ponderadas, 1));
-    set('empresas-ponderadas-stat', UI.fmt(t.ponderadas, 1));
-
-    // card de variação mensal: placeholders e linhas "padrão" seguem o novo padrão da unidade
-    const uMes = unidades.find(u => u.id === this.unidadeMesSel);
-    if (uMes) {
-      el.querySelectorAll('.table-mes tbody tr').forEach(tr => {
-        const exc = (uMes.meses || {})[Number(tr.dataset.mes)];
-        tr.querySelectorAll('input.input-mes').forEach(i => { i.placeholder = uMes[i.dataset.campo]; });
-        if (!exc) {
-          tr.querySelector('[data-mes-total]').textContent = uMes.empresas;
-          tr.querySelector('[data-mes-pond]').textContent = UI.fmt(this.ponderadas(uMes, p), 1);
+    // ---- valor próprio de um mês ----
+    el.querySelectorAll('input.input-mes').forEach(input => {
+      enterBlur(input);
+      input.addEventListener('change', async () => {
+        const u = Store.unidades.get(input.dataset.id);
+        if (!u) return;
+        const mes = Number(input.dataset.mes);
+        const campo = input.dataset.campo;
+        const vazio = input.value.trim() === '';
+        const excAtual = (u.meses || {})[mes];
+        let novo = null;
+        if (!vazio) {
+          const base = excAtual || { empresasBaixo: u.empresasBaixo, empresasMedio: u.empresasMedio, empresasAlto: u.empresasAlto };
+          novo = { ...base, [campo]: Math.max(0, Math.floor(UI.parseNum(input.value, 0))) };
+          input.value = novo[campo];
+        } else if (excAtual) {
+          // apagou este grau: se os outros graus do mês ainda diferem do padrão, mantém a exceção com o padrão neste grau
+          const resto = { ...excAtual, [campo]: u[campo] };
+          const igualPadrao = this.GRAUS.every(g => resto[g.campo] === u[g.campo]);
+          novo = igualPadrao ? null : resto;
         }
+        input.disabled = true;
+        try {
+          await Store.empresasMes.definir(u.id, mes, novo, { silent: true });
+        } catch (err) {
+          UI.toast(err.message, 'error');
+          input.value = excAtual ? excAtual[campo] : '';
+          return;
+        } finally {
+          input.disabled = false;
+        }
+        this.atualizarLinha(el, u.id);
       });
+    });
+  },
+
+  /** Recalcula, sem re-renderizar, a linha da unidade (célula em azul, média) e os totais. */
+  atualizarLinha(el, unidadeId) {
+    const unidades = Store.unidades.list();
+    const grau = this.GRAUS.find(g => g.campo === this.grauSel) || null;
+    const efetivo = (u, mes, campo) => { const exc = (u.meses || {})[mes]; return exc ? exc[campo] : u[campo]; };
+    const valor = (u, mes) => (grau ? efetivo(u, mes, grau.campo) : this.GRAUS.reduce((s, g) => s + efetivo(u, mes, g.campo), 0));
+    const fmt = v => (Number.isInteger(v) ? String(v) : UI.fmt(v, 1));
+
+    const u = unidades.find(x => x.id === unidadeId);
+    const tr = el.querySelector(`tr[data-unidade="${unidadeId}"]`);
+    if (u && tr) {
+      let soma = 0;
+      tr.querySelectorAll('input.input-mes').forEach(inp => {
+        const mes = Number(inp.dataset.mes);
+        const exc = (u.meses || {})[mes];
+        inp.closest('td').classList.toggle('cel-excecao', !!exc);
+        inp.placeholder = grau ? u[grau.campo] : '';
+        if (!exc) inp.value = '';
+      });
+      for (let m = 1; m <= 12; m++) soma += valor(u, m);
+      tr.querySelector('[data-media]').textContent = fmt(soma / 12);
+      const n = Object.keys(u.meses || {}).length;
+      tr.querySelector('td.actions').innerHTML = n ? `<button type="button" class="btn-link" data-action="limpar-mes" data-id="${u.id}" title="Apagar os valores próprios de mês e usar o padrão o ano todo">usar padrão</button>` : '';
     }
+    // totais
+    let padrao = 0, mediaT = 0;
+    const meses = new Array(12).fill(0);
+    unidades.forEach(x => {
+      padrao += grau ? x[grau.campo] : x.empresas;
+      let s = 0;
+      for (let m = 1; m <= 12; m++) { const v = valor(x, m); meses[m - 1] += v; s += v; }
+      mediaT += s / 12;
+    });
+    const set = (sel, v) => { const n = el.querySelector(sel); if (n) n.textContent = v; };
+    set('[data-total-padrao]', fmt(padrao));
+    meses.forEach((v, i) => set(`[data-total-mes="${i + 1}"]`, fmt(v)));
+    set('[data-total-media]', fmt(mediaT));
+    set('#stat-empresas', unidades.reduce((s, x) => s + x.empresas, 0));
+    set('#stat-ponderadas', UI.fmt(unidades.reduce((s, x) => s + Calculo.empresasPonderadas(x, Store.parametros.get()), 0), 1));
   },
 
   piscar(flag) {

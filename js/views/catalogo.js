@@ -5,6 +5,7 @@
 const ViewCatalogo = {
   id: 'catalogo',
   title: 'Catálogo de Documentos',
+  oculta: true, // o modelo de produção diária não usa horas por documento; tela mantida para uma fase futura
   editingId: null,
   pendingFocus: false,
 

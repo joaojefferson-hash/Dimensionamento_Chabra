@@ -58,40 +58,34 @@ Nginx…). Nenhuma configuração extra.
 - Qualquer usuário logado troca a própria senha em **Senha** (menu lateral).
 - Não há fluxo "esqueci a senha": um admin redefine pela tela Usuários.
 
-## Motor de cálculo (Fase 2)
+## Motor de cálculo (produção diária)
 
 Tudo roda no navegador, em [js/calculo.js](js/calculo.js) (funções puras; também
-roda em Node para testes). Fórmulas:
+roda em Node para testes). O modelo é declarado pelo usuário, sem horas:
 
 ```
-horas_dia              = capacidade mensal cadastrada ÷ dias úteis de referência (Calendário)
-capacidade_mes(colab)  = dias_uteis[mês] × horas_dia × eficiência
-empresas_ponderadas    = baixo × fator_baixo + médio × fator_medio + alto × fator_alto
-demanda_mes(doc)       = empresas_ponderadas(mês) × horas ÷ periodicidade   (periodicidade 0 = fora do cálculo)
-demanda_anual(doc)     = Σ demanda_mes (com empresas constantes = ponderadas × horas × 12 ÷ periodicidade)
-capacidade_planejável  = capacidade × ocupação-alvo
-gap_horas              = capacidade_planejável − demanda
-gap_colab              = gap_horas ÷ capacidade média por colaborador (mesma função)
+precisa(unidade, mês)        = empresas do mês × peso do grau
+                               (cada empresa da carteira precisa, no mês, de 1 inspeção,
+                                1 relatório e 1 finalização administrativa)
+produção(pessoa, entrega, mês) = ritmo por dia × dias úteis do mês × % do tempo na unidade
+consegue(unidade, entrega)   = Σ produção × (1 − folga para imprevistos)
+sobra                        = consegue − precisa      (negativa = falta)
+pessoas que faltam/sobram    = sobra ÷ produção de uma pessoa inteira no período
 ```
 
-- Capacidade por unidade = Σ capacidade do colaborador × percentual alocado; o nº de
-  colaboradores aparece em FTE (ex.: 2,5). A conversão de gap em pessoas usa a capacidade
-  média de um colaborador inteiro.
-- Demanda e capacidade são calculadas **por função** (o documento diz quem o
-  produz; o colaborador tem função) e somadas no total. A recomendação da visão
-  *Total* combina as necessidades por função, porque técnico não produz documento
-  administrativo.
-- Recomendação: gap < 0 → "Contratar N" (arredonda para cima); sobra ≥ 1 → "Capacidade
-  ociosa de N" (arredonda para baixo); senão "Quadro adequado".
-- Status: vermelho = déficit; amarelo = folga menor que 10% da capacidade planejável;
-  verde = suficiente.
-- Colaborador sem unidade e documento sob demanda ficam fora, com aviso na tela.
-- Telas: **Programação Anual** (consolidado por unidade + por função + demanda por
-  documento + capacidade nominal por colaborador), **Programação Mensal** (12 meses,
-  por unidade ou total, grade unidade × mês) e **Calendário** (dias úteis por mês +
-  dias de referência). A janela (de/até) e os filtros ficam no navegador; a
-  ocupação-alvo, os fatores e o calendário são parâmetros compartilhados (tabela
-  `parametros`).
+- Entregas: técnicos → inspeções por dia e relatórios por dia; administrativos →
+  empresas finalizadas por dia. A situação dos técnicos é a pior das duas entregas.
+- Sinais: verde = dá conta; amarelo = no limite (sobra < 10%); vermelho = precisa contratar.
+  As telas mostram frases prontas ("Faltam aproximadamente 3 técnicos…") em vez de
+  números crus. O total soma as faltas das unidades (folga numa não cobre outra).
+- "Folga para imprevistos" (padrão 15%) é o parâmetro `ocupacao_alvo` (85) visto pelo
+  lado do usuário.
+- Telas: **Programação Anual** (um cartão por unidade + total), **Programação Mensal**
+  (mês a mês: consegue / precisa por entrega + grade unidade × mês só com sinais) e
+  **Calendário** (dias úteis por mês). Período e unidade ficam no navegador; folga,
+  pesos e calendário são compartilhados (tabela `parametros`).
+- O Catálogo de Documentos ficou oculto (não entra no cálculo neste modelo); a tela e a
+  tabela continuam no código para uma fase futura.
 
 ## Estrutura
 
@@ -104,7 +98,7 @@ js/auth.js              cliente Supabase (`db`) + sessão (login/logout)
 js/store.js             cache em memória sobre as tabelas + exportar/importar JSON
 js/views/unidades.js        tela Unidades (CRUD)
 js/views/empresas.js        tela Empresas por Unidade (quantidade por unidade)
-js/views/catalogo.js        tela Catálogo de Documentos SST (CRUD, pré-carregado)
+js/views/catalogo.js        tela Catálogo de Documentos (oculta neste modelo)
 js/views/colaboradores.js   tela Colaboradores (CRUD)
 js/views/usuarios.js        tela Usuários (só admin) — chama a Edge Function `usuarios`
 js/views/calendario.js      tela Calendário (dias úteis por mês, dias de referência)
@@ -113,7 +107,7 @@ js/views/programacao-anual.js   tela Programação Anual
 js/calculo.js           motor de dimensionamento (puro)
 js/programacao.js       utilitários das telas de programação (janela, barra, formatação)
 js/app.js               inicialização, navegação por hash (#/unidades …), badges, backup
-supabase/migrations/    SQL do banco (0001…0007; 0005 = alocação multiunidade, 0007 = empresas por mês)
+supabase/migrations/    SQL do banco (0001…0008; 0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária)
 supabase/functions/usuarios/index.ts   Edge Function de gestão de usuários (chave secreta só no servidor)
 ```
 
@@ -126,10 +120,10 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
 |-----------------|-------------------------------------------------------------------------------------------|
 | `unidades`      | `id, nome (único), empresas_baixo/medio/alto (int ≥ 0), empresas (gerada = soma)`          |
 | `documentos`    | `id, nome (único), horas, periodicidade_meses (int ≥ 0), responsavel (função)`             |
-| `colaboradores` | `id, nome, funcao, horas_mes, eficiencia (1–100)`                                          |
+| `colaboradores` | `id, nome, funcao, empresas_dia, inspecoes_dia, relatorios_dia` (ritmo por dia)          |
 | `colaborador_unidades` | `colaborador_id, unidade_id, percentual (0–100; soma por colaborador ≤ 100, gatilho)` |
 | `unidade_empresas_mes` | `unidade_id, mes (1–12), empresas_baixo/medio/alto` — exceção mensal; sem linha = padrão |
-| `parametros`    | linha única: `dias_uteis[12], fator_baixo/medio/alto, dias_referencia, ocupacao_alvo`      |
+| `parametros`    | linha única: `dias_uteis[12], fator_baixo/medio/alto, ocupacao_alvo`                      |
 
 - `periodicidade_meses = 0` significa **sob demanda** (documento sem renovação periódica).
 - A quantidade de empresas pode **variar por mês**: os campos da unidade são o padrão e a
@@ -141,7 +135,7 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
   menor que 100% (o restante é "não alocado" e não conta) mas nunca maior. Salvo pela RPC
   `definir_alocacoes(colaborador, jsonb)` numa transação.
 - No JS/backup as chaves são camelCase (`periodicidadeMeses`, `horasMes`, `empresasBaixo`…);
-  o backup v4 inclui `parametros`, `empresasPorMes[{mes, empresasBaixo…}]` nas unidades e `alocacoes[{unidadeNome, percentual}]` nos colaboradores
+  o backup v5 inclui `parametros`, `empresasPorMes[{mes, empresasBaixo…}]` nas unidades e `alocacoes[{unidadeNome, percentual}]` nos colaboradores
   (a importação resolve a unidade pelo nome). Backups antigos: `empresas` → grau baixo;
   `unidadeNome` único → alocação de 100%.
 
@@ -157,7 +151,7 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
 ## Fases
 
 - **Fase 1 (feita):** cadastros + persistência na nuvem + login + backup + gestão de usuários.
-- **Fase 2 (feita):** graus de dificuldade, calendário, motor de cálculo, Programação
-  Mensal/Anual com recomendação.
+- **Fase 2 (feita):** graus de dificuldade, calendário, Programação Mensal/Anual com
+  recomendação; depois simplificada para o modelo de produção diária com linguagem simples.
 - **Futuro:** apontamento de produção real por colaborador, feriados automáticos,
   distribuição não uniforme da demanda ao longo do ano.
