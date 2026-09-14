@@ -58,6 +58,15 @@ const Auth = (() => {
     return session ? session.user : null;
   }
 
+  /** Nome para exibição: "Nome Sobrenome" de user_metadata, ou o e-mail se não houver. */
+  function displayName() {
+    const u = user();
+    if (!u) return '';
+    const m = u.user_metadata || {};
+    const nome = [m.nome, m.sobrenome].map(v => String(v || '').trim()).filter(Boolean).join(' ');
+    return nome || u.email || '';
+  }
+
   /** Administrador = app_metadata.admin === true (definido só pelo servidor; o usuário não edita). */
   function isAdmin() {
     const u = user();
@@ -83,7 +92,7 @@ const Auth = (() => {
   }
 
   return {
-    configOk, init, onChange, signIn, signOut, user, isAdmin, alterarSenha,
+    configOk, init, onChange, signIn, signOut, user, displayName, isAdmin, alterarSenha,
     get session() { return session; },
   };
 })();

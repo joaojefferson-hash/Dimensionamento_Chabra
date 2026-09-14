@@ -11,7 +11,8 @@
 //
 // Ações (body JSON { action, ...params }):
 //   listar                       → { usuarios: [...] }
-//   criar          { email, senha, admin }
+//   criar          { nome, sobrenome, email, senha, admin }
+//   editar         { id, nome, sobrenome }        (dados de exibição, em user_metadata)
 //   redefinirSenha { id, senha }
 //   definirAdmin   { id, admin }
 //   remover        { id }
@@ -60,16 +61,27 @@ function traduz(msg: string): string {
 type Usuario = {
   id: string;
   email: string | null;
+  nome: string;
+  sobrenome: string;
+  nomeCompleto: string;
   admin: boolean;
   confirmado: boolean;
   criadoEm: string;
   ultimoLogin: string | null;
 };
 
-function mapUser(u: { id: string; email?: string; app_metadata?: Record<string, unknown>; email_confirmed_at?: string | null; created_at: string; last_sign_in_at?: string | null }): Usuario {
+const NOME_MAX = 60;
+const limpaNome = (v: unknown) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, NOME_MAX);
+
+function mapUser(u: { id: string; email?: string; app_metadata?: Record<string, unknown>; user_metadata?: Record<string, unknown>; email_confirmed_at?: string | null; created_at: string; last_sign_in_at?: string | null }): Usuario {
+  const nome = limpaNome(u.user_metadata?.nome);
+  const sobrenome = limpaNome(u.user_metadata?.sobrenome);
   return {
     id: u.id,
     email: u.email ?? null,
+    nome,
+    sobrenome,
+    nomeCompleto: [nome, sobrenome].filter(Boolean).join(' ') || (u.email ?? ''),
     admin: u.app_metadata?.admin === true,
     confirmado: !!u.email_confirmed_at,
     criadoEm: u.created_at,
@@ -103,7 +115,7 @@ Deno.serve(async (req: Request) => {
       if (error) throw new Error(traduz(error.message));
       return data.users
         .map(mapUser)
-        .sort((a, b) => a.criadoEm.localeCompare(b.criadoEm));
+        .sort((a, b) => a.nomeCompleto.localeCompare(b.nomeCompleto, 'pt-BR', { sensitivity: 'base' }));
     }
 
     switch (action) {
@@ -112,19 +124,38 @@ Deno.serve(async (req: Request) => {
       }
 
       case 'criar': {
+        const nome = limpaNome(body.nome);
+        const sobrenome = limpaNome(body.sobrenome);
         const email = String(body.email ?? '').trim().toLowerCase();
         const senha = String(body.senha ?? '');
         const ehAdmin = body.admin === true;
+        if (!nome) return json({ error: 'Informe o nome.' }, 400);
         if (!EMAIL_RE.test(email)) return json({ error: 'E-mail inválido.' }, 400);
         if (senha.length < SENHA_MIN) return json({ error: `A senha precisa ter pelo menos ${SENHA_MIN} caracteres.` }, 400);
         const { data, error } = await admin.auth.admin.createUser({
           email,
           password: senha,
           email_confirm: true,
+          user_metadata: { nome, sobrenome },
           app_metadata: { admin: ehAdmin },
         });
         if (error) return json({ error: traduz(error.message) }, error.status === 422 ? 409 : 400);
         return json({ usuario: mapUser(data.user) }, 201);
+      }
+
+      case 'editar': {
+        const id = String(body.id ?? '');
+        const nome = limpaNome(body.nome);
+        const sobrenome = limpaNome(body.sobrenome);
+        if (!id) return json({ error: 'Usuário não informado.' }, 400);
+        if (!nome) return json({ error: 'Informe o nome.' }, 400);
+        const { data: alvo, error: getErr } = await admin.auth.admin.getUserById(id);
+        if (getErr || !alvo.user) return json({ error: 'Usuário não encontrado.' }, 404);
+        const { data, error } = await admin.auth.admin.updateUserById(id, {
+          user_metadata: { ...(alvo.user.user_metadata ?? {}), nome, sobrenome },
+        });
+        if (error) return json({ error: traduz(error.message) }, 400);
+        return json({ usuario: mapUser(data.user) });
       }
 
       case 'redefinirSenha': {

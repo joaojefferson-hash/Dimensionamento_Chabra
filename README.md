@@ -49,10 +49,12 @@ Nginx…). Nenhuma configuração extra.
 - Papel de administrador = `app_metadata.admin = true` (só o servidor altera;
   o usuário não consegue editar `app_metadata`). A mudança de papel vale no
   próximo login do usuário afetado.
-- Administradores veem a tela **Usuários**: listar, criar (e-mail + senha
-  inicial, opcionalmente admin), redefinir senha, promover/rebaixar, remover.
-  A função recusa remover a si mesmo, alterar o próprio papel e remover o último
-  admin.
+- Nome e sobrenome ficam em `user_metadata` (`nome`, `sobrenome`) e aparecem no
+  programa no lugar do e-mail (menu lateral, lista de usuários).
+- Administradores veem a tela **Usuários**: listar, criar (nome, sobrenome,
+  e-mail, senha inicial, opcionalmente admin), editar nome, redefinir senha,
+  promover/rebaixar, remover. A função recusa remover a si mesmo, alterar o
+  próprio papel e remover o último admin.
 - Qualquer usuário logado troca a própria senha em **Senha** (menu lateral).
 - Não há fluxo "esqueci a senha": um admin redefine pela tela Usuários.
 

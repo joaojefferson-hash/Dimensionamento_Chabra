@@ -58,10 +58,17 @@ const App = (() => {
     window.scrollTo(0, 0);
   }
 
-  /** Re-renderiza a tela atual e atualiza os contadores do menu. */
+  /**
+   * Re-renderiza a tela atual e atualiza os contadores do menu.
+   * Cada render recebe um elemento raiz NOVO: os listeners que a tela registra
+   * nele morrem junto com o DOM anterior (senão acumulariam a cada re-render).
+   */
   function render() {
     if (!appReady || !current) return;
-    current.render(content);
+    const root = document.createElement('div');
+    root.className = 'view';
+    content.replaceChildren(root);
+    current.render(root);
     updateBadges();
   }
 
@@ -89,7 +96,7 @@ const App = (() => {
     entering = false;
     appReady = true;
     const user = Auth.user();
-    document.getElementById('user-email').textContent = user ? user.email : '';
+    document.getElementById('user-email').textContent = Auth.displayName();
     document.getElementById('user-email').title = user ? user.email : '';
     document.querySelectorAll('[data-admin-only]').forEach(el => { el.hidden = !Auth.isAdmin(); });
     showScreen('app');

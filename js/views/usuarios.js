@@ -3,6 +3,7 @@
 
    Todas as operações passam pela Edge Function `usuarios`, que valida o JWT
    do chamador e exige app_metadata.admin. O navegador nunca vê a chave secreta.
+   Nome/sobrenome ficam em user_metadata (exibição); o papel fica em app_metadata.
    ========================================================================== */
 
 const UsuariosAPI = (() => {
@@ -25,7 +26,8 @@ const UsuariosAPI = (() => {
   }
   return {
     listar: () => chamar('listar').then(r => r.usuarios),
-    criar: (email, senha, admin) => chamar('criar', { email, senha, admin }).then(r => r.usuario),
+    criar: dados => chamar('criar', dados).then(r => r.usuario),
+    editar: (id, nome, sobrenome) => chamar('editar', { id, nome, sobrenome }).then(r => r.usuario),
     redefinirSenha: (id, senha) => chamar('redefinirSenha', { id, senha }),
     definirAdmin: (id, admin) => chamar('definirAdmin', { id, admin }),
     remover: id => chamar('remover', { id }),
@@ -37,10 +39,10 @@ const ViewUsuarios = {
   title: 'Usuários',
   adminOnly: true,
   usuarios: null,   // cache da última listagem
-  erro: null,
+  editingId: null,
 
   leave() {
-    this.erro = null;
+    this.editingId = null;
   },
 
   fmtData(iso) {
@@ -49,20 +51,35 @@ const ViewUsuarios = {
   },
 
   render(el) {
-    const eu = Auth.user();
+    const editing = this.editingId && this.usuarios ? this.usuarios.find(u => u.id === this.editingId) : null;
+    if (this.editingId && !editing) this.editingId = null;
+
     el.innerHTML = `
       <header class="page-header">
         <h1>Usuários</h1>
-        <p>Quem pode entrar no Chabra Dimensiona. Só administradores veem esta tela. Ao criar um usuário, informe a ele a senha inicial — ele pode trocá-la depois em <em>Senha</em>, no menu lateral.</p>
+        <p>Quem pode entrar no Chabra Dimensiona. Só administradores veem esta tela. O nome aparece no programa no lugar do e-mail. Ao criar um usuário, informe a ele a senha inicial — ele pode trocá-la depois em <em>Senha</em>, no menu lateral.</p>
       </header>
 
       <section class="card">
-        <h2>Novo usuário</h2>
+        <h2>${editing ? 'Editar usuário' : 'Novo usuário'}</h2>
         <form id="form-usuario" class="form-grid" autocomplete="off">
           <label class="field span-2">
-            <span>E-mail</span>
-            <input class="input" type="email" name="email" required autocomplete="off" placeholder="nome@chabra.com.br">
+            <span>Nome</span>
+            <input class="input" name="nome" required maxlength="60" autocomplete="off" placeholder="Ex.: Ana"
+                   value="${UI.esc(editing ? editing.nome : '')}">
           </label>
+          <label class="field span-2">
+            <span>Sobrenome</span>
+            <input class="input" name="sobrenome" required maxlength="60" autocomplete="off" placeholder="Ex.: Souza"
+                   value="${UI.esc(editing ? editing.sobrenome : '')}">
+          </label>
+          <label class="field span-2">
+            <span>E-mail</span>
+            <input class="input" type="email" name="email" ${editing ? 'disabled' : 'required'} autocomplete="off" placeholder="nome@chabra.com.br"
+                   value="${UI.esc(editing ? editing.email || '' : '')}">
+            ${editing ? '<small>O e-mail de acesso não pode ser alterado por aqui.</small>' : ''}
+          </label>
+          ${editing ? '' : `
           <label class="field span-2">
             <span>Senha inicial</span>
             <div class="input-group">
@@ -71,12 +88,13 @@ const ViewUsuarios = {
             </div>
             <small>Fica visível para você copiar e enviar ao colaborador.</small>
           </label>
-          <label class="field span-2 field-check">
+          <label class="field span-4 field-check">
             <input type="checkbox" name="admin">
             <span>Administrador (pode gerenciar usuários)</span>
-          </label>
+          </label>`}
           <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Criar usuário</button>
+            <button type="submit" class="btn btn-primary">${editing ? 'Salvar alterações' : 'Criar usuário'}</button>
+            ${editing ? '<button type="button" class="btn btn-ghost" data-action="cancel">Cancelar</button>' : ''}
           </div>
         </form>
       </section>
@@ -97,21 +115,32 @@ const ViewUsuarios = {
 
     form.addEventListener('submit', async e => {
       e.preventDefault();
-      const email = form.email.value.trim().toLowerCase();
-      const senha = form.senha.value;
-      const admin = form.admin.checked;
-      if (!email) return;
-      if (senha.length < 8) {
-        UI.toast('A senha precisa ter pelo menos 8 caracteres.', 'error');
-        form.senha.focus();
-        return;
-      }
+      const nome = form.nome.value.trim();
+      const sobrenome = form.sobrenome.value.trim();
+      if (!nome) { form.nome.focus(); return; }
+
       UI.busy(form, true);
       try {
-        await UsuariosAPI.criar(email, senha, admin);
-        UI.toast(`Usuário ${email} criado.`);
+        if (this.editingId) {
+          await UsuariosAPI.editar(this.editingId, nome, sobrenome);
+          this.editingId = null;
+          UI.toast('Usuário atualizado.');
+          App.render();
+          return;
+        }
+        const email = form.email.value.trim().toLowerCase();
+        const senha = form.senha.value;
+        const admin = form.admin.checked;
+        if (!email) { form.email.focus(); return; }
+        if (senha.length < 8) {
+          UI.toast('A senha precisa ter pelo menos 8 caracteres.', 'error');
+          form.senha.focus();
+          return;
+        }
+        await UsuariosAPI.criar({ nome, sobrenome, email, senha, admin });
+        UI.toast(`Usuário ${nome} ${sobrenome} criado.`);
         form.reset();
-        form.email.focus();
+        form.nome.focus();
         await this.carregar(el);
       } catch (err) {
         UI.toast(err.message, 'error');
@@ -136,13 +165,27 @@ const ViewUsuarios = {
         await this.carregar(el);
         return;
       }
+      if (action === 'cancel') {
+        this.editingId = null;
+        App.render();
+        return;
+      }
       if (!alvo) return;
+
+      if (action === 'edit') {
+        this.editingId = id;
+        App.render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        const f = el.querySelector('#form-usuario');
+        if (f) { f.nome.focus(); f.nome.select(); }
+        return;
+      }
 
       try {
         if (action === 'senha') {
           const senha = await UI.askPassword({
             title: 'Redefinir senha',
-            description: `Nova senha para ${alvo.email}. Informe-a ao colaborador.`,
+            description: `Nova senha para ${alvo.nomeCompleto} (${alvo.email}). Informe-a ao colaborador.`,
             confirmText: 'Redefinir',
           });
           if (senha === null) return;
@@ -154,8 +197,8 @@ const ViewUsuarios = {
           const ok = await UI.confirm({
             title: tornar ? 'Tornar administrador' : 'Remover administrador',
             message: tornar
-              ? `${alvo.email} passará a gerenciar usuários (criar, remover, redefinir senhas).`
-              : `${alvo.email} deixará de gerenciar usuários.`,
+              ? `${alvo.nomeCompleto} passará a gerenciar usuários (criar, remover, redefinir senhas).`
+              : `${alvo.nomeCompleto} deixará de gerenciar usuários.`,
             confirmText: tornar ? 'Tornar admin' : 'Remover admin',
           });
           if (!ok) return;
@@ -166,13 +209,14 @@ const ViewUsuarios = {
         } else if (action === 'remover') {
           const ok = await UI.confirm({
             title: 'Remover usuário',
-            message: `Remover o acesso de ${alvo.email}? Ele não conseguirá mais entrar no app.`,
+            message: `Remover o acesso de ${alvo.nomeCompleto} (${alvo.email})? Ele não conseguirá mais entrar no app.`,
             confirmText: 'Remover',
             danger: true,
           });
           if (!ok) return;
           btn.disabled = true;
           await UsuariosAPI.remover(id);
+          if (this.editingId === id) this.editingId = null;
           UI.toast('Usuário removido.');
           await this.carregar(el);
         }
@@ -182,25 +226,32 @@ const ViewUsuarios = {
       }
     });
 
-    this.carregar(el, eu);
+    // Em modo edição a lista já está em cache: só desenha. Senão, busca no servidor.
+    if (editing) this.desenharLista(el);
+    else this.carregar(el);
   },
 
-  /** Busca a lista no servidor e renderiza a tabela (não re-renderiza o formulário). */
+  /** Busca a lista no servidor e desenha a tabela (não re-renderiza o formulário). */
   async carregar(el) {
+    const box = el.querySelector('#usuarios-lista');
+    if (!box) return;
+    try {
+      this.usuarios = await UsuariosAPI.listar();
+    } catch (err) {
+      box.innerHTML = `<div class="empty"><strong>Não foi possível carregar</strong>${UI.esc(err.message)}</div>`;
+      const count = el.querySelector('#usuarios-count');
+      if (count) count.textContent = '';
+      return;
+    }
+    this.desenharLista(el);
+  },
+
+  desenharLista(el) {
     const box = el.querySelector('#usuarios-lista');
     const count = el.querySelector('#usuarios-count');
     if (!box) return;
     const eu = Auth.user();
-    try {
-      this.usuarios = await UsuariosAPI.listar();
-      this.erro = null;
-    } catch (err) {
-      this.erro = err.message;
-      box.innerHTML = `<div class="empty"><strong>Não foi possível carregar</strong>${UI.esc(err.message)}</div>`;
-      if (count) count.textContent = '';
-      return;
-    }
-    const lista = this.usuarios;
+    const lista = this.usuarios || [];
     if (count) count.textContent = UI.plural(lista.length, 'usuário', 'usuários');
     if (lista.length === 0) {
       box.innerHTML = '<div class="empty"><strong>Nenhum usuário</strong></div>';
@@ -211,9 +262,9 @@ const ViewUsuarios = {
         <table class="table">
           <thead>
             <tr>
+              <th>Nome</th>
               <th>E-mail</th>
               <th>Papel</th>
-              <th>Criado em</th>
               <th>Último acesso</th>
               <th class="actions">Ações</th>
             </tr>
@@ -221,14 +272,16 @@ const ViewUsuarios = {
           <tbody>
             ${lista.map(u => {
               const souEu = eu && u.id === eu.id;
+              const semNome = !u.nome;
               return `
-                <tr>
-                  <td>${UI.esc(u.email || '—')}${souEu ? ' <span class="muted">(você)</span>' : ''}${u.confirmado ? '' : ' <span class="chip chip-gray">não confirmado</span>'}</td>
+                <tr class="${u.id === this.editingId ? 'editing' : ''}">
+                  <td>${semNome ? '<span class="muted">(sem nome)</span>' : UI.esc(u.nomeCompleto)}${souEu ? ' <span class="muted">(você)</span>' : ''}</td>
+                  <td>${UI.esc(u.email || '—')}${u.confirmado ? '' : ' <span class="chip chip-gray">não confirmado</span>'}</td>
                   <td><span class="chip ${u.admin ? 'chip-green' : 'chip-gray'}">${u.admin ? 'Administrador' : 'Usuário'}</span></td>
-                  <td>${this.fmtData(u.criadoEm)}</td>
                   <td>${this.fmtData(u.ultimoLogin)}</td>
                   <td class="actions">
-                    <button type="button" class="btn-link" data-action="senha" data-id="${u.id}">Redefinir senha</button>
+                    <button type="button" class="btn-link" data-action="edit" data-id="${u.id}">Editar</button>
+                    <button type="button" class="btn-link" data-action="senha" data-id="${u.id}">Senha</button>
                     <button type="button" class="btn-link" data-action="admin" data-id="${u.id}" ${souEu ? 'disabled title="Você não pode alterar o seu próprio papel"' : ''}>${u.admin ? 'Remover admin' : 'Tornar admin'}</button>
                     <button type="button" class="btn-link danger" data-action="remover" data-id="${u.id}" ${souEu ? 'disabled title="Você não pode remover a si mesmo"' : ''}>Remover</button>
                   </td>
