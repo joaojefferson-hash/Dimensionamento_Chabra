@@ -110,7 +110,8 @@ js/store.js             cache em memória sobre as tabelas + exportar/importar J
 js/views/unidades.js        tela Unidades (CRUD)
 js/views/empresas.js        tela Empresas por Unidade (quantidade por unidade)
 js/views/catalogo.js        tela Catálogo de Documentos (oculta neste modelo)
-js/views/colaboradores.js   tela Colaboradores (CRUD; função vem do cadastro de funções)
+js/views/colaboradores.js   tela Colaboradores (CRUD; função vem do cadastro de funções) + modo Organograma
+js/organograma.js       organograma e barras por unidade (montados pelas alocações; chefia geral = chefia em todas as unidades)
 js/views/funcoes.js         tela Funções (nome, tipo de produção, chefia, ordem)
 js/views/usuarios.js        tela Usuários (só admin) — chama a Edge Function `usuarios`
 js/views/calendario.js      tela Calendário (dias úteis por mês, dias de referência)

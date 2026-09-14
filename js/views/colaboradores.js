@@ -13,6 +13,89 @@ const ViewColaboradores = {
   editingId: null,
   pendingFocus: false,
   filtros: { texto: '', funcao: '', unidade: '' }, // filtros da lista (mantidos enquanto a tela estiver aberta)
+  MODO_KEY: 'chabra-dimensiona:colab-modo',
+
+  get modo() {
+    try { return localStorage.getItem(this.MODO_KEY) === 'organograma' ? 'organograma' : 'cadastro'; } catch (_) { return 'cadastro'; }
+  },
+  set modo(v) {
+    try { localStorage.setItem(this.MODO_KEY, v); } catch (_) { /* sem localStorage: só não lembra */ }
+  },
+
+  /** Cabeçalho com a alternância Cadastro | Organograma. */
+  cabecalhoHTML(modo) {
+    return `
+      <header class="page-header page-header-row">
+        <div>
+          <h1>Colaboradores</h1>
+          <p>${modo === 'organograma'
+            ? 'Quem está em cada unidade e quem lidera. O organograma é montado pelas unidades marcadas em cada pessoa — clique num nome para editar.'
+            : 'Cadastre cada pessoa da equipe e informe quanto ela produz em um dia normal de trabalho. Cada pessoa tem o seu ritmo — os números são seus, não há fórmula automática.'}</p>
+        </div>
+        <div class="segmented" role="tablist" aria-label="Modo de visualização">
+          <button type="button" role="tab" class="${modo === 'cadastro' ? 'ativo' : ''}" aria-selected="${modo === 'cadastro'}" data-action="modo" data-modo="cadastro">Cadastro</button>
+          <button type="button" role="tab" class="${modo === 'organograma' ? 'ativo' : ''}" aria-selected="${modo === 'organograma'}" data-action="modo" data-modo="organograma">Organograma</button>
+        </div>
+      </header>`;
+  },
+
+  /** Modo Organograma: painel com números da equipe, pessoas por unidade e a árvore. */
+  renderOrganograma(el) {
+    const colaboradores = Store.colaboradores.list();
+    const unidades = Store.unidades.list();
+    const TEC = Calculo.TEC, ADM = Calculo.ADM;
+    const conta = f => colaboradores.filter(f).length;
+    const semUnidade = conta(c => (c.tipoProducao !== 'nenhuma' || c.chefia) && Store.totalAlocado(c) <= 0);
+
+    el.innerHTML = `
+      ${this.cabecalhoHTML('organograma')}
+
+      <div class="stats">
+        <div class="stat"><div class="label">Colaboradores</div><div class="value">${colaboradores.length}</div></div>
+        <div class="stat"><div class="label">Técnicos</div><div class="value">${conta(c => c.tipoProducao === TEC)}</div></div>
+        <div class="stat"><div class="label">Administrativos</div><div class="value">${conta(c => c.tipoProducao === ADM)}</div></div>
+        <div class="stat"><div class="label">Chefia</div><div class="value">${conta(c => c.chefia)}</div></div>
+        <div class="stat"><div class="label">Sem unidade</div><div class="value ${semUnidade ? 'neg' : ''}">${semUnidade}</div></div>
+      </div>
+
+      ${unidades.length ? `
+      <section class="card">
+        <div class="card-head">
+          <h2>Pessoas por unidade</h2>
+          <span class="muted">${UI.plural(unidades.length, 'unidade', 'unidades')}</span>
+        </div>
+        ${Organograma.barrasHTML({ unidades, colaboradores })}
+      </section>` : ''}
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Organograma</h2>
+          <span class="muted">chefia geral → unidades → equipe</span>
+        </div>
+        ${Organograma.html({ unidades, colaboradores })}
+      </section>
+    `;
+
+    const wrap = el.querySelector('.org-wrap');
+    const dica = el.querySelector('.org-dica');
+    if (wrap && dica) requestAnimationFrame(() => { dica.hidden = wrap.scrollWidth <= wrap.clientWidth + 2; });
+
+    el.addEventListener('click', e => {
+      const btn = e.target.closest('[data-action]');
+      if (!btn) return;
+      const { action, id } = btn.dataset;
+      if (action === 'modo') {
+        this.modo = btn.dataset.modo;
+        App.render();
+      } else if (action === 'edit') {
+        this.modo = 'cadastro';
+        this.editingId = id;
+        this.pendingFocus = true;
+        App.render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+  },
 
   leave() {
     this.editingId = null;
@@ -104,6 +187,7 @@ const ViewColaboradores = {
   },
 
   render(el) {
+    if (this.modo === 'organograma' && !this.editingId) { this.renderOrganograma(el); return; }
     const colaboradores = Store.colaboradores.list();
     const editing = this.editingId ? Store.colaboradores.get(this.editingId) : null;
     if (this.editingId && !editing) this.editingId = null;
@@ -129,10 +213,7 @@ const ViewColaboradores = {
     if (this.filtros.unidade && this.filtros.unidade !== 'sem' && !unidades.some(u => u.id === this.filtros.unidade)) this.filtros.unidade = '';
 
     el.innerHTML = `
-      <header class="page-header">
-        <h1>Colaboradores</h1>
-        <p>Cadastre cada pessoa da equipe e informe quanto ela produz em um dia normal de trabalho. Cada pessoa tem o seu ritmo — os números são seus, não há fórmula automática.</p>
-      </header>
+      ${this.cabecalhoHTML('cadastro')}
 
       <div class="stats">
         <div class="stat"><div class="label">Colaboradores</div><div class="value">${colaboradores.length}</div></div>
@@ -392,7 +473,11 @@ const ViewColaboradores = {
       if (!btn) return;
       const { action, id } = btn.dataset;
 
-      if (action === 'limpar-filtros') {
+      if (action === 'modo') {
+        this.modo = btn.dataset.modo;
+        this.editingId = null;
+        App.render();
+      } else if (action === 'limpar-filtros') {
         this.filtros = { texto: '', funcao: '', unidade: '' };
         const f = el.querySelector('#filtros-colab');
         if (f) { f.texto.value = ''; f.funcao.value = ''; f.unidade.value = ''; }
