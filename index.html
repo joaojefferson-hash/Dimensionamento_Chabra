@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chabra Dimensiona</title>
+  <meta name="description" content="Dimensionamento de quadro para consultoria de Segurança e Saúde do Trabalho (SST).">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23006B54'/%3E%3Ctext x='16' y='21.5' font-family='Segoe UI,Arial,sans-serif' font-size='15' font-weight='700' fill='%23fff' text-anchor='middle'%3ECD%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">CD</div>
+        <div>
+          <div class="brand-name">Chabra Dimensiona</div>
+          <div class="brand-sub">Dimensionamento de quadro SST</div>
+        </div>
+      </div>
+
+      <nav class="nav" id="nav" aria-label="Telas">
+        <button class="nav-item" data-view="unidades" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/></svg>
+          <span>Unidades</span>
+          <span class="badge" data-badge="unidades">0</span>
+        </button>
+        <button class="nav-item" data-view="empresas" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+          <span>Empresas por Unidade</span>
+          <span class="badge" data-badge="empresas">0</span>
+        </button>
+        <button class="nav-item" data-view="catalogo" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>
+          <span>Catálogo de Documentos</span>
+          <span class="badge" data-badge="catalogo">0</span>
+        </button>
+        <button class="nav-item" data-view="colaboradores" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Colaboradores</span>
+          <span class="badge" data-badge="colaboradores">0</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <p class="hint">Os dados ficam salvos neste navegador. Exporte um backup para transferir entre máquinas.</p>
+        <button class="btn btn-outline-light" id="btn-export" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+          Exportar JSON
+        </button>
+        <button class="btn btn-outline-light" id="btn-import" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+          Importar JSON
+        </button>
+        <input type="file" id="file-import" accept="application/json,.json" hidden>
+        <div class="version">Fase 1 · Cadastros</div>
+      </div>
+    </aside>
+
+    <main class="content" id="content" aria-live="polite"></main>
+  </div>
+
+  <div id="toast-container" aria-live="assertive"></div>
+
+  <dialog id="confirm-dialog" class="dialog">
+    <form method="dialog">
+      <h3 id="confirm-title">Confirmar</h3>
+      <p id="confirm-message"></p>
+      <div class="dialog-actions">
+        <button type="submit" value="cancel" class="btn btn-ghost">Cancelar</button>
+        <button type="submit" value="ok" class="btn btn-primary" id="confirm-ok">Confirmar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/ui.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/views/unidades.js"></script>
+  <script src="js/views/empresas.js"></script>
+  <script src="js/views/catalogo.js"></script>
+  <script src="js/views/colaboradores.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

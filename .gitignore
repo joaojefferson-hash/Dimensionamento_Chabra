@@ -1,0 +1,12 @@
+# Editor / ferramentas
+.vscode/
+.idea/
+.playwright-mcp/
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Backups locais exportados pelo app
+chabra-dimensiona_*.json
