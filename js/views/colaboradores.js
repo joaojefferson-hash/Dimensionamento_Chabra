@@ -39,6 +39,39 @@ const ViewColaboradores = {
       </header>`;
   },
 
+  /**
+   * Imprime só o organograma (ou salva em PDF pelo diálogo do navegador).
+   * A árvore é reduzida para caber na largura de uma folha A4 deitada.
+   */
+  imprimirOrganograma(el) {
+    const tree = el.querySelector('.org-tree');
+    if (!tree) return;
+    // A4 menos 10 mm de margem de cada lado, em px de tela (96 dpi); o cabeçalho impresso ocupa ~40 px
+    const PAGINA = { portrait: { w: 718, h: 1047 }, landscape: { w: 1047, h: 718 } };
+    const CABECALHO = 40;
+    const w = Math.max(1, tree.scrollWidth), h = Math.max(1, tree.scrollHeight);
+    const cabeEm = o => Math.min(1, PAGINA[o].w / w, (PAGINA[o].h - CABECALHO) / h);
+    let orientacao = cabeEm('portrait') >= cabeEm('landscape') ? 'portrait' : 'landscape';
+    let zoom = cabeEm(orientacao);
+    if (zoom < 0.6) { orientacao = 'landscape'; zoom = Math.min(1, PAGINA.landscape.w / w); } // grande demais: cabe na largura e segue em mais páginas
+    const pagina = document.createElement('style');
+    pagina.id = 'print-page';
+    pagina.textContent = `@page { size: A4 ${orientacao}; margin: 10mm; }`;
+    document.head.appendChild(pagina);
+    document.body.classList.add('imprimindo-organograma');
+    tree.style.zoom = String(zoom);
+    const limpar = () => {
+      document.body.classList.remove('imprimindo-organograma');
+      tree.style.zoom = '';
+      pagina.remove();
+      window.removeEventListener('afterprint', limpar);
+    };
+    window.addEventListener('afterprint', limpar);
+    window.print();
+    // navegadores sem afterprint (ou impressão cancelada sem evento): limpa um pouco depois
+    setTimeout(limpar, 2000);
+  },
+
   /** Modo Organograma: painel com números da equipe, pessoas por unidade e a árvore. */
   renderOrganograma(el) {
     const colaboradores = Store.colaboradores.list();
@@ -67,10 +100,20 @@ const ViewColaboradores = {
         ${Organograma.barrasHTML({ unidades, colaboradores })}
       </section>` : ''}
 
-      <section class="card">
+      <section class="card card-organograma">
         <div class="card-head">
           <h2>Organograma</h2>
-          <span class="muted">chefias pela hierarquia das funções → equipes por unidade</span>
+          <div class="right">
+            <span class="muted">chefias pela hierarquia das funções → equipes por unidade</span>
+            <button type="button" class="btn btn-ghost btn-sm" data-action="imprimir" title="Imprimir ou salvar em PDF só o organograma">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="6" y="14" width="12" height="7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/></svg>
+              Imprimir
+            </button>
+          </div>
+        </div>
+        <div class="print-only print-cabecalho">
+          <strong>Organograma da equipe</strong>
+          <span>Chabra Dimensiona · ${new Date().toLocaleDateString('pt-BR')} · ${UI.plural(colaboradores.length, 'colaborador', 'colaboradores')} em ${UI.plural(unidades.length, 'unidade', 'unidades')}</span>
         </div>
         ${Organograma.html({ unidades, colaboradores, funcoes: Store.funcoes.list() })}
       </section>
@@ -87,6 +130,8 @@ const ViewColaboradores = {
       if (action === 'modo') {
         this.modo = btn.dataset.modo;
         App.render();
+      } else if (action === 'imprimir') {
+        this.imprimirOrganograma(el);
       } else if (action === 'edit') {
         this.modo = 'cadastro';
         this.editingId = id;

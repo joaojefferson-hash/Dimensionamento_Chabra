@@ -812,3 +812,28 @@ form.busy { opacity: .7; pointer-events: none; }
 .org-legenda span { display: inline-flex; align-items: center; gap: 6px; }
 .org-legenda i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
 .org-dica { margin: -6px 0 10px; }
+
+/* impressão do organograma: só a árvore, em folha deitada */
+.print-only { display: none; }
+@media print {
+  body.imprimindo-organograma { background: #fff; }
+  body.imprimindo-organograma .sidebar,
+  body.imprimindo-organograma .page-header,
+  body.imprimindo-organograma .stats,
+  body.imprimindo-organograma .card:not(.card-organograma),
+  body.imprimindo-organograma .card-organograma .card-head,
+  body.imprimindo-organograma .org-dica,
+  body.imprimindo-organograma #toast-container { display: none !important; }
+  body.imprimindo-organograma .content { padding: 0; }
+  body.imprimindo-organograma .card-organograma { border: 0; box-shadow: none; padding: 0; margin: 0; }
+  body.imprimindo-organograma .print-only { display: block; }
+  body.imprimindo-organograma .print-cabecalho { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border-bottom: 2px solid var(--primary); padding-bottom: 6px; margin-bottom: 10px; }
+  body.imprimindo-organograma .print-cabecalho strong { font-size: 16px; color: var(--primary-dark); }
+  body.imprimindo-organograma .print-cabecalho span { font-size: 11px; color: var(--text-muted); }
+  body.imprimindo-organograma .org-wrap { overflow: visible; margin: 0; padding: 0; }
+  body.imprimindo-organograma .org-tree { min-width: 0; width: max-content; margin: 0 auto; }
+  body.imprimindo-organograma .org-node { box-shadow: none; break-inside: avoid; }
+  body.imprimindo-organograma .org-pessoa { cursor: default; }
+  body.imprimindo-organograma .org-tree li::before, body.imprimindo-organograma .org-tree li::after, body.imprimindo-organograma .org-tree ul::before { border-color: #9bb8ad; }
+  body.imprimindo-organograma * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

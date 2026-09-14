@@ -90,6 +90,9 @@ pessoas que faltam/sobram    = sobra ÷ produção de uma pessoa inteira no per�
   Externo → Gerente); cada pessoa fica embaixo da chefia mais próxima que coordena o
   grupo dela na unidade (chefia específica ganha de "toda a equipe"; entre iguais, a
   mais baixa na hierarquia); "Sem chefia definida" e "Sem unidade" ficam à parte.
+  Botão **Imprimir** imprime só a árvore (ou salva em PDF): escolhe retrato/paisagem e
+  reduz a árvore para caber numa folha A4; se ficar pequena demais, ajusta à largura e
+  segue em mais páginas.
 - Sinais: verde = dá conta; amarelo = no limite (sobra < 10%); vermelho = precisa contratar.
   As telas mostram frases prontas ("Faltam aproximadamente 3 técnicos…") em vez de
   números crus. O total soma as faltas das unidades (folga numa não cobre outra).
