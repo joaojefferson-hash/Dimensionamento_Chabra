@@ -64,10 +64,9 @@ Tudo roda no navegador, em [js/calculo.js](js/calculo.js) (funções puras; tamb
 roda em Node para testes). O modelo é declarado pelo usuário, sem horas:
 
 ```
-precisa(unidade, entrega, mês) = empresas do mês × peso do grau ÷ meses entre atendimentos
-                               (Calendário → "Com que frequência cada empresa é atendida?";
-                                padrão 1 = toda empresa recebe inspeção, relatório e
-                                finalização todo mês; 3 = um terço das empresas por mês)
+precisa(unidade, entrega, mês) = Σ empresas na situação × peso da situação
+                               (situação da documentação no mês: em dia = 0,
+                                vencendo = 0,5, a vencer no mês = 1 — pesos editáveis)
 produção(pessoa, entrega, mês) = ritmo por dia × dias úteis do mês × % do tempo na unidade
 consegue(unidade, entrega)   = Σ produção × (1 − folga para imprevistos)
 sobra                        = consegue − precisa      (negativa = falta)
@@ -99,7 +98,6 @@ pessoas que faltam/sobram    = sobra ÷ produção de uma pessoa inteira no per�
   números crus. O total soma as faltas das unidades (folga numa não cobre outra).
 - "Folga para imprevistos" (padrão 15%) é o parâmetro `ocupacao_alvo` (85) visto pelo
   lado do usuário.
-- Frequência de atendimento (Calendário): a cada N meses **ou anos** por tipo de entrega.
 - **Histórico**: gatilhos em todas as tabelas de cadastro gravam em `historico` (quem,
   quando, antes/depois); a tela Histórico mostra frases simples, com filtro. Importação
   de backup vira um único evento. Escrita só pelos gatilhos (security definer, fora da API).
@@ -133,7 +131,7 @@ js/views/historico.js       tela Histórico de alterações
 js/calculo.js           motor de dimensionamento (puro)
 js/programacao.js       utilitários das telas de programação (janela, barra, formatação)
 js/app.js               inicialização, navegação por hash (#/unidades …), badges, backup
-supabase/migrations/    SQL do banco (0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico, 0012 = funções cadastráveis, 0013 = chefia, 0014 = coordena/responde_para)
+supabase/migrations/    SQL do banco (0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico, 0012 = funções cadastráveis, 0013 = chefia, 0014 = coordena/responde_para, 0015 = situação da documentação no lugar do grau)
 supabase/functions/usuarios/index.ts   Edge Function de gestão de usuários (chave secreta só no servidor)
 ```
 
@@ -144,17 +142,17 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
 
 | tabela          | colunas                                                                                   |
 |-----------------|-------------------------------------------------------------------------------------------|
-| `unidades`      | `id, nome (único), empresas_baixo/medio/alto (int ≥ 0), empresas (gerada = soma)`          |
+| `unidades`      | `id, nome (único), empresas_em_dia/vencendo/a_vencer (int ≥ 0), empresas (gerada = soma)`   |
 | `documentos`    | `id, nome (único), horas, periodicidade_meses (int ≥ 0), responsavel (função)`             |
 | `funcoes`       | `id, nome (único), tipo_producao (tecnico/administrativo/nenhuma), chefia (bool), coordena (todos/tecnicos/administrativos), responde_para → funcoes, ordem` |
 | `colaboradores` | `id, nome, funcao_id → funcoes, empresas_dia, inspecoes_dia, relatorios_dia` (ritmo por dia) |
 | `colaborador_unidades` | `colaborador_id, unidade_id, percentual (0–100; soma por colaborador ≤ 100, gatilho)` |
-| `unidade_empresas_mes` | `unidade_id, mes (1–12), empresas_baixo/medio/alto` — exceção mensal; sem linha = padrão |
-| `parametros`    | linha única: `dias_uteis[12], fator_baixo/medio/alto, ocupacao_alvo, meses_por_inspecao/relatorio/finalizacao` |
+| `unidade_empresas_mes` | `unidade_id, mes (1–12), empresas_em_dia/vencendo/a_vencer` — exceção mensal; sem linha = padrão |
+| `parametros`    | linha única: `dias_uteis[12], peso_em_dia/vencendo/a_vencer (≥ 0), ocupacao_alvo` |
 
 - `periodicidade_meses = 0` significa **sob demanda** (documento sem renovação periódica).
 - A quantidade de empresas pode **variar por mês**: os campos da unidade são o padrão e a
-  tabela `unidade_empresas_mes` guarda as exceções (os três graus daquele mês). O motor
+  tabela `unidade_empresas_mes` guarda as exceções (as três situações daquele mês). O motor
   usa a quantidade de cada mês na demanda; a Programação Anual mostra a média na janela
   e marca "varia".
 - Um colaborador pode atuar em várias unidades: `alocacoes = [{ unidadeId, percentual }]`.
@@ -163,10 +161,11 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
   `definir_alocacoes(colaborador, jsonb)` numa transação.
 - No JS/backup as chaves são camelCase (`periodicidadeMeses`, `horasMes`, `empresasBaixo`…);
   o backup v6 inclui `funcoes[{nome, tipoProducao, chefia, coordena, respondePara (nome), ordem}]`, `parametros`,
-  `empresasPorMes[{mes, empresasBaixo…}]` nas unidades e `alocacoes[{unidadeNome, percentual}]`
+  `empresasPorMes[{mes, empresasEmDia…}]` nas unidades e `alocacoes[{unidadeNome, percentual}]`
   + `funcao` (nome) nos colaboradores (a importação resolve unidade e função pelo nome;
   função desconhecida → função técnica padrão; funções do backup são criadas/atualizadas,
-  nunca apagadas). Backups antigos: `empresas` → grau baixo; `unidadeNome` único → 100%.
+  nunca apagadas). Backups antigos: `empresasBaixo/Medio/Alto` → em dia / vencendo / a vencer;
+  só `empresas` → em dia; `unidadeNome` único → 100%; `fator*` e `mesesPor*` são ignorados.
 
 ## Backup e migração
 
