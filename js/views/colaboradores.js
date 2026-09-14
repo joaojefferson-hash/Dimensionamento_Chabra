@@ -137,7 +137,7 @@ const ViewColaboradores = {
 
     const form = el.querySelector('#form-colaborador');
 
-    form.addEventListener('submit', e => {
+    form.addEventListener('submit', async e => {
       e.preventDefault();
       const nome = form.nome.value.trim();
       const funcao = form.funcao.value;
@@ -157,14 +157,22 @@ const ViewColaboradores = {
       }
 
       const dados = { nome, funcao, horasMes, eficiencia };
-      this.pendingFocus = true;
-      if (this.editingId) {
-        Store.colaboradores.update(this.editingId, dados);
-        this.editingId = null;
-        UI.toast('Colaborador atualizado.');
-      } else {
-        Store.colaboradores.add(dados);
-        UI.toast('Colaborador adicionado.');
+      UI.busy(form, true);
+      try {
+        if (this.editingId) {
+          await Store.colaboradores.update(this.editingId, dados);
+          this.editingId = null;
+          this.pendingFocus = true;
+          UI.toast('Colaborador atualizado.');
+        } else {
+          await Store.colaboradores.add(dados);
+          this.pendingFocus = true;
+          UI.toast('Colaborador adicionado.');
+        }
+      } catch (err) {
+        UI.toast(err.message, 'error');
+      } finally {
+        UI.busy(form, false);
       }
     });
 
@@ -191,9 +199,13 @@ const ViewColaboradores = {
           danger: true,
         });
         if (!ok) return;
-        if (this.editingId === id) this.editingId = null;
-        Store.colaboradores.remove(id);
-        UI.toast('Colaborador excluído.');
+        try {
+          await Store.colaboradores.remove(id);
+          if (this.editingId === id) this.editingId = null;
+          UI.toast('Colaborador excluído.');
+        } catch (err) {
+          UI.toast(err.message, 'error');
+        }
       }
     });
 

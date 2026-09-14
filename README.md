@@ -2,7 +2,8 @@
 
 Ferramenta de dimensionamento de quadro para consultoria de Segurança e Saúde do
 Trabalho (SST). App web independente — HTML/CSS/JS vanilla, sem framework e sem
-build step.
+build step. Dados na nuvem (Supabase), compartilhados por toda a equipe, com
+login por e-mail/senha.
 
 ## Como rodar
 
@@ -12,50 +13,71 @@ build step.
 **Qualquer servidor estático:** `python -m http.server 5500` e acesse
 `http://localhost:5500`.
 
-Abrir o `index.html` direto (duplo clique) também funciona, mas o localStorage
-fica vinculado ao esquema `file://` — use um servidor para manter os dados
-consistentes com a versão hospedada.
+Precisa de internet: o `supabase-js` vem do CDN (jsDelivr, versão pinada) e os
+dados ficam no Supabase.
 
 ## Hospedagem
 
 Site estático: basta publicar a pasta inteira (Vercel, Netlify, GitHub Pages,
 Nginx…). Nenhuma configuração extra.
 
+## Configuração do Supabase (uma vez por projeto)
+
+1. **Banco:** rode `supabase/migrations/0001_init.sql` no projeto (SQL Editor do
+   dashboard ou MCP `apply_migration`). Cria as tabelas, RLS, grants para
+   `authenticated`, a função `importar_backup` e o catálogo padrão.
+2. **Chave:** em `js/config.js`, informe `SUPABASE_URL` e a chave **publishable**
+   (Project Settings → API Keys → `sb_publishable_…`). Ela é pública por design;
+   nunca use a secret/service_role no app.
+3. **Auth:** Authentication → Sign In / Providers → Email → desligue
+   **"Allow new users to sign up"** (obrigatório: com signup aberto, qualquer
+   pessoa com a chave publishable viraria `authenticated`). Crie os usuários da
+   equipe em Authentication → Users → *Add user* (marque *Auto Confirm User*).
+4. Reset de senha: por enquanto é feito pelo admin no dashboard (não há fluxo
+   "esqueci a senha" no app).
+
 ## Estrutura
 
 ```
-index.html              casca da aplicação (menu lateral, diálogo, toasts)
+index.html              casca da aplicação (telas de login/carregando, menu lateral, diálogo, toasts)
 style.css               identidade visual (verde institucional #006B54)
-js/ui.js                utilitários: escape, formatação, toast, confirmação
-js/store.js             estado + localStorage + exportar/importar JSON
+js/config.js            URL e chave publishable do Supabase
+js/ui.js                utilitários: escape, formatação, toast, confirmação, busy
+js/auth.js              cliente Supabase (`db`) + sessão (login/logout)
+js/store.js             cache em memória sobre as tabelas + exportar/importar JSON
 js/views/unidades.js        tela Unidades (CRUD)
 js/views/empresas.js        tela Empresas por Unidade (quantidade por unidade)
 js/views/catalogo.js        tela Catálogo de Documentos SST (CRUD, pré-carregado)
 js/views/colaboradores.js   tela Colaboradores (CRUD)
-js/app.js               navegação por hash (#/unidades …), badges, backup
+js/app.js               inicialização, navegação por hash (#/unidades …), badges, backup
+supabase/migrations/    SQL do banco (0001_init.sql)
 ```
 
-## Dados
+## Modelo de dados
 
-Persistidos em `localStorage` na chave `chabra-dimensiona:data`:
+Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
+(policies `to authenticated using (true)`); `anon` não tem acesso.
 
-```json
-{
-  "app": "chabra-dimensiona",
-  "version": 1,
-  "unidades":      [{ "id": "…", "nome": "Matriz", "empresas": 42 }],
-  "documentos":    [{ "id": "…", "nome": "PGR", "horas": 16, "periodicidadeMeses": 24 }],
-  "colaboradores": [{ "id": "…", "nome": "…", "funcao": "Técnico de Segurança do Trabalho",
-                      "horasMes": 160, "eficiencia": 80 }]
-}
-```
+| tabela          | colunas                                                            |
+|-----------------|--------------------------------------------------------------------|
+| `unidades`      | `id, nome (único), empresas (int ≥ 0)`                              |
+| `documentos`    | `id, nome (único), horas (numeric), periodicidade_meses (int ≥ 0)`  |
+| `colaboradores` | `id, nome, funcao, horas_mes (numeric), eficiencia (1–100)`         |
 
-- `periodicidadeMeses = 0` significa **sob demanda** (documento sem renovação periódica).
-- *Exportar JSON* baixa esse objeto; *Importar JSON* valida, mostra um resumo e
-  substitui todos os dados do navegador.
+- `periodicidade_meses = 0` significa **sob demanda** (documento sem renovação periódica).
+- No JS/backup as chaves são camelCase (`periodicidadeMeses`, `horasMes`).
+
+## Backup e migração
+
+- **Exportar JSON** baixa `{ unidades, documentos, colaboradores }`.
+- **Importar JSON** valida, mostra um resumo e chama `importar_backup(jsonb)`,
+  que substitui **todos** os dados numa única transação (para toda a equipe).
+- Se o navegador ainda tiver dados da versão anterior (só `localStorage`), o app
+  oferece enviá-los para a nuvem no primeiro login; depois guarda uma cópia em
+  `chabra-dimensiona:backup-local` e não pergunta de novo.
 
 ## Fases
 
-- **Fase 1 (atual):** cadastros + persistência + backup.
+- **Fase 1 (feita):** cadastros + persistência na nuvem + login + backup.
 - **Fase 2 (próxima):** motor de cálculo de demanda, seletor de janela de tempo,
   indicadores de gap / produtividade / quadro ideal.

@@ -77,7 +77,7 @@ const ViewUnidades = {
 
     const form = el.querySelector('#form-unidade');
 
-    form.addEventListener('submit', e => {
+    form.addEventListener('submit', async e => {
       e.preventDefault();
       const nome = form.nome.value.trim();
       if (!nome) return;
@@ -86,14 +86,22 @@ const ViewUnidades = {
         form.nome.focus();
         return;
       }
-      this.pendingFocus = true;
-      if (this.editingId) {
-        Store.unidades.update(this.editingId, { nome });
-        this.editingId = null;
-        UI.toast('Unidade atualizada.');
-      } else {
-        Store.unidades.add({ nome, empresas: 0 });
-        UI.toast('Unidade adicionada.');
+      UI.busy(form, true);
+      try {
+        if (this.editingId) {
+          await Store.unidades.update(this.editingId, { nome });
+          this.editingId = null;
+          this.pendingFocus = true;
+          UI.toast('Unidade atualizada.');
+        } else {
+          await Store.unidades.add({ nome, empresas: 0 });
+          this.pendingFocus = true;
+          UI.toast('Unidade adicionada.');
+        }
+      } catch (err) {
+        UI.toast(err.message, 'error');
+      } finally {
+        UI.busy(form, false);
       }
     });
 
@@ -123,9 +131,13 @@ const ViewUnidades = {
           danger: true,
         });
         if (!ok) return;
-        if (this.editingId === id) this.editingId = null;
-        Store.unidades.remove(id);
-        UI.toast('Unidade excluída.');
+        try {
+          await Store.unidades.remove(id);
+          if (this.editingId === id) this.editingId = null;
+          UI.toast('Unidade excluída.');
+        } catch (err) {
+          UI.toast(err.message, 'error');
+        }
       }
     });
 

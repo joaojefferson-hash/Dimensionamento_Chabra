@@ -107,7 +107,7 @@ const ViewCatalogo = {
 
     const form = el.querySelector('#form-documento');
 
-    form.addEventListener('submit', e => {
+    form.addEventListener('submit', async e => {
       e.preventDefault();
       const nome = form.nome.value.trim();
       const horas = UI.parseNum(form.horas.value, NaN);
@@ -131,14 +131,22 @@ const ViewCatalogo = {
       }
 
       const dados = { nome, horas, periodicidadeMeses };
-      this.pendingFocus = true;
-      if (this.editingId) {
-        Store.documentos.update(this.editingId, dados);
-        this.editingId = null;
-        UI.toast('Documento atualizado.');
-      } else {
-        Store.documentos.add(dados);
-        UI.toast('Documento adicionado.');
+      UI.busy(form, true);
+      try {
+        if (this.editingId) {
+          await Store.documentos.update(this.editingId, dados);
+          this.editingId = null;
+          this.pendingFocus = true;
+          UI.toast('Documento atualizado.');
+        } else {
+          await Store.documentos.add(dados);
+          this.pendingFocus = true;
+          UI.toast('Documento adicionado.');
+        }
+      } catch (err) {
+        UI.toast(err.message, 'error');
+      } finally {
+        UI.busy(form, false);
       }
     });
 
@@ -156,8 +164,15 @@ const ViewCatalogo = {
         App.render();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else if (action === 'restore') {
-        const n = Store.restaurarDocumentosPadrao();
-        UI.toast(n > 0 ? `${UI.plural(n, 'item padrão restaurado', 'itens padrão restaurados')}.` : 'Todos os itens padrão já estão no catálogo.', n > 0 ? 'success' : 'info');
+        btn.disabled = true;
+        try {
+          const n = await Store.restaurarDocumentosPadrao();
+          UI.toast(n > 0 ? `${UI.plural(n, 'item padrão restaurado', 'itens padrão restaurados')}.` : 'Todos os itens padrão já estão no catálogo.', n > 0 ? 'success' : 'info');
+        } catch (err) {
+          UI.toast(err.message, 'error');
+        } finally {
+          btn.disabled = false;
+        }
       } else if (action === 'delete') {
         const d = Store.documentos.get(id);
         if (!d) return;
@@ -168,9 +183,13 @@ const ViewCatalogo = {
           danger: true,
         });
         if (!ok) return;
-        if (this.editingId === id) this.editingId = null;
-        Store.documentos.remove(id);
-        UI.toast('Documento excluído.');
+        try {
+          await Store.documentos.remove(id);
+          if (this.editingId === id) this.editingId = null;
+          UI.toast('Documento excluído.');
+        } catch (err) {
+          UI.toast(err.message, 'error');
+        }
       }
     });
 

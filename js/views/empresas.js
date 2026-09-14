@@ -76,10 +76,20 @@ const ViewEmpresas = {
         if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
       });
 
-      input.addEventListener('change', () => {
+      input.addEventListener('change', async () => {
         const valor = Math.max(0, Math.floor(UI.parseNum(input.value, 0)));
         input.value = valor;
-        Store.unidades.update(input.dataset.id, { empresas: valor }, { silent: true });
+        const anterior = Store.unidades.get(input.dataset.id);
+        input.disabled = true;
+        try {
+          await Store.unidades.update(input.dataset.id, { empresas: valor }, { silent: true });
+        } catch (err) {
+          UI.toast(err.message, 'error');
+          if (anterior) input.value = anterior.empresas;
+          return;
+        } finally {
+          input.disabled = false;
+        }
 
         const novoTotal = Store.counts().empresas;
         el.querySelector('#empresas-total').textContent = novoTotal;

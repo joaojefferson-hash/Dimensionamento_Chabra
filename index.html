@@ -9,7 +9,57 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app">
+  <!-- Telas de estado (fora da app) -->
+  <section id="screen-loading" class="screen">
+    <div class="screen-box">
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="muted">Carregando…</p>
+    </div>
+  </section>
+
+  <section id="screen-login" class="screen" hidden>
+    <div class="screen-card">
+      <div class="brand brand-light">
+        <div class="brand-mark" aria-hidden="true">CD</div>
+        <div>
+          <div class="brand-name">Chabra Dimensiona</div>
+          <div class="brand-sub">Dimensionamento de quadro SST</div>
+        </div>
+      </div>
+      <h1>Entrar</h1>
+      <p class="muted">Use o e-mail e a senha cadastrados pelo administrador.</p>
+      <form id="form-login" class="form-stack" autocomplete="on">
+        <label class="field">
+          <span>E-mail</span>
+          <input class="input" type="email" name="email" required autocomplete="username" inputmode="email" placeholder="voce@chabra.com.br">
+        </label>
+        <label class="field">
+          <span>Senha</span>
+          <input class="input" type="password" name="password" required autocomplete="current-password">
+        </label>
+        <p class="form-error" id="login-error" hidden></p>
+        <button type="submit" class="btn btn-primary btn-block">Entrar</button>
+      </form>
+    </div>
+  </section>
+
+  <section id="screen-config" class="screen" hidden>
+    <div class="screen-card">
+      <h1>Configuração pendente</h1>
+      <p class="muted">Falta informar a chave <em>publishable</em> do projeto Supabase em <code>js/config.js</code>.</p>
+      <p class="muted">No dashboard: <strong>Project Settings → API Keys → Publishable key</strong> (<code>sb_publishable_…</code>). Cole o valor em <code>SUPABASE_KEY</code> e recarregue a página.</p>
+    </div>
+  </section>
+
+  <section id="screen-error" class="screen" hidden>
+    <div class="screen-card">
+      <h1>Não foi possível carregar</h1>
+      <p class="form-error" id="error-message"></p>
+      <button type="button" class="btn btn-primary" id="btn-retry">Tentar novamente</button>
+    </div>
+  </section>
+
+  <div class="app" hidden>
     <aside class="sidebar">
       <div class="brand">
         <div class="brand-mark" aria-hidden="true">CD</div>
@@ -43,7 +93,7 @@
       </nav>
 
       <div class="sidebar-footer">
-        <p class="hint">Os dados ficam salvos neste navegador. Exporte um backup para transferir entre máquinas.</p>
+        <p class="hint">Os dados ficam na nuvem, compartilhados com toda a equipe. Exporte um backup quando quiser.</p>
         <button class="btn btn-outline-light" id="btn-export" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
           Exportar JSON
@@ -53,7 +103,11 @@
           Importar JSON
         </button>
         <input type="file" id="file-import" accept="application/json,.json" hidden>
-        <div class="version">Fase 1 · Cadastros</div>
+        <div class="user-row">
+          <span class="user-email" id="user-email"></span>
+          <button type="button" class="btn-link light" id="btn-logout">Sair</button>
+        </div>
+        <div class="version">Fase 1 · Cadastros na nuvem</div>
       </div>
     </aside>
 
@@ -73,7 +127,11 @@
     </form>
   </dialog>
 
+  <!-- supabase-js (UMD, versão pinada) — expõe window.supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/auth.js"></script>
   <script src="js/store.js"></script>
   <script src="js/views/unidades.js"></script>
   <script src="js/views/empresas.js"></script>

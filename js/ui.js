@@ -30,6 +30,13 @@ const UI = (() => {
     return `${n} ${n === 1 ? singular : pluralForm}`;
   }
 
+  /** Bloqueia um formulário enquanto uma gravação está em andamento. */
+  function busy(form, on) {
+    if (!form || !form.isConnected) return;
+    form.classList.toggle('busy', on);
+    form.querySelectorAll('button, input, select').forEach(el => { el.disabled = on; });
+  }
+
   /** Mensagem rápida no canto inferior direito. type: success | error | info */
   function toast(message, type = 'success') {
     const container = document.getElementById('toast-container');
@@ -54,10 +61,19 @@ const UI = (() => {
       okBtn.textContent = confirmText;
       okBtn.className = danger ? 'btn btn-danger' : 'btn btn-primary';
 
-      const onClose = () => {
+      const form = dlg.querySelector('form');
+      let done = false;
+      const finish = value => {
+        if (done) return;
+        done = true;
+        form.removeEventListener('submit', onSubmit);
         dlg.removeEventListener('close', onClose);
-        resolve(dlg.returnValue === 'ok');
+        resolve(value);
       };
+      // submit responde no clique; close cobre Esc (o evento close pode atrasar em abas em segundo plano)
+      const onSubmit = e => finish(!!e.submitter && e.submitter.value === 'ok');
+      const onClose = () => finish(dlg.returnValue === 'ok');
+      form.addEventListener('submit', onSubmit);
       dlg.addEventListener('close', onClose);
       dlg.returnValue = '';
       dlg.showModal();
@@ -65,5 +81,5 @@ const UI = (() => {
     });
   }
 
-  return { esc, fmt, parseNum, plural, toast, confirm };
+  return { esc, fmt, parseNum, plural, busy, toast, confirm };
 })();
