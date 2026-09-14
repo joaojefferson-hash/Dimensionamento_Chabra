@@ -11,5 +11,5 @@
 
 const CONFIG = {
   SUPABASE_URL: 'https://wdlxpbusyuieftnxemot.supabase.co',
-  SUPABASE_KEY: 'COLE_AQUI_A_CHAVE_PUBLISHABLE',
+  SUPABASE_KEY: 'sb_publishable_JShHESezBIHHmowVLqFOOA_EeWW1bc0',
 };
