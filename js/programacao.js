@@ -125,7 +125,7 @@ const Programacao = (() => {
     const q = Math.round(Number(s.quantidade) || 0);
     const sing = Calculo.FUNCAO_SINGULAR[s.grupo] || 'pessoa';
     const rot = Math.abs(q) === 1 ? sing : sing + 's';
-    const quando = s.de === 0 && s.ate === 11 ? 'ano todo' : s.de === s.ate ? Calculo.MESES[s.de].toLowerCase() : `${Calculo.MESES[s.de].toLowerCase()}–${Calculo.MESES[s.ate].toLowerCase()}`;
+    const quando = s.de === 0 && s.ate === 11 ? 'ano todo' : s.ate === 11 ? `a partir de ${Calculo.MESES[s.de].toLowerCase()}` : s.de === s.ate ? `só em ${Calculo.MESES[s.de].toLowerCase()}` : `${Calculo.MESES[s.de].toLowerCase()}–${Calculo.MESES[s.ate].toLowerCase()}`;
     return `${q > 0 ? '+' : '−'}${Math.abs(q)} ${rot} em ${u ? u.nome : '?'} (${quando})`;
   }
 
@@ -142,7 +142,7 @@ const Programacao = (() => {
           <option value="${Calculo.ADM}" ${s.grupo === Calculo.ADM ? 'selected' : ''}>Administrativos</option>
         </select></td>
         <td><input class="input input-sm input-num sim-qtd" type="number" name="quantidade" step="1" inputmode="numeric" value="${Math.round(Number(s.quantidade) || 0)}" aria-label="Pessoas a mais (positivo) ou a menos (negativo)" title="Positivo = contratar; negativo = desligar"></td>
-        <td><div class="param-inline"><select class="input input-sm" name="de" aria-label="Mês inicial">${opcoesMes(s.de)}</select><span class="muted">a</span><select class="input input-sm" name="ate" aria-label="Mês final">${opcoesMes(s.ate)}</select></div></td>
+        <td><div class="param-inline"><span class="muted">a partir de</span><select class="input input-sm" name="de" aria-label="Mês em que a pessoa entra">${opcoesMes(s.de)}</select><span class="muted">até</span><select class="input input-sm" name="ate" aria-label="Último mês da pessoa na equipe" title="Deixe em Dez para a pessoa ficar na equipe até o fim do ano">${opcoesMes(s.ate)}</select></div></td>
         <td><div class="param-inline sim-ritmo">
           ${s.grupo === Calculo.ADM
             ? `<input class="input input-sm input-num" type="number" name="empresasDia" min="0" step="0.5" inputmode="decimal" value="${s.empresasDia}" aria-label="Empresas finalizadas por dia"><span class="muted">empresas/dia</span>`
@@ -160,12 +160,12 @@ const Programacao = (() => {
             ${sims.length ? '<button type="button" class="btn btn-ghost btn-sm" data-action="sim-limpar">Limpar simulação</button>' : ''}
           </div>
         </div>
-        <p class="muted">Teste contratações (quantidade positiva) ou desligamentos (negativa) numa unidade, num período. As programações abaixo passam a contar com essas pessoas${sims.length ? '' : ' assim que você adicionar uma linha'}.</p>
+        <p class="muted">Teste contratações (quantidade positiva) ou desligamentos (negativa) numa unidade. A pessoa entra no mês escolhido e <strong>fica na equipe até o mês final</strong> (por padrão, dezembro) — ou seja, quem é contratado em setembro também conta em outubro, novembro e dezembro. As programações abaixo passam a contar com essas pessoas${sims.length ? '' : ' assim que você adicionar uma linha'}.</p>
         ${sims.length ? `
         <form class="sim-form" id="form-simulacao" autocomplete="off">
           <div class="table-wrap">
             <table class="table table-sim">
-              <thead><tr><th>Unidade</th><th>Grupo</th><th class="num">Pessoas (+/−)</th><th>Meses</th><th>Ritmo por dia de cada pessoa</th><th class="actions"></th></tr></thead>
+              <thead><tr><th>Unidade</th><th>Grupo</th><th class="num">Pessoas (+/−)</th><th>Na equipe</th><th>Ritmo por dia de cada pessoa</th><th class="actions"></th></tr></thead>
               <tbody>${sims.map(linha).join('')}</tbody>
             </table>
           </div>
@@ -189,7 +189,8 @@ const Programacao = (() => {
       const sims = lerSimulacao();
       if (btn.dataset.action === 'sim-adicionar') {
         const unidadeId = unidades.some(u => u.id === unidadeSel) ? unidadeSel : unidades[0].id;
-        sims.push({ unidadeId, grupo: Calculo.TEC, quantidade: 1, de: janela.de, ate: janela.ate, ...ritmoSugerido(Calculo.TEC, unidadeId) });
+        // entra no primeiro mês do período e fica até dezembro (contratação, não temporário)
+        sims.push({ unidadeId, grupo: Calculo.TEC, quantidade: 1, de: janela.de, ate: 11, ...ritmoSugerido(Calculo.TEC, unidadeId) });
       } else if (btn.dataset.action === 'sim-remover') {
         sims.splice(Number(btn.dataset.sim), 1);
       } else if (btn.dataset.action === 'sim-limpar') {
