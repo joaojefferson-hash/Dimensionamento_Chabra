@@ -603,3 +603,15 @@ form.busy { opacity: .7; pointer-events: none; }
   .calendario-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .barra-params { gap: 12px; }
 }
+
+/* editor de alocação por unidade (Colaboradores) */
+.alocacoes { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; background: #fff; }
+.aloc-linha { display: flex; align-items: center; gap: 10px; padding: 6px 2px; cursor: pointer; }
+.aloc-linha + .aloc-linha { border-top: 1px solid var(--border); }
+.aloc-linha input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--primary); }
+.aloc-nome { flex: 1; min-width: 0; }
+.aloc-pct { display: flex; align-items: center; gap: 6px; }
+.aloc-pct .input-num { width: 80px; }
+.aloc-rodape { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 2px 2px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.aloc-aviso { color: var(--text-muted); }
+.aloc-aviso.erro { color: var(--danger); font-weight: 600; }

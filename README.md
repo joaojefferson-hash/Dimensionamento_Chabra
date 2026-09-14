@@ -74,6 +74,9 @@ gap_horas              = capacidade_planejável − demanda
 gap_colab              = gap_horas ÷ capacidade média por colaborador (mesma função)
 ```
 
+- Capacidade por unidade = Σ capacidade do colaborador × percentual alocado; o nº de
+  colaboradores aparece em FTE (ex.: 2,5). A conversão de gap em pessoas usa a capacidade
+  média de um colaborador inteiro.
 - Demanda e capacidade são calculadas **por função** (o documento diz quem o
   produz; o colaborador tem função) e somadas no total. A recomendação da visão
   *Total* combina as necessidades por função, porque técnico não produz documento
@@ -110,7 +113,7 @@ js/views/programacao-anual.js   tela Programação Anual
 js/calculo.js           motor de dimensionamento (puro)
 js/programacao.js       utilitários das telas de programação (janela, barra, formatação)
 js/app.js               inicialização, navegação por hash (#/unidades …), badges, backup
-supabase/migrations/    SQL do banco (0001_init, 0002, 0003_fase2_dimensionamento, 0004)
+supabase/migrations/    SQL do banco (0001…0006; 0005 = alocação multiunidade)
 supabase/functions/usuarios/index.ts   Edge Function de gestão de usuários (chave secreta só no servidor)
 ```
 
@@ -123,13 +126,19 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
 |-----------------|-------------------------------------------------------------------------------------------|
 | `unidades`      | `id, nome (único), empresas_baixo/medio/alto (int ≥ 0), empresas (gerada = soma)`          |
 | `documentos`    | `id, nome (único), horas, periodicidade_meses (int ≥ 0), responsavel (função)`             |
-| `colaboradores` | `id, nome, funcao, horas_mes, eficiencia (1–100), unidade_id (FK, on delete set null)`     |
+| `colaboradores` | `id, nome, funcao, horas_mes, eficiencia (1–100)`                                          |
+| `colaborador_unidades` | `colaborador_id, unidade_id, percentual (0–100; soma por colaborador ≤ 100, gatilho)` |
 | `parametros`    | linha única: `dias_uteis[12], fator_baixo/medio/alto, dias_referencia, ocupacao_alvo`      |
 
 - `periodicidade_meses = 0` significa **sob demanda** (documento sem renovação periódica).
+- Um colaborador pode atuar em várias unidades: `alocacoes = [{ unidadeId, percentual }]`.
+  A capacidade dele entra em cada unidade multiplicada pelo percentual; a soma pode ser
+  menor que 100% (o restante é "não alocado" e não conta) mas nunca maior. Salvo pela RPC
+  `definir_alocacoes(colaborador, jsonb)` numa transação.
 - No JS/backup as chaves são camelCase (`periodicidadeMeses`, `horasMes`, `empresasBaixo`…);
-  o backup v2 inclui `parametros` e `unidadeNome` nos colaboradores (a importação resolve
-  a unidade pelo nome). Backups v1 (só `empresas`) entram com o total no grau baixo.
+  o backup v3 inclui `parametros` e `alocacoes[{unidadeNome, percentual}]` nos colaboradores
+  (a importação resolve a unidade pelo nome). Backups antigos: `empresas` → grau baixo;
+  `unidadeNome` único → alocação de 100%.
 
 ## Backup e migração
 

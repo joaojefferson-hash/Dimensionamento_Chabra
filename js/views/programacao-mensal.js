@@ -46,7 +46,7 @@ const ViewProgramacaoMensal = {
       <section class="card">
         <div class="card-head">
           <h2>${UI.esc(tituloAlvo)} · ${rotuloFuncao} · ${Programacao.descricaoJanela(janela)}</h2>
-          <span class="muted">${UI.plural(bj.colaboradores, 'colaborador alocado', 'colaboradores alocados')}</span>
+          <span class="muted">${Programacao.fmtFte(bj.colaboradores)} colaborador${bj.colaboradores === 1 ? '' : 'es'} (FTE) alocado${bj.colaboradores === 1 ? '' : 's'}</span>
         </div>
         <div class="table-wrap">
           <table class="table table-prog">

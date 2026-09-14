@@ -6,13 +6,15 @@
    Entradas (formato do Store):
      unidades:      [{ id, nome, empresasBaixo, empresasMedio, empresasAlto }]
      documentos:    [{ id, nome, horas, periodicidadeMeses, responsavel }]
-     colaboradores: [{ id, nome, funcao, horasMes, eficiencia, unidadeId }]
+     colaboradores: [{ id, nome, funcao, horasMes, eficiencia, alocacoes: [{ unidadeId, percentual }] }]
      parametros:    { diasUteis[12], fatorBaixo, fatorMedio, fatorAlto, diasReferencia, ocupacaoAlvo }
      janela:        { de: 0..11, ate: 0..11 }   (meses, inclusive)
 
    Fórmulas (spec Fase 2):
      horas_dia            = horasMes ÷ diasReferencia
      capacidade_mes(colab)= diasUteis[mes] × horas_dia × eficiencia/100
+     capacidade na unidade= capacidade_mes × percentual alocado/100 (colaborador pode estar em N unidades)
+     colaboradores (FTE)  = Σ percentual/100
      empresas_ponderadas  = baixo×fatorBaixo + medio×fatorMedio + alto×fatorAlto
      demanda_anual(doc)   = empresas_ponderadas × horas × (12 ÷ periodicidade)   [periodicidade 0 = fora]
      demanda_mes          = demanda_anual ÷ 12 (distribuição uniforme)
@@ -106,7 +108,14 @@ const Calculo = (() => {
 
     const docsValidos = documentos.filter(d => n(d.periodicidadeMeses) > 0);
     const docsSobDemanda = documentos.filter(d => n(d.periodicidadeMeses) <= 0).map(d => d.nome);
-    const colabSemUnidade = colaboradores.filter(c => !c.unidadeId || !unidades.some(u => u.id === c.unidadeId)).map(c => c.nome);
+    const idsUnidades = new Set(unidades.map(u => u.id));
+    const alocValidas = c => (c.alocacoes || []).filter(a => a && idsUnidades.has(a.unidadeId) && n(a.percentual) > 0);
+    const fracaoEm = (c, unidadeId) => alocValidas(c).filter(a => a.unidadeId === unidadeId).reduce((s, a) => s + n(a.percentual), 0) / 100;
+    const colabSemUnidade = colaboradores.filter(c => alocValidas(c).length === 0).map(c => c.nome);
+    const colabParcial = colaboradores
+      .map(c => ({ nome: c.nome, pct: alocValidas(c).reduce((s, a) => s + n(a.percentual), 0) }))
+      .filter(x => x.pct > 0 && x.pct < 99.999)
+      .map(x => `${x.nome} (${Math.round(x.pct)}%)`);
 
     // capacidade média por colaborador (por função) para converter gap em nº de pessoas.
     // Usa os colaboradores da unidade; se não houver, os de toda a equipe; se não houver, o padrão.
@@ -117,7 +126,8 @@ const Calculo = (() => {
     });
 
     const resultadoUnidades = unidades.map(u => {
-      const colabs = colaboradores.filter(c => c.unidadeId === u.id);
+      // colaboradores com alguma alocação nesta unidade, com a fração dedicada
+      const colabs = colaboradores.map(c => ({ ...c, fracao: fracaoEm(c, u.id) })).filter(c => c.fracao > 0);
       const demandaAnualPorFuncao = {};
       FUNCOES.forEach(f => {
         demandaAnualPorFuncao[f] = docsValidos
@@ -129,10 +139,12 @@ const Calculo = (() => {
         const porFuncao = {};
         FUNCOES.forEach(f => {
           const cf = colabs.filter(c => c.funcao === f);
-          const cap = cf.reduce((s, c) => s + capacidadeMes(c, mes, p), 0);
+          const cap = cf.reduce((s, c) => s + capacidadeMes(c, mes, p) * c.fracao, 0);
+          const fte = cf.reduce((s, c) => s + c.fracao, 0);
+          // média por colaborador INTEIRO (100%), para converter gap em pessoas
           const refLista = cf.length ? cf : mediaGlobal[f];
           const media = refLista.reduce((s, c) => s + capacidadeMes(c, mes, p), 0) / refLista.length;
-          porFuncao[f] = bloco(cap, demandaAnualPorFuncao[f] / 12, cf.length, media, p, FUNCAO_CURTA[f]);
+          porFuncao[f] = bloco(cap, demandaAnualPorFuncao[f] / 12, fte, media, p, FUNCAO_CURTA[f]);
         });
         const total = somaBlocos(Object.values(porFuncao), p);
         return { mes, nome: MESES[mes], nomeLongo: MESES_LONGO[mes], diasUteis: n(p.diasUteis[mes]), total, porFuncao };
@@ -144,9 +156,10 @@ const Calculo = (() => {
         const cap = blocosMes.reduce((s, b) => s + b.capacidade, 0);
         const dem = blocosMes.reduce((s, b) => s + b.demanda, 0);
         const cf = colabs.filter(c => c.funcao === f);
+        const fte = cf.reduce((s, c) => s + c.fracao, 0);
         const refLista = cf.length ? cf : mediaGlobal[f];
         const media = refLista.reduce((s, c) => s + meses.reduce((t, mes) => t + capacidadeMes(c, mes, p), 0), 0) / refLista.length;
-        janelaPorFuncao[f] = bloco(cap, dem, cf.length, media, p, FUNCAO_CURTA[f]);
+        janelaPorFuncao[f] = bloco(cap, dem, fte, media, p, FUNCAO_CURTA[f]);
       });
       const janelaTotal = somaBlocos(Object.values(janelaPorFuncao), p);
 
@@ -155,7 +168,7 @@ const Calculo = (() => {
         nome: u.nome,
         empresas: n(u.empresasBaixo) + n(u.empresasMedio) + n(u.empresasAlto),
         empresasPonderadas: empresasPonderadas(u, p),
-        colaboradores: colabs.map(c => capacidadeNominal(c, meses, p)),
+        colaboradores: colabs.map(c => ({ ...capacidadeNominal(c, meses, p), fracao: c.fracao })),
         meses: mesesCalc,
         janela: { total: janelaTotal, porFuncao: janelaPorFuncao },
       };
@@ -181,6 +194,7 @@ const Calculo = (() => {
       avisos: {
         docsSobDemanda,
         colabSemUnidade,
+        colabParcial,
         unidadesSemColab: resultadoUnidades.filter(u => u.colaboradores.length === 0 && u.empresas > 0).map(u => u.nome),
       },
       parametros: p,
@@ -211,9 +225,9 @@ const Calculo = (() => {
     const capacidade = blocos.reduce((s, b) => s + b.capacidade, 0);
     const demanda = blocos.reduce((s, b) => s + b.demanda, 0);
     const colaboradores = blocos.reduce((s, b) => s + b.colaboradores, 0);
-    // média por colaborador: capacidade total ÷ nº de colaboradores; sem gente, média das médias
+    // média por colaborador inteiro: média ponderada pelas FTEs; sem gente, média das médias
     const media = colaboradores > 0
-      ? capacidade / colaboradores
+      ? blocos.reduce((s, b) => s + b.capacidadeMediaColab * b.colaboradores, 0) / colaboradores
       : (blocos.length ? blocos.reduce((s, b) => s + b.capacidadeMediaColab, 0) / blocos.length : 0);
     return bloco(capacidade, demanda, colaboradores, media, p, rotulo);
   }

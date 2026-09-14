@@ -60,7 +60,7 @@ const ViewProgramacaoAnual = {
               <tr>
                 <th>Unidade</th>
                 <th class="num" title="Total de empresas (ponderadas pelos fatores de grau)">Empresas</th>
-                <th class="num">Colab.</th>
+                <th class="num" title="Colaboradores equivalentes (soma dos percentuais alocados)">Colab. (FTE)</th>
                 <th class="num">Capacidade (h)</th>
                 <th class="num">Demanda (h)</th>
                 <th class="num">Ocupação</th>
@@ -77,7 +77,7 @@ const ViewProgramacaoAnual = {
                   <tr class="${Programacao.classeLinha(b.status)}">
                     <td>${UI.esc(u.nome)}</td>
                     <td class="num">${u.empresas} <span class="muted">(${UI.fmt(u.empresasPonderadas, 1)})</span></td>
-                    <td class="num">${b.colaboradores}</td>
+                    <td class="num">${Programacao.fmtFte(b.colaboradores)}</td>
                     <td class="num">${Programacao.fmtH(b.capacidade)}</td>
                     <td class="num">${Programacao.fmtH(b.demanda)}</td>
                     <td class="num">${Programacao.fmtPct(b.ocupacao)}</td>
@@ -92,7 +92,7 @@ const ViewProgramacaoAnual = {
               <tr class="${Programacao.classeLinha(bt.status)}">
                 <th>Total</th>
                 <th class="num">${r.unidades.reduce((s, u) => s + u.empresas, 0)} <span class="muted">(${UI.fmt(r.unidades.reduce((s, u) => s + u.empresasPonderadas, 0), 1)})</span></th>
-                <th class="num">${bt.colaboradores}</th>
+                <th class="num">${Programacao.fmtFte(bt.colaboradores)}</th>
                 <th class="num">${Programacao.fmtH(bt.capacidade)}</th>
                 <th class="num">${Programacao.fmtH(bt.demanda)}</th>
                 <th class="num">${Programacao.fmtPct(bt.ocupacao)}</th>
@@ -122,7 +122,7 @@ const ViewProgramacaoAnual = {
               </tr>
               <tr class="sub">
                 <th></th>
-                ${Calculo.FUNCOES.map(() => '<th class="num">Colab.</th><th class="num">Gap (h)</th><th>Recomendação</th>').join('')}
+                ${Calculo.FUNCOES.map(() => '<th class="num">FTE</th><th class="num">Gap (h)</th><th>Recomendação</th>').join('')}
               </tr>
             </thead>
             <tbody>
@@ -130,7 +130,7 @@ const ViewProgramacaoAnual = {
                 <tr class="${u.total ? 'row-total' : ''}">
                   <td>${u.total ? '<strong>Total</strong>' : UI.esc(u.nome)}</td>
                   ${Calculo.FUNCOES.map(f => { const b = u.janela.porFuncao[f]; return `
-                    <td class="num">${b.colaboradores}</td>
+                    <td class="num">${Programacao.fmtFte(b.colaboradores)}</td>
                     <td class="num cel-${b.status}">${Programacao.fmtGap(b.gap)}</td>
                     <td>${Programacao.recomendacaoHTML(u.janela, f)}</td>`; }).join('')}
                 </tr>`).join('')}
@@ -177,7 +177,7 @@ const ViewProgramacaoAnual = {
           <table class="table">
             <thead>
               <tr>
-                <th>Colaborador</th><th>Função</th><th>Unidade</th>
+                <th>Colaborador</th><th>Função</th><th>Alocação</th>
                 <th class="num" title="Capacidade mensal ÷ dias úteis de referência (${p.diasReferencia})">Horas/dia</th>
                 <th class="num">Horas efetivas/mês</th>
                 <th class="num">Capacidade na janela (h)</th>
@@ -186,12 +186,12 @@ const ViewProgramacaoAnual = {
             <tbody>
               ${colaboradores.map(c => {
                 const nominal = { horasDia: Calculo.horasDia(c, p), capJanela: r.janela.meses.reduce((s, m) => s + Calculo.capacidadeMes(c, m, p), 0) };
-                const nomeU = Store.nomeUnidade(c.unidadeId);
+                const totalAloc = Store.totalAlocado(c);
                 return `
                   <tr>
                     <td>${UI.esc(c.nome)}</td>
                     <td>${c.funcao === Calculo.FUNCOES[1] ? 'Administrativo' : 'Técnico de SST'}</td>
-                    <td>${nomeU ? UI.esc(nomeU) : '<span class="chip chip-warn">sem unidade</span>'}</td>
+                    <td>${totalAloc > 0 ? UI.esc(Store.descricaoAlocacoes(c)) : '<span class="chip chip-warn">sem unidade</span>'}</td>
                     <td class="num">${Programacao.fmtH1(nominal.horasDia)}</td>
                     <td class="num">${Programacao.fmtH(c.horasMes * c.eficiencia / 100)}</td>
                     <td class="num">${Programacao.fmtH(nominal.capJanela)}</td>

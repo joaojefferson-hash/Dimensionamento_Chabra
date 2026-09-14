@@ -137,6 +137,8 @@ const Programacao = (() => {
     const s = UI.fmt(Math.abs(g), 1);
     return g < -1e-9 ? `−${s}` : g > 1e-9 ? `+${s}` : '0';
   };
+  /** Colaboradores equivalentes (FTE): inteiro sem decimais; senão 1 casa. */
+  const fmtFte = v => (!Number.isFinite(v) ? '—' : Math.abs(v - Math.round(v)) < 1e-9 ? String(Math.round(v)) : UI.fmt(v, 1));
   const fmtGap = h => {
     if (!Number.isFinite(h)) return '—';
     const s = UI.fmt(Math.abs(h), 0);
@@ -190,7 +192,8 @@ const Programacao = (() => {
   function avisosHTML(avisos) {
     const itens = [];
     if (avisos.docsSobDemanda.length) itens.push(`<strong>Fora do cálculo (sob demanda):</strong> ${avisos.docsSobDemanda.map(UI.esc).join(', ')}. Defina uma periodicidade no Catálogo para incluí-los.`);
-    if (avisos.colabSemUnidade.length) itens.push(`<strong>Sem unidade (não contam na capacidade):</strong> ${avisos.colabSemUnidade.map(UI.esc).join(', ')}. Informe a unidade em Colaboradores.`);
+    if (avisos.colabSemUnidade.length) itens.push(`<strong>Sem unidade (não contam na capacidade):</strong> ${avisos.colabSemUnidade.map(UI.esc).join(', ')}. Informe a alocação em Colaboradores.`);
+    if (avisos.colabParcial && avisos.colabParcial.length) itens.push(`<strong>Alocação parcial (só a parte alocada conta):</strong> ${avisos.colabParcial.map(UI.esc).join(', ')}.`);
     if (avisos.unidadesSemColab.length) itens.push(`<strong>Unidades com empresas e sem colaboradores:</strong> ${avisos.unidadesSemColab.map(UI.esc).join(', ')}.`);
     if (!itens.length) return '';
     return `<div class="alert alert-warn"><ul>${itens.map(i => `<li>${i}</li>`).join('')}</ul></div>`;
@@ -199,6 +202,6 @@ const Programacao = (() => {
   return {
     lerJanela, salvarJanela, lerFiltros, salvarFiltros, descricaoJanela,
     barraHTML, bindBarra,
-    fmtH, fmtH1, fmtPct, fmtColab, fmtGap, statusChip, classeLinha, blocoDe, recomendacaoHTML, legendaHTML, avisosHTML,
+    fmtH, fmtH1, fmtPct, fmtColab, fmtGap, fmtFte, statusChip, classeLinha, blocoDe, recomendacaoHTML, legendaHTML, avisosHTML,
   };
 })();

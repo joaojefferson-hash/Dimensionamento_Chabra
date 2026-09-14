@@ -11,13 +11,14 @@
    Formato em JS (igual ao backup exportado, versão 2):
      unidades:      [{ id, nome, empresasBaixo, empresasMedio, empresasAlto, empresas (soma) }]
      documentos:    [{ id, nome, horas, periodicidadeMeses, responsavel }]   // periodicidade 0 = sob demanda
-     colaboradores: [{ id, nome, funcao, horasMes, eficiencia, unidadeId, unidadeNome }] // eficiencia em %
+     colaboradores: [{ id, nome, funcao, horasMes, eficiencia, alocacoes: [{ unidadeId, unidadeNome, percentual }] }]
+                    // eficiencia em %; alocações somam ≤ 100% (o restante é "não alocado")
      parametros:    { diasUteis[12], fatorBaixo, fatorMedio, fatorAlto, diasReferencia, ocupacaoAlvo }
    ========================================================================== */
 
 const Store = (() => {
   const APP_ID = 'chabra-dimensiona';
-  const SCHEMA_VERSION = 2;
+  const SCHEMA_VERSION = 3;
   const LOCAL_KEY = 'chabra-dimensiona:data';            // versão antiga (só localStorage)
   const LOCAL_BACKUP_KEY = 'chabra-dimensiona:backup-local'; // onde os dados locais ficam após a migração
 
@@ -67,13 +68,35 @@ const Store = (() => {
     periodicidadeMeses: toInt(d.periodicidadeMeses, 0),
     responsavel: FUNCOES.includes(d.responsavel) ? d.responsavel : FUNCOES[0],
   });
+  /** Normaliza alocações: remove inválidas/duplicadas, limita cada uma a 100 e a soma a 100. */
+  const buildAlocacoes = lista => {
+    const vistos = new Set();
+    const out = [];
+    let soma = 0;
+    (Array.isArray(lista) ? lista : []).forEach(a => {
+      if (!a) return;
+      const unidadeId = toStr(a.unidadeId) || null;
+      const unidadeNome = toStr(a.unidadeNome);
+      const chaveA = unidadeId || chave(unidadeNome);
+      if (!chaveA || vistos.has(chaveA)) return;
+      let percentual = Math.min(100, Math.round(toNum(a.percentual, 0) * 100) / 100);
+      if (!(percentual > 0)) return;
+      percentual = Math.min(percentual, Math.max(0, 100 - soma));
+      if (!(percentual > 0)) return;
+      vistos.add(chaveA);
+      soma += percentual;
+      out.push({ unidadeId, unidadeNome, percentual });
+    });
+    return out;
+  };
   const buildColaborador = c => ({
     nome: toStr(c.nome),
     funcao: FUNCOES.includes(c.funcao) ? c.funcao : FUNCOES[0],
     horasMes: Math.max(0, toNum(c.horasMes, DEFAULT_COLABORADOR.horasMes)),
     eficiencia: clamp(toNum(c.eficiencia, DEFAULT_COLABORADOR.eficiencia), 1, 100),
-    unidadeId: toStr(c.unidadeId) || null,
-    unidadeNome: toStr(c.unidadeNome),
+    // formato legado (unidadeId/unidadeNome únicos) vira uma alocação de 100%
+    alocacoes: buildAlocacoes(Array.isArray(c.alocacoes) ? c.alocacoes
+      : (c.unidadeId || c.unidadeNome) ? [{ unidadeId: c.unidadeId, unidadeNome: c.unidadeNome, percentual: 100 }] : []),
   });
   const buildParametros = q => {
     const base = q || {};
@@ -119,8 +142,8 @@ const Store = (() => {
     colaboradores: {
       table: 'colaboradores',
       build: buildColaborador,
-      toRow: c => ({ nome: c.nome, funcao: c.funcao, horas_mes: c.horasMes, eficiencia: c.eficiencia, unidade_id: c.unidadeId || null }),
-      fromRow: r => ({ id: r.id, nome: r.nome, funcao: r.funcao, horasMes: Number(r.horas_mes), eficiencia: Number(r.eficiencia), unidadeId: r.unidade_id || null }),
+      toRow: c => ({ nome: c.nome, funcao: c.funcao, horas_mes: c.horasMes, eficiencia: c.eficiencia }),
+      fromRow: r => ({ id: r.id, nome: r.nome, funcao: r.funcao, horasMes: Number(r.horas_mes), eficiencia: Number(r.eficiencia), alocacoes: [] }),
     },
   };
 
@@ -141,12 +164,15 @@ const Store = (() => {
     };
     const unidades = lista('unidades', buildUnidade);
     const colaboradores = lista('colaboradores', buildColaborador).map(c => {
-      // resolve a unidade pelo nome (ids não sobrevivem à importação); se vier só o id, procura o nome no próprio arquivo
-      if (!c.unidadeNome && c.unidadeId && Array.isArray(raw.unidades)) {
-        const u = raw.unidades.find(x => x && x.id === c.unidadeId);
-        if (u) c.unidadeNome = toStr(u.nome);
-      }
-      c.unidadeId = null;
+      // ids não sobrevivem à importação: a unidade é resolvida pelo nome (se vier só o id, procura o nome no próprio arquivo)
+      c.alocacoes = c.alocacoes.map(a => {
+        let nome = a.unidadeNome;
+        if (!nome && a.unidadeId && Array.isArray(raw.unidades)) {
+          const u = raw.unidades.find(x => x && x.id === a.unidadeId);
+          if (u) nome = toStr(u.nome);
+        }
+        return { unidadeId: null, unidadeNome: nome, percentual: a.percentual };
+      }).filter(a => a.unidadeNome);
       return c;
     });
     return {
@@ -165,7 +191,7 @@ const Store = (() => {
     const msg = String((error && error.message) || '');
     let texto;
     if (code === '23505') texto = 'Já existe um registro com esse nome.';
-    else if (code === '23514') texto = 'Valor fora do permitido (verifique os números informados).';
+    else if (code === '23514') texto = /aloca/i.test(msg) ? msg : 'Valor fora do permitido (verifique os números informados).';
     else if (code === '42501' || code === 'PGRST301' || /jwt|not authenticated/i.test(msg)) texto = 'Sessão expirada ou sem permissão. Entre novamente.';
     else if (/failed to fetch|networkerror|load failed/i.test(msg)) texto = 'Sem conexão com o servidor. Verifique a internet.';
     else texto = msg || fallback;
@@ -198,8 +224,21 @@ const Store = (() => {
           if (error) throw falha(error, 'Falha ao carregar os parâmetros.');
           return ['parametros', parametrosFromRow(data)];
         }));
+    consultas.push(
+      db.from('colaborador_unidades').select('colaborador_id, unidade_id, percentual')
+        .then(({ data, error }) => {
+          if (error) throw falha(error, 'Falha ao carregar as alocações.');
+          return ['_alocacoes', data];
+        }));
     const resultados = await Promise.all(consultas);
     state = Object.fromEntries(resultados);
+    // distribui as alocações nos colaboradores (unidadeNome preenchido a partir do cache)
+    const porColab = {};
+    state._alocacoes.forEach(a => {
+      (porColab[a.colaborador_id] = porColab[a.colaborador_id] || []).push({ unidadeId: a.unidade_id, unidadeNome: '', percentual: Number(a.percentual) });
+    });
+    delete state._alocacoes;
+    state.colaboradores.forEach(c => { c.alocacoes = comNomes(porColab[c.id] || []); });
     loaded = true;
     loadedAt = Date.now();
     emit();
@@ -217,6 +256,20 @@ const Store = (() => {
     loadedAt = 0;
   }
 
+  /** Preenche unidadeNome de cada alocação a partir do cache de unidades. */
+  function comNomes(alocacoes) {
+    return alocacoes.map(a => ({ ...a, unidadeNome: nomeUnidade(a.unidadeId) || a.unidadeNome || '' }));
+  }
+
+  /** Grava as alocações de um colaborador (RPC atômica) e devolve a lista normalizada. */
+  async function salvarAlocacoes(colaboradorId, alocacoes) {
+    const validas = alocacoes.filter(a => a.unidadeId && a.percentual > 0)
+      .map(a => ({ unidadeId: a.unidadeId, percentual: a.percentual }));
+    const { error } = await db.rpc('definir_alocacoes', { p_colaborador: colaboradorId, p_alocacoes: validas });
+    if (error) throw falha(error, 'Não foi possível salvar as alocações.');
+    return comNomes(validas);
+  }
+
   /* ---------- CRUD genérico por coleção ---------- */
 
   function makeCollection(key) {
@@ -226,9 +279,13 @@ const Store = (() => {
       get: id => state[key].find(x => x.id === id) || null,
 
       async add(data) {
-        const { data: row, error } = await db.from(table).insert(toRow(build(data))).select().single();
+        const montado = build(data);
+        const { data: row, error } = await db.from(table).insert(toRow(montado)).select().single();
         if (error) throw falha(error, 'Não foi possível adicionar.');
         const item = fromRow(row);
+        if (key === 'colaboradores' && montado.alocacoes.length) {
+          item.alocacoes = await salvarAlocacoes(item.id, montado.alocacoes);
+        }
         state[key].push(item);
         emit();
         return item;
@@ -237,9 +294,15 @@ const Store = (() => {
       async update(id, patch, { silent = false } = {}) {
         const atual = state[key].find(x => x.id === id);
         if (!atual) throw new Error('Registro não encontrado (talvez tenha sido excluído em outra máquina).');
-        const { data: row, error } = await db.from(table).update(toRow(build({ ...atual, ...patch }))).eq('id', id).select().single();
+        const montado = build({ ...atual, ...patch });
+        const { data: row, error } = await db.from(table).update(toRow(montado)).eq('id', id).select().single();
         if (error) throw falha(error, 'Não foi possível salvar.');
         const item = fromRow(row);
+        if (key === 'colaboradores') {
+          item.alocacoes = patch.alocacoes !== undefined
+            ? await salvarAlocacoes(id, montado.alocacoes)
+            : comNomes(atual.alocacoes || []);
+        }
         state[key] = state[key].map(x => (x.id === id ? item : x));
         if (!silent) emit();
         return item;
@@ -268,10 +331,22 @@ const Store = (() => {
     },
   };
 
-  /** Nome da unidade de um colaborador (ou '' se não alocado). */
+  /** Nome de uma unidade pelo id (ou ''). */
   function nomeUnidade(unidadeId) {
     const u = unidadeId ? state.unidades.find(x => x.id === unidadeId) : null;
     return u ? u.nome : '';
+  }
+
+  /** Texto "Matriz 60% · Filial 40%" (ou '' se não alocado). */
+  function descricaoAlocacoes(c) {
+    return (c.alocacoes || [])
+      .map(a => `${nomeUnidade(a.unidadeId) || a.unidadeNome || '?'} ${a.percentual % 1 === 0 ? a.percentual : a.percentual.toFixed(1).replace('.', ',')}%`)
+      .join(' · ');
+  }
+
+  /** Soma dos percentuais alocados (0–100). */
+  function totalAlocado(c) {
+    return (c.alocacoes || []).reduce((s, a) => s + a.percentual, 0);
   }
 
   /** Verifica se já existe registro com o mesmo nome (ignora maiúsculas/minúsculas). */
@@ -301,7 +376,7 @@ const Store = (() => {
       exportedAt: new Date().toISOString(),
       unidades: state.unidades,
       documentos: state.documentos,
-      colaboradores: state.colaboradores.map(c => ({ ...c, unidadeNome: nomeUnidade(c.unidadeId) })),
+      colaboradores: state.colaboradores.map(c => ({ ...c, alocacoes: comNomes(c.alocacoes || []) })),
       parametros: state.parametros,
     };
     return JSON.stringify(payload, null, 2);
@@ -365,6 +440,8 @@ const Store = (() => {
     colaboradores: makeCollection('colaboradores'),
     parametros,
     nomeUnidade,
+    descricaoAlocacoes,
+    totalAlocado,
     loadAll,
     reloadIfStale,
     clear,
