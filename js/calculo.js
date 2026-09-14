@@ -6,13 +6,12 @@
    Entradas (formato do Store):
      unidades:      [{ id, nome, empresasBaixo, empresasMedio, empresasAlto, meses?: { [1..12]: {...} } }]
      colaboradores: [{ id, nome, funcao, empresasDia, inspecoesDia, relatoriosDia, alocacoes: [{ unidadeId, percentual }] }]
-     parametros:    { diasUteis[12], fatorBaixo, fatorMedio, fatorAlto, ocupacaoAlvo }
+     parametros:    { diasUteis[12], fatorBaixo, fatorMedio, fatorAlto, ocupacaoAlvo, mesesPorInspecao, mesesPorRelatorio, mesesPorFinalizacao }
      janela:        { de: 0..11, ate: 0..11 }   (meses, inclusive)
 
    Modelo:
-     precisa(unidade, mês)     = empresas do mês ponderadas pelo peso do grau
-                                 (cada empresa da carteira precisa, no mês, de 1 inspeção,
-                                  1 relatório e 1 finalização administrativa)
+     precisa(unidade, entrega, mês) = empresas do mês (com peso do grau) ÷ meses entre atendimentos
+                                 (ex.: inspeção a cada 3 meses → 1/3 das empresas por mês)
      produção(colab, entrega, mês) = valor_por_dia × dias úteis do mês × fração alocada na unidade
      consegue(unidade, entrega, mês) = Σ produção × (ocupaçãoAlvo/100)   ← folga para imprevistos
      sobra = consegue − precisa  (negativa = falta)
@@ -32,9 +31,9 @@ const Calculo = (() => {
   const FUNCAO_SINGULAR = { [TEC]: 'técnico', [ADM]: 'administrativo' };
 
   const ENTREGAS = [
-    { id: 'inspecoes',  funcao: TEC, campo: 'inspecoesDia',  rotulo: 'Inspeções',            unidade: 'inspeções' },
-    { id: 'relatorios', funcao: TEC, campo: 'relatoriosDia', rotulo: 'Relatórios',           unidade: 'relatórios' },
-    { id: 'empresas',   funcao: ADM, campo: 'empresasDia',   rotulo: 'Empresas finalizadas', unidade: 'empresas finalizadas' },
+    { id: 'inspecoes',  funcao: TEC, campo: 'inspecoesDia',  freq: 'mesesPorInspecao',    rotulo: 'Inspeções',            unidade: 'inspeções',            singular: 'uma inspeção' },
+    { id: 'relatorios', funcao: TEC, campo: 'relatoriosDia', freq: 'mesesPorRelatorio',   rotulo: 'Relatórios',           unidade: 'relatórios',           singular: 'um relatório' },
+    { id: 'empresas',   funcao: ADM, campo: 'empresasDia',   freq: 'mesesPorFinalizacao', rotulo: 'Empresas finalizadas', unidade: 'empresas finalizadas', singular: 'uma finalização' },
   ];
   const ENTREGAS_DA_FUNCAO = { [TEC]: ENTREGAS.filter(e => e.funcao === TEC), [ADM]: ENTREGAS.filter(e => e.funcao === ADM) };
 
@@ -61,6 +60,12 @@ const Calculo = (() => {
   /** Produção de um colaborador numa entrega num mês (100% do tempo). */
   function producaoMes(colab, entrega, mes, p) {
     return n(colab[entrega.campo]) * n(p.diasUteis[mes]);
+  }
+
+  /** Quantas entregas a carteira da unidade precisa no mês: empresas ponderadas ÷ meses entre atendimentos. */
+  function precisaMes(u, entrega, mes, p) {
+    const freq = n(p[entrega.freq]) || 1;
+    return empresasPonderadas(u, p, mes) / freq;
   }
 
   function status(sobra, consegue) {
@@ -179,7 +184,7 @@ const Calculo = (() => {
           const consegueMax = cf.reduce((s, c) => s + producaoMes(c, e, mes, p) * c.fracao, 0);
           const ref = cf.length ? cf : globalPorFuncao[e.funcao];
           const producaoPessoaMax = ref.reduce((s, c) => s + producaoMes(c, e, mes, p), 0) / ref.length;
-          entregas[e.id] = bloco(precisa, consegueMax, pessoas[e.funcao], producaoPessoaMax, p);
+          entregas[e.id] = bloco(precisaMes(u, e, mes, p), consegueMax, pessoas[e.funcao], producaoPessoaMax, p);
         });
         const funcoes = {};
         FUNCOES.forEach(f => { funcoes[f] = resumoFuncao(f, entregas); });
@@ -295,6 +300,9 @@ const Calculo = (() => {
       fatorMedio: n(base.fatorMedio) || 1.3,
       fatorAlto: n(base.fatorAlto) || 1.6,
       ocupacaoAlvo: n(base.ocupacaoAlvo) || 85,
+      mesesPorInspecao: n(base.mesesPorInspecao) || 1,
+      mesesPorRelatorio: n(base.mesesPorRelatorio) || 1,
+      mesesPorFinalizacao: n(base.mesesPorFinalizacao) || 1,
     };
   }
 
@@ -313,7 +321,7 @@ const Calculo = (() => {
 
   return {
     MESES, MESES_LONGO, TEC, ADM, FUNCOES, FUNCAO_CURTA, FUNCAO_SINGULAR, ENTREGAS, ENTREGAS_DA_FUNCAO, COLAB_PADRAO, MARGEM_ATENCAO,
-    empresasDoMes, empresasPonderadas, producaoMes, calcular, normalizarParametros, ritmoTexto, piorStatus,
+    empresasDoMes, empresasPonderadas, producaoMes, precisaMes, calcular, normalizarParametros, ritmoTexto, piorStatus,
   };
 })();
 

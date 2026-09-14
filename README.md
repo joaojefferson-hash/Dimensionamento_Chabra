@@ -64,9 +64,10 @@ Tudo roda no navegador, em [js/calculo.js](js/calculo.js) (funções puras; tamb
 roda em Node para testes). O modelo é declarado pelo usuário, sem horas:
 
 ```
-precisa(unidade, mês)        = empresas do mês × peso do grau
-                               (cada empresa da carteira precisa, no mês, de 1 inspeção,
-                                1 relatório e 1 finalização administrativa)
+precisa(unidade, entrega, mês) = empresas do mês × peso do grau ÷ meses entre atendimentos
+                               (Calendário → "Com que frequência cada empresa é atendida?";
+                                padrão 1 = toda empresa recebe inspeção, relatório e
+                                finalização todo mês; 3 = um terço das empresas por mês)
 produção(pessoa, entrega, mês) = ritmo por dia × dias úteis do mês × % do tempo na unidade
 consegue(unidade, entrega)   = Σ produção × (1 − folga para imprevistos)
 sobra                        = consegue − precisa      (negativa = falta)
@@ -107,7 +108,7 @@ js/views/programacao-anual.js   tela Programação Anual
 js/calculo.js           motor de dimensionamento (puro)
 js/programacao.js       utilitários das telas de programação (janela, barra, formatação)
 js/app.js               inicialização, navegação por hash (#/unidades …), badges, backup
-supabase/migrations/    SQL do banco (0001…0008; 0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária)
+supabase/migrations/    SQL do banco (0001…0008; 0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência de atendimento)
 supabase/functions/usuarios/index.ts   Edge Function de gestão de usuários (chave secreta só no servidor)
 ```
 
@@ -123,7 +124,7 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
 | `colaboradores` | `id, nome, funcao, empresas_dia, inspecoes_dia, relatorios_dia` (ritmo por dia)          |
 | `colaborador_unidades` | `colaborador_id, unidade_id, percentual (0–100; soma por colaborador ≤ 100, gatilho)` |
 | `unidade_empresas_mes` | `unidade_id, mes (1–12), empresas_baixo/medio/alto` — exceção mensal; sem linha = padrão |
-| `parametros`    | linha única: `dias_uteis[12], fator_baixo/medio/alto, ocupacao_alvo`                      |
+| `parametros`    | linha única: `dias_uteis[12], fator_baixo/medio/alto, ocupacao_alvo, meses_por_inspecao/relatorio/finalizacao` |
 
 - `periodicidade_meses = 0` significa **sob demanda** (documento sem renovação periódica).
 - A quantidade de empresas pode **variar por mês**: os campos da unidade são o padrão e a

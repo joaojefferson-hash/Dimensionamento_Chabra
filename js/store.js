@@ -14,7 +14,8 @@
      documentos:    [{ id, nome, horas, periodicidadeMeses, responsavel }]   // periodicidade 0 = sob demanda
      colaboradores: [{ id, nome, funcao, empresasDia, inspecoesDia, relatoriosDia, alocacoes: [{ unidadeId, unidadeNome, percentual }] }]
                     // produção declarada por dia; alocações somam ≤ 100% (o restante é "não alocado")
-     parametros:    { diasUteis[12], fatorBaixo, fatorMedio, fatorAlto, ocupacaoAlvo }
+     parametros:    { diasUteis[12], fatorBaixo, fatorMedio, fatorAlto, ocupacaoAlvo,
+                      mesesPorInspecao, mesesPorRelatorio, mesesPorFinalizacao }  // a cada N meses por empresa
    ========================================================================== */
 
 const Store = (() => {
@@ -28,6 +29,7 @@ const Store = (() => {
   const DEFAULT_PARAMETROS = {
     diasUteis: [21, 18, 22, 20, 20, 21, 23, 21, 21, 21, 19, 22],
     fatorBaixo: 1, fatorMedio: 1.3, fatorAlto: 1.6, ocupacaoAlvo: 85,
+    mesesPorInspecao: 1, mesesPorRelatorio: 1, mesesPorFinalizacao: 1,
   };
 
   // Mesmos valores do seed da migration 0001 (sugestões, editáveis).
@@ -127,15 +129,20 @@ const Store = (() => {
       fatorMedio: pos(base.fatorMedio, DEFAULT_PARAMETROS.fatorMedio),
       fatorAlto: pos(base.fatorAlto, DEFAULT_PARAMETROS.fatorAlto),
       ocupacaoAlvo: clamp(pos(base.ocupacaoAlvo, DEFAULT_PARAMETROS.ocupacaoAlvo), 1, 100),
+      mesesPorInspecao: pos(base.mesesPorInspecao, DEFAULT_PARAMETROS.mesesPorInspecao),
+      mesesPorRelatorio: pos(base.mesesPorRelatorio, DEFAULT_PARAMETROS.mesesPorRelatorio),
+      mesesPorFinalizacao: pos(base.mesesPorFinalizacao, DEFAULT_PARAMETROS.mesesPorFinalizacao),
     };
   };
   const parametrosToRow = q => ({
     dias_uteis: q.diasUteis, fator_baixo: q.fatorBaixo, fator_medio: q.fatorMedio, fator_alto: q.fatorAlto,
     ocupacao_alvo: q.ocupacaoAlvo,
+    meses_por_inspecao: q.mesesPorInspecao, meses_por_relatorio: q.mesesPorRelatorio, meses_por_finalizacao: q.mesesPorFinalizacao,
   });
   const parametrosFromRow = r => buildParametros({
     diasUteis: r.dias_uteis, fatorBaixo: r.fator_baixo, fatorMedio: r.fator_medio, fatorAlto: r.fator_alto,
     ocupacaoAlvo: r.ocupacao_alvo,
+    mesesPorInspecao: r.meses_por_inspecao, mesesPorRelatorio: r.meses_por_relatorio, mesesPorFinalizacao: r.meses_por_finalizacao,
   });
 
   const TABELAS = {

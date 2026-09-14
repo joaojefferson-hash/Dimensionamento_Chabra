@@ -125,7 +125,9 @@ const Programacao = (() => {
     const consegue = porMes && bloco.porMes ? bloco.porMes.consegue : bloco.consegue;
     const precisa = porMes && bloco.porMes ? bloco.porMes.precisa : bloco.precisa;
     const sufixo = porMes ? ' por mês' : '';
-    return `A equipe consegue até <strong>${num(consegue)}</strong> ${entrega.unidade}${sufixo}; a carteira precisa de <strong>${num(precisa)}</strong>.`;
+    const freq = Store.parametros.get()[entrega.freq];
+    const nota = freq && freq !== 1 ? ` <span class="muted">(${entrega.singular} por empresa a cada ${UI.fmt(freq, 1)} meses)</span>` : '';
+    return `A equipe consegue até <strong>${num(consegue)}</strong> ${entrega.unidade}${sufixo}; a carteira precisa de <strong>${num(precisa)}</strong>.${nota}`;
   }
 
   function recomendacaoHTML(rec) {

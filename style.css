@@ -703,3 +703,5 @@ form.busy { opacity: .7; pointer-events: none; }
 .grau-baixo { background: #e3f2ea; color: #0b5d43; }
 .grau-medio { background: #fff1cc; color: #7a5200; }
 .grau-alto  { background: #fde2df; color: #8f1d17; }
+
+.input-sufixo { white-space: nowrap; align-self: center; }
