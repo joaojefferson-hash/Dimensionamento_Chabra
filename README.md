@@ -76,6 +76,12 @@ pessoas que faltam/sobram    = sobra ÷ produção de uma pessoa inteira no per�
 
 - Entregas: técnicos → inspeções por dia e relatórios por dia; administrativos →
   empresas finalizadas por dia. A situação dos técnicos é a pior das duas entregas.
+- **Funções são cadastráveis** (tela Funções). Cada função tem um *tipo de produção*:
+  `tecnico`, `administrativo` ou `nenhuma`. Quem tem função sem produção (supervisores)
+  não tem ritmo diário e fica fora das contas. A função pode ser marcada como **chefia
+  de equipe**: a pessoa aparece como "Chefia: Fulano (Supervisor ADM)" nos cartões das
+  unidades em que estiver alocada (para quem não produz, o tempo não é dividido — só se
+  marcam as unidades). Uma função em uso não pode ser excluída.
 - Sinais: verde = dá conta; amarelo = no limite (sobra < 10%); vermelho = precisa contratar.
   As telas mostram frases prontas ("Faltam aproximadamente 3 técnicos…") em vez de
   números crus. O total soma as faltas das unidades (folga numa não cobre outra).
@@ -104,7 +110,8 @@ js/store.js             cache em memória sobre as tabelas + exportar/importar J
 js/views/unidades.js        tela Unidades (CRUD)
 js/views/empresas.js        tela Empresas por Unidade (quantidade por unidade)
 js/views/catalogo.js        tela Catálogo de Documentos (oculta neste modelo)
-js/views/colaboradores.js   tela Colaboradores (CRUD)
+js/views/colaboradores.js   tela Colaboradores (CRUD; função vem do cadastro de funções)
+js/views/funcoes.js         tela Funções (nome, tipo de produção, chefia, ordem)
 js/views/usuarios.js        tela Usuários (só admin) — chama a Edge Function `usuarios`
 js/views/calendario.js      tela Calendário (dias úteis por mês, dias de referência)
 js/views/programacao-mensal.js  tela Programação Mensal
@@ -113,7 +120,7 @@ js/views/historico.js       tela Histórico de alterações
 js/calculo.js           motor de dimensionamento (puro)
 js/programacao.js       utilitários das telas de programação (janela, barra, formatação)
 js/app.js               inicialização, navegação por hash (#/unidades …), badges, backup
-supabase/migrations/    SQL do banco (0001…0008; 0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico)
+supabase/migrations/    SQL do banco (0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico, 0012 = funções cadastráveis, 0013 = chefia)
 supabase/functions/usuarios/index.ts   Edge Function de gestão de usuários (chave secreta só no servidor)
 ```
 
@@ -126,7 +133,8 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
 |-----------------|-------------------------------------------------------------------------------------------|
 | `unidades`      | `id, nome (único), empresas_baixo/medio/alto (int ≥ 0), empresas (gerada = soma)`          |
 | `documentos`    | `id, nome (único), horas, periodicidade_meses (int ≥ 0), responsavel (função)`             |
-| `colaboradores` | `id, nome, funcao, empresas_dia, inspecoes_dia, relatorios_dia` (ritmo por dia)          |
+| `funcoes`       | `id, nome (único), tipo_producao (tecnico/administrativo/nenhuma), chefia (bool), ordem` |
+| `colaboradores` | `id, nome, funcao_id → funcoes, empresas_dia, inspecoes_dia, relatorios_dia` (ritmo por dia) |
 | `colaborador_unidades` | `colaborador_id, unidade_id, percentual (0–100; soma por colaborador ≤ 100, gatilho)` |
 | `unidade_empresas_mes` | `unidade_id, mes (1–12), empresas_baixo/medio/alto` — exceção mensal; sem linha = padrão |
 | `parametros`    | linha única: `dias_uteis[12], fator_baixo/medio/alto, ocupacao_alvo, meses_por_inspecao/relatorio/finalizacao` |
@@ -141,13 +149,15 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
   menor que 100% (o restante é "não alocado" e não conta) mas nunca maior. Salvo pela RPC
   `definir_alocacoes(colaborador, jsonb)` numa transação.
 - No JS/backup as chaves são camelCase (`periodicidadeMeses`, `horasMes`, `empresasBaixo`…);
-  o backup v5 inclui `parametros`, `empresasPorMes[{mes, empresasBaixo…}]` nas unidades e `alocacoes[{unidadeNome, percentual}]` nos colaboradores
-  (a importação resolve a unidade pelo nome). Backups antigos: `empresas` → grau baixo;
-  `unidadeNome` único → alocação de 100%.
+  o backup v6 inclui `funcoes[{nome, tipoProducao, chefia, ordem}]`, `parametros`,
+  `empresasPorMes[{mes, empresasBaixo…}]` nas unidades e `alocacoes[{unidadeNome, percentual}]`
+  + `funcao` (nome) nos colaboradores (a importação resolve unidade e função pelo nome;
+  função desconhecida → função técnica padrão; funções do backup são criadas/atualizadas,
+  nunca apagadas). Backups antigos: `empresas` → grau baixo; `unidadeNome` único → 100%.
 
 ## Backup e migração
 
-- **Exportar JSON** baixa `{ unidades, documentos, colaboradores }`.
+- **Exportar JSON** baixa `{ funcoes, unidades, documentos, colaboradores, parametros }`.
 - **Importar JSON** valida, mostra um resumo e chama `importar_backup(jsonb)`,
   que substitui **todos** os dados numa única transação (para toda a equipe).
 - Se o navegador ainda tiver dados da versão anterior (só `localStorage`), o app

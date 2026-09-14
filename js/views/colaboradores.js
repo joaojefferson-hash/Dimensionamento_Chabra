@@ -23,7 +23,6 @@ const ViewColaboradores = {
   desenharLista(el) {
     const box = el.querySelector('#lista-colab');
     if (!box) return;
-    const TEC = Calculo.TEC;
     const fmtPct = v => (v % 1 === 0 ? String(v) : v.toFixed(1).replace('.', ','));
     const colaboradores = Store.colaboradores.list();
     const listados = this.filtrar(colaboradores);
@@ -58,13 +57,15 @@ const ViewColaboradores = {
             ${listados.map(c => `
               <tr class="${c.id === this.editingId ? 'editing' : ''}">
                 <td>${UI.esc(c.nome)}</td>
-                <td><span class="chip ${c.funcao === TEC ? 'chip-green' : 'chip-blue'}">${c.funcao === TEC ? 'Técnico de SST' : 'Administrativo'}</span></td>
-                <td>${UI.esc(Calculo.ritmoTexto(c))}</td>
+                <td>${ViewColaboradores.chipFuncao(c)}</td>
+                <td class="${c.tipoProducao === 'nenhuma' ? 'muted' : ''}">${UI.esc(Calculo.ritmoTexto(c))}</td>
                 ${(() => {
                   const t = Store.totalAlocado(c);
-                  if (t <= 0) return '<td><span class="chip chip-warn">sem unidade</span></td><td class="num muted">—</td>';
+                  const semProducao = c.tipoProducao === 'nenhuma';
+                  if (t <= 0) return `<td><span class="chip chip-warn">sem unidade</span></td><td class="num muted">—</td>`;
                   const alocs = (c.alocacoes || []).filter(a => a.percentual > 0);
                   const nomes = alocs.map(a => `<div>${UI.esc(Store.nomeUnidade(a.unidadeId) || a.unidadeNome || '?')}</div>`).join('');
+                  if (semProducao) return `<td class="col-unidades">${nomes}</td><td class="num muted" title="Sem produção: o tempo não entra nas contas">—</td>`;
                   const tempos = alocs.map(a => `<div>${fmtPct(a.percentual)}%</div>`).join('');
                   const livre = t < 99.999 ? `<div><span class="chip chip-warn" title="Parte do tempo sem unidade">${fmtPct(Math.round((100 - t) * 10) / 10)}% livre</span></div>` : '';
                   return `<td class="col-unidades">${nomes}</td><td class="num col-tempo">${tempos}${livre}</td>`;
@@ -79,16 +80,23 @@ const ViewColaboradores = {
       </div>`;
   },
 
+  /** Chip com o nome da função (cor pelo tipo de produção) e a marca de chefia. */
+  chipFuncao(c) {
+    const cor = c.tipoProducao === Calculo.TEC ? 'chip-green' : c.tipoProducao === Calculo.ADM ? 'chip-blue' : 'chip-gray';
+    return `<span class="chip ${cor}">${UI.esc(c.funcao || 'sem função')}</span>${c.chefia ? ' <span class="chip chip-chefia" title="Chefia de equipe: aparece como responsável pelas unidades em que está">Chefia</span>' : ''}`;
+  },
+
   /** Aplica os filtros à lista de colaboradores. */
   filtrar(lista) {
     const f = this.filtros;
     const termo = f.texto.trim().toLocaleLowerCase('pt-BR');
     return lista.filter(c => {
-      if (f.funcao && c.funcao !== f.funcao) return false;
+      if (f.funcao === 'chefia' && !c.chefia) return false;
+      if (f.funcao && f.funcao !== 'chefia' && c.funcaoId !== f.funcao) return false;
       if (f.unidade === 'sem' && Store.totalAlocado(c) > 0) return false;
       if (f.unidade && f.unidade !== 'sem' && !(c.alocacoes || []).some(a => a.unidadeId === f.unidade)) return false;
       if (termo) {
-        const alvo = (c.nome + ' ' + Store.descricaoAlocacoes(c) + ' ' + Calculo.ritmoTexto(c)).toLocaleLowerCase('pt-BR');
+        const alvo = (c.nome + ' ' + (c.funcao || '') + ' ' + Store.descricaoAlocacoes(c) + ' ' + Calculo.ritmoTexto(c)).toLocaleLowerCase('pt-BR');
         if (!alvo.includes(termo)) return false;
       }
       return true;
@@ -101,18 +109,23 @@ const ViewColaboradores = {
     if (this.editingId && !editing) this.editingId = null;
 
     const TEC = Calculo.TEC, ADM = Calculo.ADM;
-    const tecnicos = colaboradores.filter(c => c.funcao === TEC).length;
-    const administrativos = colaboradores.filter(c => c.funcao === ADM).length;
-    const funcaoAtual = editing ? editing.funcao : TEC;
+    const funcoes = Store.funcoes.list();
+    const tecnicos = colaboradores.filter(c => c.tipoProducao === TEC).length;
+    const administrativos = colaboradores.filter(c => c.tipoProducao === ADM).length;
+    const chefes = colaboradores.filter(c => c.chefia).length;
+    const funcaoPadrao = funcoes.find(f => f.tipoProducao === TEC) || funcoes[0] || null;
+    const funcaoAtual = (editing && funcoes.find(f => f.id === editing.funcaoId)) || funcaoPadrao;
+    const tipoAtual = funcaoAtual ? funcaoAtual.tipoProducao : 'nenhuma';
     const padrao = Store.DEFAULT_COLABORADOR;
     const val = campo => (editing ? editing[campo] : padrao[campo]);
 
     const unidades = Store.unidades.list();
     const alocAtual = editing ? (editing.alocacoes || []) : (unidades.length === 1 ? [{ unidadeId: unidades[0].id, percentual: 100 }] : []);
     const pctDe = uid => { const a = alocAtual.find(x => x.unidadeId === uid); return a ? a.percentual : 0; };
-    const semUnidade = colaboradores.filter(c => Store.totalAlocado(c) <= 0).length;
-    const parciais = colaboradores.filter(c => { const t = Store.totalAlocado(c); return t > 0 && t < 99.999; }).length;
+    const semUnidade = colaboradores.filter(c => (c.tipoProducao !== 'nenhuma' || c.chefia) && Store.totalAlocado(c) <= 0).length;
+    const parciais = colaboradores.filter(c => { if (c.tipoProducao === 'nenhuma') return false; const t = Store.totalAlocado(c); return t > 0 && t < 99.999; }).length;
     const fmtPct = v => (v % 1 === 0 ? String(v) : v.toFixed(1).replace('.', ','));
+    if (this.filtros.funcao && this.filtros.funcao !== 'chefia' && !funcoes.some(f => f.id === this.filtros.funcao)) this.filtros.funcao = '';
     if (this.filtros.unidade && this.filtros.unidade !== 'sem' && !unidades.some(u => u.id === this.filtros.unidade)) this.filtros.unidade = '';
 
     el.innerHTML = `
@@ -123,8 +136,9 @@ const ViewColaboradores = {
 
       <div class="stats">
         <div class="stat"><div class="label">Colaboradores</div><div class="value">${colaboradores.length}</div></div>
-        <div class="stat"><div class="label">Técnicos de SST</div><div class="value">${tecnicos}</div></div>
+        <div class="stat"><div class="label">Técnicos</div><div class="value">${tecnicos}</div></div>
         <div class="stat"><div class="label">Administrativos</div><div class="value">${administrativos}</div></div>
+        <div class="stat"><div class="label">Chefia</div><div class="value">${chefes}</div></div>
       </div>
       ${semUnidade > 0 ? `<p class="alert alert-warn">${UI.plural(semUnidade, 'pessoa ainda não tem', 'pessoas ainda não têm')} unidade e por isso não ${semUnidade === 1 ? 'entra' : 'entram'} na programação. Clique em Editar e marque onde ${semUnidade === 1 ? 'ela atua' : 'elas atuam'}.${parciais > 0 ? ` ${UI.plural(parciais, 'pessoa tem', 'pessoas têm')} parte do tempo sem unidade.` : ''}</p>` : (parciais > 0 ? `<p class="alert alert-warn">${UI.plural(parciais, 'pessoa tem', 'pessoas têm')} parte do tempo sem unidade — só a parte marcada conta na programação.</p>` : '')}
 
@@ -138,13 +152,18 @@ const ViewColaboradores = {
           </label>
           <label class="field span-2">
             <span>Função</span>
-            <select class="input" name="funcao" required>
-              ${Store.FUNCOES.map(f => `<option value="${UI.esc(f)}" ${f === funcaoAtual ? 'selected' : ''}>${UI.esc(f)}</option>`).join('')}
+            <select class="input" name="funcao" required ${funcoes.length === 0 ? 'disabled' : ''}>
+              ${funcoes.length === 0 ? '<option value="">Cadastre uma função primeiro</option>' : ''}
+              ${funcoes.map(f => `<option value="${f.id}" data-tipo="${f.tipoProducao}" data-chefia="${f.chefia ? '1' : ''}" ${funcaoAtual && f.id === funcaoAtual.id ? 'selected' : ''}>${UI.esc(f.nome)}${f.chefia ? ' (chefia)' : ''}</option>`).join('')}
             </select>
-            <small>Define o que essa pessoa entrega: técnicos fazem inspeções e relatórios; administrativos finalizam empresas.</small>
+            <small>Define o que essa pessoa entrega. Para criar ou mudar funções, use a tela <a href="#funcoes">Funções</a>.</small>
           </label>
 
-          <div class="span-4 campos-funcao" data-funcao="${UI.esc(TEC)}" ${funcaoAtual === TEC ? '' : 'hidden'}>
+          <div class="span-4 campos-funcao" data-tipo="nenhuma" ${tipoAtual === 'nenhuma' ? '' : 'hidden'}>
+            <p class="note"><strong>Função sem produção.</strong> Essa pessoa não tem ritmo diário e não entra nas contas da programação.
+              <span class="so-chefia" ${funcaoAtual && funcaoAtual.chefia ? '' : 'hidden'}>Como é chefia, ela aparece como responsável pelas unidades marcadas abaixo.</span></p>
+          </div>
+          <div class="span-4 campos-funcao" data-tipo="${TEC}" ${tipoAtual === TEC ? '' : 'hidden'}>
             <div class="form-grid">
               <label class="field span-2">
                 <span>Quantas inspeções esse colaborador faz por dia?</span>
@@ -158,7 +177,7 @@ const ViewColaboradores = {
               </label>
             </div>
           </div>
-          <div class="span-4 campos-funcao" data-funcao="${UI.esc(ADM)}" ${funcaoAtual === ADM ? '' : 'hidden'}>
+          <div class="span-4 campos-funcao" data-tipo="${ADM}" ${tipoAtual === ADM ? '' : 'hidden'}>
             <div class="form-grid">
               <label class="field span-2">
                 <span>Quantas empresas esse colaborador consegue finalizar por dia?</span>
@@ -169,9 +188,9 @@ const ViewColaboradores = {
           </div>
 
           <div class="field span-4">
-            <span>Em quais unidades essa pessoa atua?</span>
+            <span id="aloc-titulo">${funcaoAtual && funcaoAtual.chefia ? 'Quais unidades essa pessoa lidera?' : 'Em quais unidades essa pessoa atua?'}</span>
             ${unidades.length === 0 ? '<p class="note">Cadastre uma unidade primeiro. Sem unidade, a pessoa não entra na programação.</p>' : `
-            <div class="alocacoes" id="alocacoes">
+            <div class="alocacoes ${tipoAtual === 'nenhuma' ? 'sem-pct' : ''}" id="alocacoes">
               ${unidades.map(u => { const pct = pctDe(u.id); return `
                 <label class="aloc-linha">
                   <input type="checkbox" class="aloc-check" data-unidade="${u.id}" ${pct > 0 ? 'checked' : ''}>
@@ -186,7 +205,8 @@ const ViewColaboradores = {
                 <button type="button" class="btn btn-ghost btn-sm" data-action="dividir">Dividir igualmente</button>
               </div>
             </div>
-            <small>Se a pessoa atende mais de uma unidade, divida o tempo dela em percentuais. A soma pode ficar abaixo de 100% (o resto não entra na programação), mas não acima.</small>`}
+            <small class="ajuda-pct">Se a pessoa atende mais de uma unidade, divida o tempo dela em percentuais. A soma pode ficar abaixo de 100% (o resto não entra na programação), mas não acima.</small>
+            <small class="ajuda-sem-pct">Marque as unidades pelas quais essa pessoa responde. Como não tem produção, não é preciso dividir o tempo.</small>`}
           </div>
 
           <div class="form-actions">
@@ -206,8 +226,8 @@ const ViewColaboradores = {
           <input class="input input-sm filtro-texto" type="search" name="texto" placeholder="Buscar por nome…" value="${UI.esc(this.filtros.texto)}" aria-label="Buscar por nome">
           <select class="input input-sm" name="funcao" aria-label="Função">
             <option value="">Todas as funções</option>
-            <option value="${UI.esc(TEC)}" ${this.filtros.funcao === TEC ? 'selected' : ''}>Técnicos de SST</option>
-            <option value="${UI.esc(ADM)}" ${this.filtros.funcao === ADM ? 'selected' : ''}>Administrativos</option>
+            ${funcoes.map(f => `<option value="${f.id}" ${this.filtros.funcao === f.id ? 'selected' : ''}>${UI.esc(f.nome)}</option>`).join('')}
+            ${chefes > 0 ? `<option value="chefia" ${this.filtros.funcao === 'chefia' ? 'selected' : ''}>Só chefia</option>` : ''}
           </select>
           <select class="input input-sm" name="unidade" aria-label="Unidade">
             <option value="">Todas as unidades</option>
@@ -236,10 +256,20 @@ const ViewColaboradores = {
     }
     this.desenharLista(el);
 
-    // ---- campos conforme a função ----
-    form.funcao.addEventListener('change', () => {
-      el.querySelectorAll('.campos-funcao').forEach(box => { box.hidden = box.dataset.funcao !== form.funcao.value; });
-    });
+    // ---- campos conforme o tipo de produção da função escolhida ----
+    const funcaoEscolhida = () => Store.funcoes.get(form.funcao.value) || null;
+    const aplicarFuncao = () => {
+      const f = funcaoEscolhida();
+      const tipo = f ? f.tipoProducao : 'nenhuma';
+      el.querySelectorAll('.campos-funcao').forEach(box => { box.hidden = box.dataset.tipo !== tipo; });
+      const soChefia = el.querySelector('.so-chefia');
+      if (soChefia) soChefia.hidden = !(f && f.chefia);
+      const titulo = el.querySelector('#aloc-titulo');
+      if (titulo) titulo.textContent = f && f.chefia ? 'Quais unidades essa pessoa lidera?' : 'Em quais unidades essa pessoa atua?';
+      const aloc = el.querySelector('#alocacoes');
+      if (aloc) aloc.classList.toggle('sem-pct', tipo === 'nenhuma');
+    };
+    form.funcao.addEventListener('change', aplicarFuncao);
 
     // ---- editor de alocação ----
     const lerAlocacoes = () => [...el.querySelectorAll('.aloc-input')]
@@ -288,8 +318,11 @@ const ViewColaboradores = {
     form.addEventListener('submit', async e => {
       e.preventDefault();
       const nome = form.nome.value.trim();
-      const funcao = form.funcao.value;
+      const funcaoSel = funcaoEscolhida();
+      const idEdicao = this.editingId; // guardado antes dos awaits: sair da tela zera editingId
       if (!nome) return;
+      if (!funcaoSel) { UI.toast('Escolha a função. Se ainda não existe, cadastre em Funções.', 'error'); return; }
+      const tipo = funcaoSel.tipoProducao;
 
       const lerProd = (campo, rotulo) => {
         const v = UI.parseNum(form[campo].value, NaN);
@@ -301,36 +334,44 @@ const ViewColaboradores = {
         return v;
       };
       const dados = {
-        nome, funcao,
+        nome, funcaoId: funcaoSel.id,
         empresasDia: editing ? editing.empresasDia : padrao.empresasDia,
         inspecoesDia: editing ? editing.inspecoesDia : padrao.inspecoesDia,
         relatoriosDia: editing ? editing.relatoriosDia : padrao.relatoriosDia,
       };
-      if (funcao === ADM) {
+      if (tipo === ADM) {
         const v = lerProd('empresasDia', 'empresas por dia'); if (v === null) return;
         dados.empresasDia = v;
-      } else {
+      } else if (tipo === TEC) {
         const a = lerProd('inspecoesDia', 'inspeções por dia'); if (a === null) return;
         const b = lerProd('relatoriosDia', 'relatórios por dia'); if (b === null) return;
         dados.inspecoesDia = a; dados.relatoriosDia = b;
       }
 
-      const alocacoes = lerAlocacoes();
+      let alocacoes = lerAlocacoes();
+      if (tipo === 'nenhuma') {
+        // sem produção: só importa em quais unidades a pessoa está (tempo dividido por igual, só para registro)
+        const marcadas = [...el.querySelectorAll('.aloc-check')].filter(c => c.checked).map(c => c.dataset.unidade);
+        const parte = marcadas.length ? Math.floor(10000 / marcadas.length) / 100 : 0;
+        alocacoes = marcadas.map((uid, i) => ({ unidadeId: uid, percentual: i === marcadas.length - 1 ? Math.round((100 - parte * (marcadas.length - 1)) * 100) / 100 : parte }));
+      }
       const somaAloc = alocacoes.reduce((s, a) => s + a.percentual, 0);
       if (somaAloc > 100.0001) {
         UI.toast(`A soma das unidades não pode passar de 100% (está em ${fmtPct(Math.round(somaAloc * 10) / 10)}%).`, 'error');
         return;
       }
-      if (alocacoes.length === 0 && Store.unidades.list().length > 0) {
-        const ok = await UI.confirm({ title: 'Sem unidade', message: 'Esta pessoa não está em nenhuma unidade e não vai aparecer na programação. Salvar mesmo assim?', confirmText: 'Salvar' });
-        if (!ok) return;
+      if (alocacoes.length === 0 && Store.unidades.list().length > 0 && (tipo !== 'nenhuma' || funcaoSel.chefia)) {
+        const ok = await UI.confirm({ title: 'Sem unidade', message: funcaoSel.chefia && tipo === 'nenhuma'
+          ? 'Esta pessoa é chefia, mas não está marcada em nenhuma unidade — não vai aparecer como responsável em lugar nenhum. Salvar mesmo assim?'
+          : 'Esta pessoa não está em nenhuma unidade e não vai aparecer na programação. Salvar mesmo assim?', confirmText: 'Salvar' });
+        if (!ok || !el.isConnected) return; // a tela pode ter sido trocada enquanto o diálogo estava aberto
       }
       dados.alocacoes = alocacoes;
 
       UI.busy(form, true);
       try {
-        if (this.editingId) {
-          await Store.colaboradores.update(this.editingId, dados);
+        if (idEdicao) {
+          await Store.colaboradores.update(idEdicao, dados);
           this.editingId = null;
           this.pendingFocus = true;
           UI.toast('Colaborador atualizado.');

@@ -36,7 +36,10 @@ const ViewProgramacaoMensal = {
 
       <section class="card">
         <div class="card-head">
-          <h2>${UI.esc(titulo)} · ${Programacao.descricaoJanela(janela)}</h2>
+          <div>
+            <h2>${UI.esc(titulo)} · ${Programacao.descricaoJanela(janela)}</h2>
+            <div class="linha-chefia">${Programacao.chefiaHTML(alvo.chefia)}</div>
+          </div>
           <div class="right">
             <span class="muted">${Programacao.numFte(alvo.pessoas[TEC])} técnicos · ${Programacao.numFte(alvo.pessoas[ADM])} administrativos</span>
             ${Programacao.statusChip(alvo.janela.status)}

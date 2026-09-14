@@ -144,8 +144,16 @@ const Programacao = (() => {
       </div>`;
   }
 
+  /** Linha "Chefia: Fulano (Supervisor ADM) · Beltrano (Supervisor Geral)" de uma unidade (ou do total). */
+  function chefiaHTML(lista) {
+    const l = Array.isArray(lista) ? lista : [];
+    if (l.length === 0) return '<span class="chefia chefia-vazia" title="Nenhuma pessoa com função de chefia está nesta unidade">Chefia: <em>não definida</em></span>';
+    return `<span class="chefia" title="Pessoas com função de chefia alocadas nesta unidade">Chefia: ${l.map(ch => `<strong>${UI.esc(ch.nome)}</strong>${ch.funcao ? ` <span class="muted">(${UI.esc(ch.funcao)})</span>` : ''}`).join(' · ')}</span>`;
+  }
+
   function avisosHTML(avisos) {
     const itens = [];
+    if (avisos.colabSemProducao && avisos.colabSemProducao.length) itens.push(`<strong>Fora das contas (função sem produção):</strong> ${avisos.colabSemProducao.map(UI.esc).join(', ')}.`);
     if (avisos.colabSemUnidade.length) itens.push(`<strong>Sem unidade (não entram na programação):</strong> ${avisos.colabSemUnidade.map(UI.esc).join(', ')}. Em Colaboradores, marque onde cada um atua.`);
     if (avisos.colabParcial && avisos.colabParcial.length) itens.push(`<strong>Parte do tempo sem unidade:</strong> ${avisos.colabParcial.map(UI.esc).join(', ')} — só a parte marcada conta.`);
     if (avisos.unidadesSemColab.length) itens.push(`<strong>Unidades com empresas e sem equipe:</strong> ${avisos.unidadesSemColab.map(UI.esc).join(', ')}.`);
@@ -157,6 +165,6 @@ const Programacao = (() => {
   return {
     lerJanela, salvarJanela, lerFiltros, salvarFiltros, descricaoJanela,
     barraHTML, bindBarra,
-    num, numFte, statusChip, statusDot, classeLinha, fraseEntrega, recomendacaoHTML, legendaHTML, avisosHTML,
+    num, numFte, statusChip, statusDot, classeLinha, fraseEntrega, recomendacaoHTML, legendaHTML, avisosHTML, chefiaHTML,
   };
 })();

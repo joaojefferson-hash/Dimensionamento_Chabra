@@ -5,7 +5,9 @@
 
    Entradas (formato do Store):
      unidades:      [{ id, nome, empresasBaixo, empresasMedio, empresasAlto, meses?: { [1..12]: {...} } }]
-     colaboradores: [{ id, nome, funcao, empresasDia, inspecoesDia, relatoriosDia, alocacoes: [{ unidadeId, percentual }] }]
+     colaboradores: [{ id, nome, funcao, tipoProducao ('tecnico' | 'administrativo' | 'nenhuma'), chefia,
+                       empresasDia, inspecoesDia, relatoriosDia, alocacoes: [{ unidadeId, percentual }] }]
+                    // tipoProducao 'nenhuma' = não entra nas contas; chefia = aparece como responsável pelas unidades
      parametros:    { diasUteis[12], fatorBaixo, fatorMedio, fatorAlto, ocupacaoAlvo, mesesPorInspecao, mesesPorRelatorio, mesesPorFinalizacao }
      janela:        { de: 0..11, ate: 0..11 }   (meses, inclusive)
 
@@ -24,8 +26,9 @@
 const Calculo = (() => {
   const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const MESES_LONGO = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-  const TEC = 'Técnico de Segurança do Trabalho';
-  const ADM = 'Administrativo';
+  // grupos de produção (tipo da função do colaborador)
+  const TEC = 'tecnico';
+  const ADM = 'administrativo';
   const FUNCOES = [TEC, ADM];
   const FUNCAO_CURTA = { [TEC]: 'Técnicos', [ADM]: 'Administrativos' };
   const FUNCAO_SINGULAR = { [TEC]: 'técnico', [ADM]: 'administrativo' };
@@ -140,11 +143,11 @@ const Calculo = (() => {
    * Calcula tudo para a janela. Retorna:
    * {
    *   janela: { de, ate, meses: [idx...] },
-   *   unidades: [{ id, nome, pessoas: {funcao: fte}, colaboradores: [{ id, nome, funcao, fracao }],
+   *   unidades: [{ id, nome, pessoas: {funcao: fte}, colaboradores: [{ id, nome, funcao, fracao }], chefia: [{ id, nome, funcao }],
    *                meses: [{ mes, nome, nomeLongo, diasUteis, empresas, precisa, excecao, entregas: {id: Bloco}, funcoes: {f: Resumo}, status }],
    *                janela: { nMeses, empresasMedia, precisa, precisaMedia, entregas, funcoes, status, mesesComExcecao } }],
-   *   total: { pessoas, meses: [...], janela: {...} },
-   *   avisos: { colabSemUnidade: [], colabParcial: [], unidadesSemColab: [], unidadesSemFuncao: [{unidade, funcao}] },
+   *   total: { pessoas, meses: [...], janela: {...}, chefia: [...] },
+   *   avisos: { colabSemProducao: [], colabSemUnidade: [], colabParcial: [], unidadesSemColab: [], unidadesSemFuncao: [{unidade, funcao}] },
    *   parametros: p
    * }
    */
@@ -158,20 +161,24 @@ const Calculo = (() => {
     const idsUnidades = new Set(unidades.map(u => u.id));
     const alocValidas = c => (c.alocacoes || []).filter(a => a && idsUnidades.has(a.unidadeId) && n(a.percentual) > 0);
     const fracaoEm = (c, unidadeId) => alocValidas(c).filter(a => a.unidadeId === unidadeId).reduce((s, a) => s + n(a.percentual), 0) / 100;
-    const colabSemUnidade = colaboradores.filter(c => alocValidas(c).length === 0).map(c => c.nome);
-    const colabParcial = colaboradores
+    // quem não produz fica fora das contas; se for chefia, aparece como responsável pelas unidades
+    const chefes = colaboradores.filter(c => c.chefia).map(c => ({ id: c.id, nome: c.nome, funcao: c.funcao || '', unidades: alocValidas(c).map(a => a.unidadeId) }));
+    const colabSemProducao = colaboradores.filter(c => !FUNCOES.includes(c.tipoProducao) && !c.chefia).map(c => `${c.nome}${c.funcao ? ' (' + c.funcao + ')' : ''}`);
+    const produtivos = colaboradores.filter(c => FUNCOES.includes(c.tipoProducao));
+    const colabSemUnidade = colaboradores.filter(c => (FUNCOES.includes(c.tipoProducao) || c.chefia) && alocValidas(c).length === 0).map(c => c.nome);
+    const colabParcial = produtivos
       .map(c => ({ nome: c.nome, pct: alocValidas(c).reduce((s, a) => s + n(a.percentual), 0) }))
       .filter(x => x.pct > 0 && x.pct < 99.999)
       .map(x => `${x.nome} (${Math.round(x.pct)}%)`);
 
-    // referência de "uma pessoa inteira" por função: os da unidade; senão, os da equipe; senão, o padrão
+    // referência de "uma pessoa inteira" por grupo: os da unidade; senão, os da equipe; senão, o padrão
     const globalPorFuncao = {};
-    FUNCOES.forEach(f => { const l = colaboradores.filter(c => c.funcao === f); globalPorFuncao[f] = l.length ? l : [COLAB_PADRAO]; });
+    FUNCOES.forEach(f => { const l = produtivos.filter(c => c.tipoProducao === f); globalPorFuncao[f] = l.length ? l : [COLAB_PADRAO]; });
 
     const calcUnidade = u => {
-      const colabs = colaboradores.map(c => ({ ...c, fracao: fracaoEm(c, u.id) })).filter(c => c.fracao > 0);
+      const colabs = produtivos.map(c => ({ ...c, fracao: fracaoEm(c, u.id) })).filter(c => c.fracao > 0);
       const porFuncao = {};
-      FUNCOES.forEach(f => { porFuncao[f] = colabs.filter(c => c.funcao === f); });
+      FUNCOES.forEach(f => { porFuncao[f] = colabs.filter(c => c.tipoProducao === f); });
       const pessoas = {};
       FUNCOES.forEach(f => { pessoas[f] = porFuncao[f].reduce((s, c) => s + c.fracao, 0); });
 
@@ -197,7 +204,8 @@ const Calculo = (() => {
 
       return {
         id: u.id, nome: u.nome, pessoas,
-        colaboradores: colabs.map(c => ({ id: c.id, nome: c.nome, funcao: c.funcao, fracao: c.fracao })),
+        colaboradores: colabs.map(c => ({ id: c.id, nome: c.nome, funcao: c.funcao, tipoProducao: c.tipoProducao, fracao: c.fracao })),
+        chefia: chefes.filter(ch => ch.unidades.includes(u.id)).map(ch => ({ id: ch.id, nome: ch.nome, funcao: ch.funcao })),
         meses: mesesCalc,
         janela: consolidar(mesesCalc, p),
       };
@@ -253,8 +261,9 @@ const Calculo = (() => {
     return {
       janela: { de: Math.min(de, ate), ate: Math.max(de, ate), meses },
       unidades: resultadoUnidades,
-      total: { pessoas: pessoasTotal, meses: totalMeses, janela: totalJanela },
+      total: { pessoas: pessoasTotal, meses: totalMeses, janela: totalJanela, chefia: chefes.map(ch => ({ id: ch.id, nome: ch.nome, funcao: ch.funcao })) },
       avisos: {
+        colabSemProducao,
         colabSemUnidade,
         colabParcial,
         unidadesSemColab: resultadoUnidades.filter(u => u.colaboradores.length === 0 && u.janela.precisa > 0).map(u => u.nome),
@@ -311,12 +320,12 @@ const Calculo = (() => {
     return Number.isInteger(m) && m >= 0 && m <= 11 ? m : fallback;
   }
 
-  /** Texto do ritmo diário de um colaborador ("2 inspeções · 2 relatórios por dia"). */
+  /** Texto do ritmo diário de um colaborador ("2 inspeções · 2 relatórios por dia"; "sem produção" para quem não produz). */
   function ritmoTexto(c) {
     const f = v => (Number.isInteger(n(v)) ? String(n(v)) : n(v).toLocaleString('pt-BR', { maximumFractionDigits: 1 }));
-    return ENTREGAS_DA_FUNCAO[c.funcao === ADM ? ADM : TEC]
-      .map(e => `${f(c[e.campo])} ${e.unidade}`)
-      .join(' · ') + ' por dia';
+    const tipo = c.tipoProducao;
+    if (!FUNCOES.includes(tipo)) return 'sem produção';
+    return ENTREGAS_DA_FUNCAO[tipo].map(e => `${f(c[e.campo])} ${e.unidade}`).join(' · ') + ' por dia';
   }
 
   return {

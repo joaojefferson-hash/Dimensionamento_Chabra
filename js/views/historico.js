@@ -106,7 +106,8 @@ const ViewHistorico = {
   CAMPOS: {
     unidades: { nome: 'nome', empresas_baixo: 'grau baixo (padrão)', empresas_medio: 'grau médio (padrão)', empresas_alto: 'grau alto (padrão)' },
     unidade_empresas_mes: { empresas_baixo: 'grau baixo', empresas_medio: 'grau médio', empresas_alto: 'grau alto' },
-    colaboradores: { nome: 'nome', funcao: 'função', empresas_dia: 'empresas por dia', inspecoes_dia: 'inspeções por dia', relatorios_dia: 'relatórios por dia' },
+    colaboradores: { nome: 'nome', funcao: 'função', funcao_id: 'função', empresas_dia: 'empresas por dia', inspecoes_dia: 'inspeções por dia', relatorios_dia: 'relatórios por dia' },
+    funcoes: { nome: 'nome', tipo_producao: 'tipo de produção', chefia: 'chefia de equipe', ordem: 'ordem' },
     colaborador_unidades: { percentual: '% do tempo' },
     parametros: { fator_baixo: 'peso do grau baixo', fator_medio: 'peso do grau médio', fator_alto: 'peso do grau alto', ocupacao_alvo: 'folga para imprevistos', dias_uteis: 'dias úteis', meses_por_inspecao: 'frequência de inspeção', meses_por_relatorio: 'frequência de relatório', meses_por_finalizacao: 'frequência de finalização' },
     documentos: { nome: 'nome', horas: 'horas', periodicidade_meses: 'periodicidade', responsavel: 'produzido por' },
@@ -117,7 +118,10 @@ const ViewHistorico = {
     if (campo === 'ocupacao_alvo') return `${UI.fmt(100 - Number(v), 0)}%`;
     if (campo === 'percentual') return `${UI.fmt(Number(v), 1)}%`;
     if (campo.startsWith('meses_por')) { const m = Number(v); return m >= 12 && m % 12 === 0 ? `a cada ${m / 12} ${m === 12 ? 'ano' : 'anos'}` : `a cada ${UI.fmt(m, 1)} ${m === 1 ? 'mês' : 'meses'}`; }
-    if (campo === 'funcao') return v === 'Administrativo' ? 'Administrativo' : 'Técnico de SST';
+    if (campo === 'funcao') return String(v);
+    if (campo === 'funcao_id') { const f = Store.funcoes.get(String(v)); return f ? f.nome : 'função excluída'; }
+    if (campo === 'tipo_producao') { const t = Store.TIPOS_PRODUCAO.find(x => x.id === v); return t ? t.rotulo : String(v); }
+    if (typeof v === 'boolean') return v ? 'sim' : 'não';
     if (Array.isArray(v)) return v.join(', ');
     if (typeof v === 'number' || /^-?\d+(\.\d+)?$/.test(String(v))) return UI.fmt(Number(v), 2);
     return String(v);
@@ -158,8 +162,12 @@ const ViewHistorico = {
         if (h.operacao === 'delete') return `Voltou <strong>${mes}</strong> de <strong>${uni}</strong> ao padrão (era ${valores(a)})`;
         return `Alterou <strong>${mes}</strong> de <strong>${uni}</strong>${mudancas()}`;
       }
+      case 'funcoes':
+        if (h.operacao === 'insert') return `Cadastrou a função <strong>${nome}</strong> (${this.fmtVal('tipo_producao', r.tipo_producao)}${r.chefia ? ', chefia de equipe' : ''})`;
+        if (h.operacao === 'delete') return `Excluiu a função <strong>${nome}</strong>`;
+        return `Alterou a função <strong>${nome}</strong>${mudancas()}`;
       case 'colaboradores':
-        if (h.operacao === 'insert') return `Cadastrou o colaborador <strong>${nome}</strong> (${this.fmtVal('funcao', r.funcao)})`;
+        if (h.operacao === 'insert') return `Cadastrou o colaborador <strong>${nome}</strong> (${r.funcao_id ? this.fmtVal('funcao_id', r.funcao_id) : this.fmtVal('funcao', r.funcao)})`;
         if (h.operacao === 'delete') return `Excluiu o colaborador <strong>${nome}</strong>`;
         return `Alterou o colaborador <strong>${nome}</strong>${mudancas()}`;
       case 'colaborador_unidades':

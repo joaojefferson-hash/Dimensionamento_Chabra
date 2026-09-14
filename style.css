@@ -729,3 +729,18 @@ form.busy { opacity: .7; pointer-events: none; }
 /* colaboradores: unidades e tempo em colunas separadas, linha a linha */
 .col-unidades div, .col-tempo div { line-height: 1.6; white-space: nowrap; }
 .col-tempo { font-variant-numeric: tabular-nums; }
+
+/* funções / chefia */
+.chip-chefia { background: #4a2c80; color: #fff; }
+.alocacoes.sem-pct .aloc-pct, .alocacoes.sem-pct .aloc-rodape { display: none; }
+.ajuda-sem-pct { display: none; }
+.alocacoes.sem-pct + .ajuda-pct { display: none; }
+.alocacoes.sem-pct + .ajuda-pct + .ajuda-sem-pct { display: block; }
+.linha-chefia { margin-top: 4px; font-size: 13px; }
+.linha-chefia .chefia-vazia { color: var(--text-muted); }
+.tipo-opcoes { display: grid; gap: 8px; }
+.tipo-opcao { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.tipo-opcao:has(input:checked) { border-color: var(--primary); background: #f2f8f5; }
+.tipo-opcao input { margin-top: 3px; }
+.tipo-opcao small { display: block; color: var(--text-muted); }
+.check-inline { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: var(--text); cursor: pointer; }

@@ -41,6 +41,7 @@ const ViewProgramacaoAnual = {
           <div>
             <h2>${UI.esc(titulo)}</h2>
             <div class="muted">${subtitulo}</div>
+            <div class="linha-chefia">${Programacao.chefiaHTML(item.chefia)}</div>
           </div>
           ${Programacao.statusChip(item.janela.status)}
         </div>

@@ -12,7 +12,9 @@
      unidades:      [{ id, nome, empresasBaixo, empresasMedio, empresasAlto, empresas (soma),
                        meses: { [1..12]: { empresasBaixo, empresasMedio, empresasAlto } } }]  // exceções mensais (padrão = campos acima)
      documentos:    [{ id, nome, horas, periodicidadeMeses, responsavel }]   // periodicidade 0 = sob demanda
-     colaboradores: [{ id, nome, funcao, empresasDia, inspecoesDia, relatoriosDia, alocacoes: [{ unidadeId, unidadeNome, percentual }] }]
+     funcoes:       [{ id, nome, tipoProducao: 'tecnico' | 'administrativo' | 'nenhuma', chefia, ordem }]
+     colaboradores: [{ id, nome, funcaoId, funcao (nome), tipoProducao, chefia, empresasDia, inspecoesDia, relatoriosDia,
+                       alocacoes: [{ unidadeId, unidadeNome, percentual }] }]
                     // produção declarada por dia; alocações somam ≤ 100% (o restante é "não alocado")
      parametros:    { diasUteis[12], fatorBaixo, fatorMedio, fatorAlto, ocupacaoAlvo,
                       mesesPorInspecao, mesesPorRelatorio, mesesPorFinalizacao }  // a cada N meses por empresa
@@ -20,11 +22,16 @@
 
 const Store = (() => {
   const APP_ID = 'chabra-dimensiona';
-  const SCHEMA_VERSION = 5;
+  const SCHEMA_VERSION = 6;
   const LOCAL_KEY = 'chabra-dimensiona:data';            // versão antiga (só localStorage)
   const LOCAL_BACKUP_KEY = 'chabra-dimensiona:backup-local'; // onde os dados locais ficam após a migração
 
-  const FUNCOES = ['Técnico de Segurança do Trabalho', 'Administrativo'];
+  const FUNCOES = ['Técnico de Segurança do Trabalho', 'Administrativo']; // nomes legados (catálogo de documentos)
+  const TIPOS_PRODUCAO = [
+    { id: 'tecnico',        rotulo: 'Técnico',        descricao: 'faz inspeções e relatórios — entra na programação como técnico' },
+    { id: 'administrativo', rotulo: 'Administrativo', descricao: 'finaliza empresas — entra na programação como administrativo' },
+    { id: 'nenhuma',        rotulo: 'Sem produção',   descricao: 'não tem ritmo diário e não entra na programação (ex.: supervisores)' },
+  ];
   const DEFAULT_COLABORADOR = { empresasDia: 2, inspecoesDia: 2, relatoriosDia: 2 };
   const DEFAULT_PARAMETROS = {
     diasUteis: [21, 18, 22, 20, 20, 21, 23, 21, 21, 21, 19, 22],
@@ -107,9 +114,16 @@ const Store = (() => {
     });
     return out;
   };
+  const buildFuncao = f => ({
+    nome: toStr(f.nome),
+    tipoProducao: TIPOS_PRODUCAO.some(t => t.id === f.tipoProducao) ? f.tipoProducao : 'nenhuma',
+    chefia: f.chefia === true || f.chefia === 'true',
+    ordem: Math.max(0, toInt(f.ordem, 0)),
+  });
   const buildColaborador = c => ({
     nome: toStr(c.nome),
-    funcao: FUNCOES.includes(c.funcao) ? c.funcao : FUNCOES[0],
+    funcaoId: toStr(c.funcaoId) || null,
+    funcao: toStr(c.funcao), // nome (usado no backup; o id vem do cadastro de funções)
     empresasDia: Math.max(0, toNum(c.empresasDia, DEFAULT_COLABORADOR.empresasDia)),
     inspecoesDia: Math.max(0, toNum(c.inspecoesDia, DEFAULT_COLABORADOR.inspecoesDia)),
     relatoriosDia: Math.max(0, toNum(c.relatoriosDia, DEFAULT_COLABORADOR.relatoriosDia)),
@@ -146,6 +160,12 @@ const Store = (() => {
   });
 
   const TABELAS = {
+    funcoes: {
+      table: 'funcoes',
+      build: buildFuncao,
+      toRow: f => ({ nome: f.nome, tipo_producao: f.tipoProducao, chefia: f.chefia, ordem: f.ordem }),
+      fromRow: r => ({ id: r.id, nome: r.nome, tipoProducao: r.tipo_producao, chefia: r.chefia === true, ordem: Number(r.ordem) }),
+    },
     unidades: {
       table: 'unidades',
       build: buildUnidade,
@@ -166,8 +186,8 @@ const Store = (() => {
     colaboradores: {
       table: 'colaboradores',
       build: buildColaborador,
-      toRow: c => ({ nome: c.nome, funcao: c.funcao, empresas_dia: c.empresasDia, inspecoes_dia: c.inspecoesDia, relatorios_dia: c.relatoriosDia }),
-      fromRow: r => ({ id: r.id, nome: r.nome, funcao: r.funcao, empresasDia: Number(r.empresas_dia), inspecoesDia: Number(r.inspecoes_dia), relatoriosDia: Number(r.relatorios_dia), alocacoes: [] }),
+      toRow: c => ({ nome: c.nome, funcao_id: c.funcaoId, empresas_dia: c.empresasDia, inspecoes_dia: c.inspecoesDia, relatorios_dia: c.relatoriosDia }),
+      fromRow: r => ({ id: r.id, nome: r.nome, funcaoId: r.funcao_id, empresasDia: Number(r.empresas_dia), inspecoesDia: Number(r.inspecoes_dia), relatoriosDia: Number(r.relatorios_dia), alocacoes: [] }),
     },
   };
 
@@ -200,6 +220,7 @@ const Store = (() => {
       return c;
     });
     return {
+      funcoes: lista('funcoes', buildFuncao),
       unidades,
       // Sem a chave "documentos" mantém o catálogo padrão; lista vazia explícita é respeitada.
       documentos: Array.isArray(raw.documentos) ? lista('documentos', buildDocumento) : DEFAULT_DOCUMENTOS.map(d => buildDocumento(d)),
@@ -215,6 +236,7 @@ const Store = (() => {
     const msg = String((error && error.message) || '');
     let texto;
     if (code === '23505') texto = 'Já existe um registro com esse nome.';
+    else if (code === '23503') texto = 'Este item está em uso e não pode ser excluído.';
     else if (code === '23514') texto = /aloca/i.test(msg) ? msg : 'Valor fora do permitido (verifique os números informados).';
     else if (code === '42501' || code === 'PGRST301' || /jwt|not authenticated/i.test(msg)) texto = 'Sessão expirada ou sem permissão. Entre novamente.';
     else if (/failed to fetch|networkerror|load failed/i.test(msg)) texto = 'Sem conexão com o servidor. Verifique a internet.';
@@ -226,7 +248,7 @@ const Store = (() => {
 
   /* ---------- estado (cache) ---------- */
 
-  let state = { unidades: [], documentos: [], colaboradores: [], parametros: buildParametros(null) };
+  let state = { funcoes: [], unidades: [], documentos: [], colaboradores: [], parametros: buildParametros(null) };
   let loaded = false;
   let loadedAt = 0;
 
@@ -277,6 +299,8 @@ const Store = (() => {
     });
     delete state._meses;
     state.unidades.forEach(u => { u.meses = porUnidade[u.id] || {}; });
+    state.funcoes.sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR'));
+    state.colaboradores.forEach(c => Object.assign(c, infoFuncao(c.funcaoId)));
     loaded = true;
     loadedAt = Date.now();
     emit();
@@ -289,9 +313,15 @@ const Store = (() => {
   }
 
   function clear() {
-    state = { unidades: [], documentos: [], colaboradores: [], parametros: buildParametros(null) };
+    state = { funcoes: [], unidades: [], documentos: [], colaboradores: [], parametros: buildParametros(null) };
     loaded = false;
     loadedAt = 0;
+  }
+
+  /** Nome e tipo de produção de uma função (pelo id), para enriquecer o colaborador. */
+  function infoFuncao(funcaoId) {
+    const f = funcaoId ? state.funcoes.find(x => x.id === funcaoId) : null;
+    return { funcao: f ? f.nome : '', tipoProducao: f ? f.tipoProducao : 'nenhuma', chefia: !!(f && f.chefia) };
   }
 
   /** Preenche unidadeNome de cada alocação a partir do cache de unidades. */
@@ -321,10 +351,12 @@ const Store = (() => {
         const { data: row, error } = await db.from(table).insert(toRow(montado)).select().single();
         if (error) throw falha(error, 'Não foi possível adicionar.');
         const item = fromRow(row);
-        if (key === 'colaboradores' && montado.alocacoes.length) {
-          item.alocacoes = await salvarAlocacoes(item.id, montado.alocacoes);
+        if (key === 'colaboradores') {
+          Object.assign(item, infoFuncao(item.funcaoId));
+          if (montado.alocacoes.length) item.alocacoes = await salvarAlocacoes(item.id, montado.alocacoes);
         }
         state[key].push(item);
+        if (key === 'funcoes') { state.funcoes.sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR')); state.colaboradores.forEach(c => Object.assign(c, infoFuncao(c.funcaoId))); }
         emit();
         return item;
       },
@@ -337,12 +369,14 @@ const Store = (() => {
         if (error) throw falha(error, 'Não foi possível salvar.');
         const item = fromRow(row);
         if (key === 'colaboradores') {
+          Object.assign(item, infoFuncao(item.funcaoId));
           item.alocacoes = patch.alocacoes !== undefined
             ? await salvarAlocacoes(id, montado.alocacoes)
             : comNomes(atual.alocacoes || []);
         }
         if (key === 'unidades') item.meses = atual.meses || {};
         state[key] = state[key].map(x => (x.id === id ? item : x));
+        if (key === 'funcoes') { state.funcoes.sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR')); state.colaboradores.forEach(c => Object.assign(c, infoFuncao(c.funcaoId))); }
         if (!silent) emit();
         return item;
       },
@@ -448,13 +482,14 @@ const Store = (() => {
       app: APP_ID,
       version: SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
+      funcoes: state.funcoes,
       unidades: state.unidades.map(u => ({
         ...u,
         meses: undefined,
         empresasPorMes: Object.entries(u.meses || {}).map(([mes, v]) => ({ mes: Number(mes), ...v })).sort((a, b) => a.mes - b.mes),
       })),
       documentos: state.documentos,
-      colaboradores: state.colaboradores.map(c => ({ ...c, alocacoes: comNomes(c.alocacoes || []) })),
+      colaboradores: state.colaboradores.map(c => ({ ...c, ...infoFuncao(c.funcaoId), alocacoes: comNomes(c.alocacoes || []) })),
       parametros: state.parametros,
     };
     return JSON.stringify(payload, null, 2);
@@ -511,8 +546,10 @@ const Store = (() => {
 
   return {
     FUNCOES,
+    TIPOS_PRODUCAO,
     DEFAULT_COLABORADOR,
     DEFAULT_PARAMETROS,
+    funcoes: makeCollection('funcoes'),
     unidades: makeCollection('unidades'),
     documentos: makeCollection('documentos'),
     colaboradores: makeCollection('colaboradores'),
