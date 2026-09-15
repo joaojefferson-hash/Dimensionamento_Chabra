@@ -87,7 +87,7 @@ em { font-style: normal; color: var(--primary-dark); font-weight: 500; }
 .brand-name { font-weight: 700; font-size: 16px; line-height: 1.2; }
 .brand-sub { font-size: 12px; opacity: .8; margin-top: 2px; }
 
-.nav { display: flex; flex-direction: column; gap: 4px; padding: 14px 12px; }
+.nav { display: flex; flex-direction: column; gap: 4px; padding: 14px 12px; flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .35) transparent; }
 
 .nav-item {
   display: flex;
@@ -125,7 +125,8 @@ em { font-style: normal; color: var(--primary-dark); font-weight: 500; }
 
 .sidebar-footer {
   margin-top: auto;
-  padding: 16px 12px 18px;
+  flex-shrink: 0;
+  padding: 12px 12px 14px;
   border-top: 1px solid rgba(255, 255, 255, .14);
   display: flex;
   flex-direction: column;
@@ -901,3 +902,11 @@ form.busy { opacity: .7; pointer-events: none; }
 .alert-info { background: #e7eef8; border: 1px solid #c5d5ee; color: #2b4c7e; }
 .user-papel { display: inline-block; padding: 0 6px; border-radius: 999px; background: rgba(255, 255, 255, .18); font-size: 11px; margin-right: 4px; }
 .sel-papel { width: auto; }
+
+/* rodapé do menu: nome + papel numa linha, botões Senha / Sair bem visíveis embaixo */
+.user-row { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 6px 4px 0; }
+.user-actions { display: flex; gap: 8px; }
+.user-actions .btn-link.light { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid rgba(255, 255, 255, .35); padding: 7px 10px; font-weight: 600; }
+.user-actions .btn-link.light svg { width: 16px; height: 16px; flex-shrink: 0; }
+.sidebar-footer .hint { display: none; }
+@media (min-height: 900px) { .sidebar-footer .hint { display: block; } }
