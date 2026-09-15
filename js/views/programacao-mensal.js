@@ -23,7 +23,7 @@ const ViewProgramacaoMensal = {
   /**
    * Leitura mês a mês de uma função, sempre em relação à equipe de hoje (não acumula):
    * "Mês a mês: faltam 2 em setembro, outubro e novembro; sobra 1 em dezembro.
-   *  Contratando 2 administrativos a partir de setembro, nenhum mês do período fica descoberto."
+   *  Contratando 2 administrativos a partir de setembro, nenhum mês do ano fica descoberto."
    * Vazio quando todos os meses estão ok.
    */
   leituraMensal(meses, funcao) {
@@ -48,13 +48,13 @@ const ViewProgramacaoMensal = {
       return `${tipo === 'sobra' ? (n === 1 ? 'sobra' : 'sobram') : (n === 1 ? 'falta' : 'faltam')} ${n} ${plural(n)} em ${lista(l)}`;
     });
     const conclusao = pico > 0
-      ? ` <strong>Contratando ${pico} ${plural(pico)} a partir de ${primeiroComFalta}, nenhum mês do período fica descoberto</strong> — os números de cada mês são em relação à equipe de hoje e não somam entre si.`
+      ? ` <strong>Contratando ${pico} ${plural(pico)} a partir de ${primeiroComFalta}, nenhum mês do ano fica descoberto</strong> — os números de cada mês são em relação à equipe de hoje e não somam entre si.`
       : '';
     return `<span class="muted">Mês a mês: ${partes.join('; ')}.${conclusao}</span>`;
   },
 
   render(el) {
-    const janela = Programacao.lerJanela();
+    const janela = { de: 0, ate: 11 }; // a mensal mostra sempre o ano inteiro (o período fica na Anual e na Fila)
     const filtros = Programacao.lerFiltros();
     const unidades = Store.unidades.list();
     const unidadeSel = unidades.some(u => u.id === filtros.unidade) ? filtros.unidade : '';
@@ -110,12 +110,12 @@ const ViewProgramacaoMensal = {
             </tbody>
             <tfoot>
               <tr class="${Programacao.classeLinha(resumo.status)}">
-                <th>Período (${alvo.janela.nMeses} ${alvo.janela.nMeses === 1 ? 'mês' : 'meses'})</th>
+                <th>Ano de ${Store.ano}</th>
                 <th class="num">${alvo.meses.reduce((s, m) => s + m.diasUteis, 0)}</th>
                 <th class="num">${Programacao.num(alvo.janela.precisa)}</th>
                 <th class="num" title="Média do período">${Programacao.numFte(resumo.pessoas)}</th>
                 ${entregas.map(e => { const b = alvo.janela.entregas[e.id]; return `<th class="num cel-${b.status}">${Programacao.num(b.consegue)}<small> de ${Programacao.num(b.precisa)}</small></th>`; }).join('')}
-                <th class="num col-pessoas" title="Conta do período inteiro (meses folgados compensam meses apertados). Para não faltar em nenhum mês, vale o maior valor mensal.">${Programacao.pessoasHTML(resumo, singular)}</th>
+                <th class="num col-pessoas" title="Conta do ano inteiro (meses folgados compensam meses apertados). Para não faltar em nenhum mês, vale o maior valor mensal.">${Programacao.pessoasHTML(resumo, singular)}</th>
                 <th>${Programacao.statusChip(resumo.status)}</th>
               </tr>
             </tfoot>
@@ -160,7 +160,7 @@ const ViewProgramacaoMensal = {
         <p>Mês a mês, para técnicos e para administrativos: quanto a equipe consegue entregar, quanto a carteira precisa e quantas pessoas faltam (ou sobram) em cada mês — sempre em relação à equipe de hoje. Em cada célula de entrega, o primeiro número é o que a equipe consegue e o segundo o que precisa.</p>
       </header>
 
-      ${Programacao.barraHTML({ janela, ocupacaoAlvo: p.ocupacaoAlvo, unidades, unidadeSel })}
+      ${Programacao.barraHTML({ ocupacaoAlvo: p.ocupacaoAlvo, unidades, unidadeSel })}
 
       ${unidades.length === 0 ? `
         <section class="card"><div class="empty"><strong>Nenhuma unidade cadastrada</strong>Cadastre unidades, empresas por unidade e colaboradores para ver a programação.</div></section>` : `
@@ -196,7 +196,6 @@ const ViewProgramacaoMensal = {
     }));
 
     Programacao.bindBarra(el, {
-      onJanela: () => App.render(),
       onUnidade: id => { Programacao.salvarFiltros({ ...Programacao.lerFiltros(), unidade: id }); App.render(); },
     });
     Programacao.bindSimulacao(el, { unidades, janela, unidadeSel });
