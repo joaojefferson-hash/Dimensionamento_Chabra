@@ -71,6 +71,11 @@ folga, prazo, ramp-up, pesos dos portes), Histórico, Usuários (Edge Function +
 `stores/ui.js` + `components/ui/Avisos.vue`: toasts e confirmação. Acesso de leitura: formulários
 escondidos/desabilitados via `auth.podeEditar`.
 
-Ainda não portado: modo **Organograma** e impressão (tela Colaboradores do app atual). Próximo
-passo: trocar o deploy do Vercel para `web/` (Root Directory = web, build `npm run build`,
-output `dist`).
+Ainda não portado: modo **Organograma** e impressão (tela Colaboradores do app atual).
+
+## Deploy
+
+`vercel.json` na raiz do repositório: `installCommand: cd web && npm ci`, `buildCommand: cd web &&
+npm run build`, `outputDirectory: web/dist`. Todo push em `main` publica o front novo em
+https://dimensionamento-chabra.vercel.app (hash routing, sem rewrites). Rollback: apagar o
+`vercel.json` volta a publicar o app vanilla da raiz.

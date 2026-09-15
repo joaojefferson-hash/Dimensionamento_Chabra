@@ -220,7 +220,9 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
   Etapa 3 feita: serviços (`src/services/api.js`), stores (`auth`, `cadastros`, `preferencias`,
   `dimensionamento`), router com guard por papel, layout e login. Etapa 4 feita: Dimensionamento
   completo (TabelaMeses, PorUnidade, Simulacao) e todas as telas de cadastro (falta só o modo
-  Organograma). Próximo: trocar o deploy do Vercel para `web/`. Ver `web/README.md`.
+  Organograma). **Em produção desde 15/09/2026**: `vercel.json` na raiz manda o Vercel instalar e
+  buildar em `web/` e publicar `web/dist`. O app vanilla (raiz: `index.html`, `js/`, `style.css`)
+  continua no repositório como referência/rollback (basta apagar o `vercel.json`). Ver `web/README.md`.
 - **Fase 4 (feita, migração 0022):** porte do cliente (tabela `portes` com peso; demanda
   normalizada em `demanda_mensal` por unidade × ano × mês × condição × porte; `unidade_mes`
   para clientes ativos), ramp-up de contratações (`colaboradores.data_admissao` /
