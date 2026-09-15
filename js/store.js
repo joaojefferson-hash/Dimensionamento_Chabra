@@ -590,10 +590,20 @@ const Store = (() => {
     } catch (_) { /* ignora */ }
   }
 
+  /** Média mensal de clientes (Mensal + Exclusiva TST) de uma unidade no ano selecionado. */
+  function mediaClientesMes(u) {
+    let s = 0;
+    for (let m = 1; m <= 12; m++) {
+      const exc = (u.meses || {})[m];
+      s += exc ? (Number(exc.empresasVencidas) || 0) + (Number(exc.empresasExclusivaTst) || 0) : (u.empresas || 0);
+    }
+    return s / 12;
+  }
+
   function counts() {
     return {
       unidades: state.unidades.length,
-      empresas: state.unidades.reduce((soma, u) => soma + u.empresas, 0),
+      empresas: Math.round(state.unidades.reduce((soma, u) => soma + mediaClientesMes(u), 0)),
       documentos: state.documentos.length,
       colaboradores: state.colaboradores.length,
     };
@@ -613,6 +623,7 @@ const Store = (() => {
     colaboradores: makeCollection('colaboradores'),
     parametros,
     empresasMes,
+    mediaClientesMes,
     get ano() { return ano; },
     definirAno,
     anosDisponiveis,

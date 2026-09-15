@@ -931,3 +931,10 @@ form.busy { opacity: .7; pointer-events: none; }
 .table-matriz tr.linha-informativa td.cel-excecao .input-mes { color: var(--text); }
 .table-matriz tfoot tr.linha-informativa th { background: #f7f9f8; font-weight: 500; }
 .stat .value.muted-value { color: var(--text-muted); }
+
+/* matriz: números centralizados de verdade (sem as setinhas do campo numérico) */
+.table-matriz .input-mes { -moz-appearance: textfield; appearance: textfield; text-align: center; }
+.table-matriz .input-mes::-webkit-inner-spin-button, .table-matriz .input-mes::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.table-matriz td, .table-matriz th { text-align: center; }
+.table-matriz .col-soma, .table-matriz .col-media { text-align: center; }
+.table-matriz tr.linha-total-unidade td strong { display: inline-block; min-width: 52px; }

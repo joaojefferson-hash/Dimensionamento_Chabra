@@ -4,11 +4,11 @@
    Mensal e Exclusiva TST (as duas exigem o atendimento completo: inspeção,
    relatório e finalização — a separação é para enxergar cada uma).
 
-   Cada unidade tem, por condição, um valor PADRÃO (vale para todos os anos e
-   meses) e pode ter valores diferentes em meses específicos:
-   Padrão | Jan … Dez | Média, mais a linha Total da unidade. Digitar num mês
-   grava o valor daquele mês (a outra condição do mês fica como está); apagar
-   a célula volta ao padrão. Tudo salva automaticamente.
+   Por unidade e condição: Jan … Dez | Total do ano | Média, mais a linha Total
+   da unidade. Digitar num mês grava o valor daquele mês (as outras linhas do
+   mês ficam como estão); célula vazia conta como zero. Tudo salva
+   automaticamente. (O "padrão" da unidade continua existindo no modelo, mas
+   não aparece: fica em zero.)
    ========================================================================== */
 
 const ViewEmpresas = {
@@ -37,7 +37,6 @@ const ViewEmpresas = {
     const mostrarTotal = this.condSel === 'todas';
     const nExc = u => Object.keys(u.meses || {}).length;
 
-    const somaPadrao = unidades.reduce((s, u) => s + conds.reduce((t, c) => t + (u[c.campo] || 0), 0), 0);
     const somaMes = m => unidades.reduce((s, u) => s + conds.reduce((t, c) => t + this.efetivo(u, m, c.campo), 0), 0);
     const somaMedia = unidades.reduce((s, u) => s + conds.reduce((t, c) => t + this.media(u, c.campo), 0), 0);
     const somaAnoTodas = unidades.reduce((s, u) => s + conds.reduce((t, c) => t + this.somaAno(u, c.campo), 0), 0);
@@ -52,12 +51,11 @@ const ViewEmpresas = {
       <tr data-unidade="${u.id}" data-campo="${c.campo}" class="${primeira ? 'inicio-unidade' : ''} ${informativo ? 'linha-informativa' : ''}">
         ${primeira ? `<td class="col-nome" rowspan="${nLinhas}">
           <div class="nome-unidade">${UI.esc(u.nome)}</div>
-          <div class="acoes-unidade" data-acoes="${u.id}">${nExc(u) ? `<button type="button" class="btn-link" data-action="limpar-mes" data-id="${u.id}" title="Apagar os valores próprios de ${ano} e usar o padrão o ano todo">usar padrão em ${ano}</button>` : ''}</div>
+          <div class="acoes-unidade" data-acoes="${u.id}">${nExc(u) ? `<button type="button" class="btn-link" data-action="limpar-mes" data-id="${u.id}" title="Apagar todos os números de ${ano} desta unidade (voltam a zero)">limpar ${ano}</button>` : ''}</div>
         </td>` : ''}
         <td class="col-grau"><span class="chip-grau ${c.classe}" title="${c.ajuda}">${c.rotulo}</span></td>
-        <td class="col-padrao"><input type="number" class="input input-sm input-num input-padrao" min="0" step="1" inputmode="numeric" data-id="${u.id}" data-campo="${c.campo}" value="${u[c.campo] || 0}" aria-label="Padrão ${c.rotulo} de ${UI.esc(u.nome)}"></td>
         ${MESES.map((m, i) => { const mes = i + 1; const exc = (u.meses || {})[mes]; return `
-          <td class="${exc ? 'cel-excecao' : ''}"><input type="number" class="input input-sm input-num input-mes" min="0" step="1" inputmode="numeric" data-id="${u.id}" data-mes="${mes}" data-campo="${c.campo}" value="${exc ? (exc[c.campo] || 0) : ''}" placeholder="${u[c.campo] || 0}" aria-label="${UI.esc(u.nome)} ${c.rotulo} — ${Calculo.MESES_LONGO[i]}"></td>`; }).join('')}
+          <td class="${exc ? 'cel-excecao' : ''}"><input type="number" class="input input-sm input-num input-mes" min="0" step="1" inputmode="numeric" data-id="${u.id}" data-mes="${mes}" data-campo="${c.campo}" value="${exc ? (exc[c.campo] || 0) : ''}" placeholder="${u[c.campo] || '–'}" aria-label="${UI.esc(u.nome)} ${c.rotulo} — ${Calculo.MESES_LONGO[i]}"></td>`; }).join('')}
         <td class="col-soma" data-soma>${this.fmt(this.somaAno(u, c.campo))}</td>
         <td class="col-media" data-media>${this.fmt(this.media(u, c.campo))}</td>
       </tr>`;
@@ -65,7 +63,6 @@ const ViewEmpresas = {
     const linhaTotal = u => `
       <tr class="linha-total-unidade" data-unidade="${u.id}" data-total>
         <td class="col-grau"><strong>Total</strong></td>
-        <td class="col-padrao" data-padrao-total><strong>${u.empresas}</strong></td>
         ${MESES.map((m, i) => `<td data-mes-total="${i + 1}"><strong>${this.totalMes(u, i + 1)}</strong></td>`).join('')}
         <td class="col-soma" data-soma><strong>${this.fmt(this.somaAno(u, null))}</strong></td>
         <td class="col-media" data-media><strong>${this.fmt(this.media(u, null))}</strong></td>
@@ -107,14 +104,13 @@ const ViewEmpresas = {
             <label class="param-inline"><span class="muted">Ano</span> ${Programacao.seletorAnoHTML('empresas-ano')}</label>
           </div>
         </div>
-        <p class="muted">Cada unidade tem uma linha por condição, mais a linha <strong>Clientes ativos</strong> (total de clientes da unidade no mês — só informativo, para histórico; não entra em nenhuma conta). Os números dos meses são de <strong>${ano}</strong> (troque o ano ao lado para planejar outro ano). A coluna <strong>Padrão</strong> vale para todos os meses e anos sem valor próprio; digite um número em um mês só quando ele for diferente. Célula em azul = mês com valor próprio; apague o número para voltar ao padrão.</p>
+        <p class="muted">Cada unidade tem uma linha por condição, mais a linha <strong>Clientes ativos</strong> (total de clientes da unidade no mês — só informativo, para histórico; não entra em nenhuma conta). Os números são de <strong>${ano}</strong> (troque o ano ao lado para planejar outro ano). Digite o número de cada mês; célula vazia conta como zero.</p>
         <div class="table-wrap">
           <table class="table table-matriz">
             <thead>
               <tr>
                 <th class="col-nome">Unidade</th>
                 <th class="col-grau">Condição</th>
-                <th class="col-padrao">Padrão</th>
                 ${MESES.map(m => `<th>${m}</th>`).join('')}
                 <th class="col-soma" title="Soma dos 12 meses de ${ano}">Total ${ano}</th>
                 <th class="col-media" title="Média dos 12 meses">Média</th>
@@ -132,14 +128,12 @@ const ViewEmpresas = {
               ${mostrarTotal ? `
               <tr class="linha-informativa">
                 <th class="col-nome" colspan="2">${ativos.rotulo} (todas)</th>
-                <th class="col-padrao" data-ativos-padrao>${this.fmt(unidades.reduce((s, u) => s + (u[ativos.campo] || 0), 0))}</th>
                 ${MESES.map((m, i) => `<th data-ativos-mes="${i + 1}">${this.fmt(somaAtivosMes(i + 1))}</th>`).join('')}
                 <th class="col-soma" data-ativos-soma>${this.fmt(unidades.reduce((s, u) => s + this.somaAno(u, ativos.campo), 0))}</th>
                 <th class="col-media" data-ativos-media>${this.fmt(mediaAtivos)}</th>
               </tr>` : ''}
               <tr>
                 <th class="col-nome" colspan="2">${this.condSel === ativos.campo ? `${ativos.rotulo} (todas)` : 'Total das unidades'}</th>
-                <th class="col-padrao" data-total-padrao>${this.fmt(somaPadrao)}</th>
                 ${MESES.map((m, i) => `<th data-total-mes="${i + 1}">${this.fmt(somaMes(i + 1))}</th>`).join('')}
                 <th class="col-soma" data-total-soma>${this.fmt(somaAnoTodas)}</th>
                 <th class="col-media" data-total-media>${this.fmt(somaMedia)}</th>
@@ -163,36 +157,14 @@ const ViewEmpresas = {
         App.render();
       } else if (btn.dataset.action === 'limpar-mes') {
         const u = Store.unidades.get(btn.dataset.id);
-        const ok = await UI.confirm({ title: `Usar o padrão em ${ano}`, message: `Apagar os valores próprios de ${ano} de "${u ? u.nome : ''}"? Todos os meses de ${ano} passam a usar o padrão.`, confirmText: 'Apagar' });
+        const ok = await UI.confirm({ title: `Limpar ${ano}`, message: `Apagar todos os números de ${ano} de "${u ? u.nome : ''}" (clientes ativos, Mensal e Exclusiva TST)? Todos os meses voltam a zero.`, confirmText: 'Apagar', danger: true });
         if (!ok) return;
-        try { await Store.empresasMes.limpar(btn.dataset.id); UI.toast('Meses voltaram ao padrão.'); }
+        try { await Store.empresasMes.limpar(btn.dataset.id); UI.toast(`Números de ${ano} apagados.`); }
         catch (err) { UI.toast(err.message, 'error'); }
       }
     });
 
     const enterBlur = input => input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
-
-    // ---- padrão da unidade (por condição) ----
-    el.querySelectorAll('input.input-padrao').forEach(input => {
-      enterBlur(input);
-      input.addEventListener('change', async () => {
-        const valor = Math.max(0, Math.floor(UI.parseNum(input.value, 0)));
-        input.value = valor;
-        const anterior = Store.unidades.get(input.dataset.id);
-        input.disabled = true;
-        try {
-          await Store.unidades.update(input.dataset.id, { [input.dataset.campo]: valor }, { silent: true });
-        } catch (err) {
-          UI.toast(err.message, 'error');
-          if (anterior) input.value = anterior[input.dataset.campo] || 0;
-          return;
-        } finally {
-          input.disabled = false;
-        }
-        this.atualizarUnidade(el, input.dataset.id);
-        App.updateBadges();
-      });
-    });
 
     // ---- valor próprio de um mês (por condição) ----
     el.querySelectorAll('input.input-mes').forEach(input => {
@@ -227,6 +199,7 @@ const ViewEmpresas = {
           input.disabled = false;
         }
         this.atualizarUnidade(el, u.id);
+        App.updateBadges();
       });
     });
   },
@@ -242,7 +215,7 @@ const ViewEmpresas = {
         tr.querySelectorAll('input.input-mes').forEach(inp => {
           const exc = (u.meses || {})[Number(inp.dataset.mes)];
           inp.closest('td').classList.toggle('cel-excecao', !!exc);
-          inp.placeholder = u[campo] || 0;
+          inp.placeholder = u[campo] || '–';
           if (!exc) inp.value = ''; else inp.value = exc[campo] || 0;
         });
         tr.querySelector('[data-media]').textContent = this.fmt(this.media(u, campo));
@@ -250,23 +223,20 @@ const ViewEmpresas = {
       });
       const trTotal = el.querySelector(`tr[data-unidade="${unidadeId}"][data-total]`);
       if (trTotal) {
-        trTotal.querySelector('[data-padrao-total]').innerHTML = `<strong>${u.empresas}</strong>`;
         for (let m = 1; m <= 12; m++) trTotal.querySelector(`[data-mes-total="${m}"]`).innerHTML = `<strong>${this.totalMes(u, m)}</strong>`;
         trTotal.querySelector('[data-soma]').innerHTML = `<strong>${this.fmt(this.somaAno(u, null))}</strong>`;
         trTotal.querySelector('[data-media]').innerHTML = `<strong>${this.fmt(this.media(u, null))}</strong>`;
       }
       const acoes = el.querySelector(`[data-acoes="${unidadeId}"]`);
-      if (acoes) acoes.innerHTML = Object.keys(u.meses || {}).length ? `<button type="button" class="btn-link" data-action="limpar-mes" data-id="${u.id}" title="Apagar os valores próprios de ${ano} e usar o padrão o ano todo">usar padrão em ${ano}</button>` : '';
+      if (acoes) acoes.innerHTML = Object.keys(u.meses || {}).length ? `<button type="button" class="btn-link" data-action="limpar-mes" data-id="${u.id}" title="Apagar todos os números de ${ano} desta unidade (voltam a zero)">limpar ${ano}</button>` : '';
     }
     const conds = this.condSel === 'todas' ? this.CONDICOES : this.CAMPOS.filter(c => c.campo === this.condSel);
     const set = (sel, v) => { const n = el.querySelector(sel); if (n) n.textContent = v; };
     const ativos = this.INFORMATIVOS[0];
-    set('[data-ativos-padrao]', this.fmt(unidades.reduce((s, x) => s + (x[ativos.campo] || 0), 0)));
     for (let m = 1; m <= 12; m++) set(`[data-ativos-mes="${m}"]`, this.fmt(unidades.reduce((s, x) => s + this.efetivo(x, m, ativos.campo), 0)));
     set('[data-ativos-soma]', this.fmt(unidades.reduce((s, x) => s + this.somaAno(x, ativos.campo), 0)));
     set('[data-ativos-media]', this.fmt(unidades.reduce((s, x) => s + this.media(x, ativos.campo), 0)));
     set('#stat-ativos', UI.fmt(unidades.reduce((s, x) => s + this.media(x, ativos.campo), 0), 1));
-    set('[data-total-padrao]', this.fmt(unidades.reduce((s, x) => s + conds.reduce((t, c) => t + (x[c.campo] || 0), 0), 0)));
     for (let m = 1; m <= 12; m++) set(`[data-total-mes="${m}"]`, this.fmt(unidades.reduce((s, x) => s + conds.reduce((t, c) => t + this.efetivo(x, m, c.campo), 0), 0)));
     set('[data-total-soma]', this.fmt(unidades.reduce((s, x) => s + conds.reduce((t, c) => t + this.somaAno(x, c.campo), 0), 0)));
     set('[data-total-media]', this.fmt(unidades.reduce((s, x) => s + conds.reduce((t, c) => t + this.media(x, c.campo), 0), 0)));

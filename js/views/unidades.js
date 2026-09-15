@@ -55,7 +55,7 @@ const ViewUnidades = {
               <thead>
                 <tr>
                   <th>Nome</th>
-                  <th class="num" title="Padrão (Mensal + Exclusiva TST); a variação por mês fica em Empresas por Unidade">Clientes (padrão)</th>
+                  <th class="num" title="Média mensal de clientes com documentos vencidos (Mensal + Exclusiva TST) no ano selecionado — Empresas por Unidade">Clientes/mês (${Store.ano})</th>
                   <th class="actions">Ações</th>
                 </tr>
               </thead>
@@ -63,7 +63,7 @@ const ViewUnidades = {
                 ${unidades.map(u => `
                   <tr class="${u.id === this.editingId ? 'editing' : ''}">
                     <td>${UI.esc(u.nome)}</td>
-                    <td class="num">${u.empresas}</td>
+                    <td class="num">${UI.fmt(Store.mediaClientesMes(u), 1)}</td>
                     <td class="actions">
                       <button type="button" class="btn-link" data-action="edit" data-id="${u.id}">Editar</button>
                       <button type="button" class="btn-link danger" data-action="delete" data-id="${u.id}">Excluir</button>
@@ -121,8 +121,9 @@ const ViewUnidades = {
       } else if (action === 'delete') {
         const u = Store.unidades.get(id);
         if (!u) return;
-        const extra = u.empresas > 0
-          ? `\n\nEsta unidade tem ${UI.plural(u.empresas, 'empresa com documentos vencidos', 'empresas com documentos vencidos')} no padrão; esse número (e a variação por mês) será perdido.`
+        const temNumeros = Object.values(u.mesesPorAno || {}).some(a => Object.keys(a || {}).length > 0);
+        const extra = temNumeros
+          ? '\n\nOs números de clientes por mês desta unidade (todos os anos) serão perdidos.'
           : '';
         const ok = await UI.confirm({
           title: 'Excluir unidade',
