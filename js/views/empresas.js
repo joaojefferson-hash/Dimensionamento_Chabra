@@ -71,7 +71,7 @@ const ViewEmpresas = {
     el.innerHTML = `
       <header class="page-header">
         <h1>Empresas por Unidade</h1>
-        <p>Quantos clientes de cada unidade estão com <strong>documentos vencidos</strong> em cada mês do ano selecionado, separados por condição: <strong>Mensal</strong> e <strong>Exclusiva TST</strong>. Os dois exigem o atendimento completo no mês: uma inspeção e um relatório (técnicos) e uma finalização (administrativos). Preencha o <em>padrão</em> (vale para todos os meses e anos) e, se algum mês for diferente, digite o número naquele mês. Tudo é salvo automaticamente.</p>
+        <p>Quantos clientes de cada unidade estão com <strong>documentos vencidos</strong> (pendentes) em cada mês do ano selecionado, separados por condição: <strong>Mensal</strong> e <strong>Exclusiva TST</strong>. Os dois exigem o atendimento completo no mês: uma inspeção e um relatório (técnicos) e uma finalização (administrativos). A linha <strong>Clientes ativos</strong> é só o registro de quantos clientes a unidade tinha no mês. Digite o número de cada mês; célula vazia conta como zero. Tudo é salvo automaticamente.</p>
       </header>
 
       <div class="stats">
