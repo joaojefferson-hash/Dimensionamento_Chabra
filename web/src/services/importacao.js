@@ -14,6 +14,7 @@
      • uma linha = um documento (ou um cliente) com data de vencimento;
      • opcoes.unidadeFixa = nome: o arquivo inteiro conta para essa unidade (o relatório do SGG sai por região);
      • opcoes.condicaoFixa = 'mensal' | 'exclusiva_tst': o arquivo inteiro vai para essa condição (ignora a coluna);
+     • opcoes.porteCliente = { [codigo ou nome]: 'P'|'M'|'G' }: porte escolhido por cliente (vence a coluna e o padrão);
      • conta-se cada CLIENTE uma vez por unidade × mês (vários documentos do mesmo cliente
        vencendo no mesmo mês = 1 atendimento), a não ser que opcoes.contarPor = 'linha';
      • condição: valor contendo "exclus" ou "tst" → Exclusiva TST; senão Mensal (padrão quando não há coluna);
@@ -112,7 +113,7 @@ export function lerPorte(v, faixas = null, codigos = ['P', 'M', 'G']) {
 /* ---------- resumo por unidade × mês ---------- */
 
 export function resumir(linhas, mapa, opcoes = {}) {
-  const { contarPor = 'cliente', ano = null, condicaoPadrao = 'mensal', portePadrao = 'P', porteFaixas = null, codigosPorte = ['P', 'M', 'G'], situacoes = null, unidadeFixa = null, condicaoFixa = null } = opcoes;
+  const { contarPor = 'cliente', ano = null, condicaoPadrao = 'mensal', portePadrao = 'P', porteFaixas = null, codigosPorte = ['P', 'M', 'G'], situacoes = null, unidadeFixa = null, condicaoFixa = null, porteCliente = null } = opcoes;
   let foraSituacao = 0;
   const avisos = [];
   const anos = {};
@@ -141,8 +142,10 @@ export function resumir(linhas, mapa, opcoes = {}) {
     if (ano != null && y !== ano) { outroAno++; fora(`vence em ${y}, não em ${ano}`); return; }
     const mes = data.getMonth() + 1;
     const cond = condicaoFixa || (mapa.condicao != null ? lerCondicao(l[mapa.condicao]) : condicaoPadrao);
-    const porte = mapa.porte != null ? lerPorte(l[mapa.porte], porteFaixas, codigosPorte) : portePadrao;
-    det.condicao = cond; det.porte = porte;
+    // porte: o escolhido para o cliente (pelo código; sem código, pelo nome) > coluna do arquivo > padrão
+    const chaveCliente = det.codigo || det.cliente;
+    const porte = (porteCliente && chaveCliente && porteCliente[chaveCliente]) || (mapa.porte != null ? lerPorte(l[mapa.porte], porteFaixas, codigosPorte) : portePadrao);
+    det.condicao = cond; det.porte = porte; det.chave = chaveCliente;
     // identidade do cliente: o código (cada estabelecimento tem o seu) ou, sem código, o nome
     const idCliente = mapa.clienteId != null ? l[mapa.clienteId] : mapa.cliente != null ? l[mapa.cliente] : null;
     if (contarPor === 'cliente' && idCliente != null && String(idCliente).trim() !== '') {

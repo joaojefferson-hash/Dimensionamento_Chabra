@@ -75,7 +75,7 @@ function mesesPorUnidade(demanda, ativos) {
 /** Carrega todos os cadastros de uma vez (em paralelo). */
 export async function carregarTudo() {
   const q = async (promessa, oQue) => { const { data, error } = await promessa; if (error) lancar(error, `Falha ao carregar ${oQue}.`); return data; };
-  const [funcoes, unidades, colaboradores, alocacoes, demanda, ativos, portes, parametros] = await Promise.all([
+  const [funcoes, unidades, colaboradores, alocacoes, demanda, ativos, portes, parametros, clientesPorte] = await Promise.all([
     q(supabase.from('funcoes').select('*').order('ordem').order('nome'), 'as funções'),
     q(supabase.from('unidades').select('*').order('created_at').order('id'), 'as unidades'),
     q(supabase.from('colaboradores').select('*').order('created_at').order('id'), 'os colaboradores'),
@@ -84,6 +84,7 @@ export async function carregarTudo() {
     q(supabase.from('unidade_mes').select('unidade_id, ano, mes, clientes_ativos'), 'os clientes ativos'),
     q(supabase.from('portes').select('*').order('ordem').order('codigo'), 'os portes'),
     q(supabase.from('parametros').select('*').eq('id', 1).single(), 'os parâmetros'),
+    q(supabase.from('clientes_porte').select('codigo, nome, porte'), 'o porte dos clientes'),
   ]);
   const porUnidade = mesesPorUnidade(demanda, ativos);
   const porColab = {};
@@ -94,7 +95,16 @@ export async function carregarTudo() {
     colaboradores: colaboradores.map(r => ({ ...colaboradorDeLinha(r), alocacoes: porColab[r.id] || [] })),
     portes: portes.map(porteDeLinha),
     parametros: parametrosDeLinha(parametros),
+    clientesPorte: Object.fromEntries(clientesPorte.map(r => [r.codigo, { nome: r.nome, porte: r.porte }])),
   };
+}
+
+/** Porte de clientes (pelo código do SGG): grava vários de uma vez. */
+export async function salvarClientesPorte(lista) {
+  const linhas = lista.filter(x => x && String(x.codigo).trim()).map(x => ({ codigo: String(x.codigo).trim(), nome: String(x.nome || '').trim(), porte: x.porte }));
+  if (!linhas.length) return;
+  const { error } = await supabase.from('clientes_porte').upsert(linhas, { onConflict: 'codigo' });
+  if (error) lancar(error, 'Não foi possível salvar o porte do cliente.');
 }
 
 /* ---------- escrita: cadastros ---------- */

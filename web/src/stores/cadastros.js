@@ -13,6 +13,7 @@ export const useCadastrosStore = defineStore('cadastros', () => {
   const colaboradores = ref([]);
   const portes = ref([]);
   const parametros = ref({ ...api.PARAMETROS_PADRAO });
+  const clientesPorte = ref({}); // { [codigo]: { nome, porte } } — porte de cada cliente do SGG
   const carregado = ref(false);
   const carregando = ref(false);
   const erro = ref('');
@@ -30,6 +31,7 @@ export const useCadastrosStore = defineStore('cadastros', () => {
       colaboradores.value = d.colaboradores;
       portes.value = d.portes;
       parametros.value = d.parametros;
+      clientesPorte.value = d.clientesPorte || {};
       carregado.value = true;
       carregadoEm = Date.now();
     } catch (e) {
@@ -46,7 +48,7 @@ export const useCadastrosStore = defineStore('cadastros', () => {
   }
   function limpar() {
     funcoes.value = []; unidades.value = []; colaboradores.value = []; portes.value = [];
-    parametros.value = { ...api.PARAMETROS_PADRAO }; carregado.value = false;
+    parametros.value = { ...api.PARAMETROS_PADRAO }; clientesPorte.value = {}; carregado.value = false;
   }
 
   /* ---------- getters ---------- */
@@ -145,6 +147,13 @@ export const useCadastrosStore = defineStore('cadastros', () => {
     guardarMes(u, ano, mes, api.montarMes(atual.demanda, q));
   }
   async function substituirDemandaAno(ano, linhas) { const r = await api.demanda.substituirAno(ano, linhas); await carregar(); return r; }
+  /** Grava o porte de clientes (lista de { codigo, nome, porte }) e atualiza o cache. */
+  async function salvarClientesPorte(lista) {
+    await api.salvarClientesPorte(lista);
+    const novo = { ...clientesPorte.value };
+    lista.forEach(x => { if (x && String(x.codigo).trim()) novo[String(x.codigo).trim()] = { nome: x.nome || '', porte: x.porte }; });
+    clientesPorte.value = novo;
+  }
   async function limparAno(unidadeId, ano) {
     const u = unidadePorId.value[unidadeId]; if (!u) throw new Error('Unidade não encontrada.');
     await api.demanda.limparAno(unidadeId, ano);
@@ -180,13 +189,13 @@ export const useCadastrosStore = defineStore('cadastros', () => {
   async function importarBackup(json) { await api.importarBackup(json); await carregar(); }
 
   return {
-    funcoes, unidades, colaboradores, portes, parametros, carregado, carregando, erro,
+    funcoes, unidades, colaboradores, portes, parametros, clientesPorte, carregado, carregando, erro,
     funcaoPorId, unidadePorId, pesosPorte, colaboradoresCompletos, contagens,
     carregar, recarregarSeVelho, limpar, unidadesDoAno, anosDisponiveis,
     adicionarFuncao, atualizarFuncao, removerFuncao,
     adicionarUnidade, atualizarUnidade, removerUnidade,
     adicionarColaborador, atualizarColaborador, removerColaborador,
-    definirDemanda, definirClientesAtivos, limparAno, substituirDemandaAno,
+    definirDemanda, definirClientesAtivos, limparAno, substituirDemandaAno, salvarClientesPorte,
     atualizarParametros, atualizarPorte,
     exportarBackup, importarBackup,
   };

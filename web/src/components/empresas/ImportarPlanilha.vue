@@ -25,6 +25,7 @@ const opcoes = reactive({ unidadeId: '', condicao: 'mensal', contarPor: 'cliente
 const condicaoFixa = computed(() => (opcoes.condicao === '' && mapa.condicao != null ? null : (opcoes.condicao || 'mensal')));
 const unidadeFixa = computed(() => (cad.unidadePorId[opcoes.unidadeId] || null));
 const mapaUnidades = reactive({});
+const porteCliente = reactive({}); // { [codigo|nome]: porte } escolhido nesta importação (pré-preenchido pelo cadastro)
 const gravando = ref(false);
 const ultimo = ref(null);
 
@@ -48,7 +49,10 @@ async function escolher(ev) {
     if (!lidas.some(a => a.linhas.length)) { ui.toast('A planilha não tem linhas com dados.', 'error'); return; }
     abas.value = lidas; abaSel.value = lidas.findIndex(a => a.linhas.length);
     arquivoNome.value = f.name; ultimo.value = null;
+    Object.keys(porteCliente).forEach(k => delete porteCliente[k]);
     aplicarDeteccao();
+    // porte já conhecido de cada cliente (pelo código do SGG)
+    if (mapa.clienteId != null) abas.value[abaSel.value].linhas.forEach(l => { const c = String(l[mapa.clienteId] ?? '').trim(); const p = cad.clientesPorte[c]; if (c && p && !porteCliente[c]) porteCliente[c] = p.porte; });
     // unidade: a que está filtrada no Dimensionamento; senão, a única do cadastro; senão, pela coluna do arquivo
     if (!opcoes.unidadeId) opcoes.unidadeId = cad.unidades.some(u => u.id === pref.unidadeSel) ? pref.unidadeSel : (cad.unidades.length === 1 ? cad.unidades[0].id : '');
   } catch (e) { ui.toast('Não foi possível ler o arquivo: ' + e.message, 'error'); }
@@ -66,7 +70,7 @@ function alternarSituacao(valor, on) { const s = new Set(situacoesSel.value || [
 const resumo = computed(() => {
   if (!aba.value) return null;
   const faixas = opcoes.usarFaixas ? { pequeno: Number(opcoes.faixaP), medio: Number(opcoes.faixaM) } : null;
-  return resumir(aba.value.linhas, mapa, { contarPor: opcoes.contarPor, ano: Number(opcoes.ano), portePadrao: opcoes.portePadrao, porteFaixas: faixas, codigosPorte: cad.portes.map(p => p.codigo), situacoes: mapa.situacao != null ? situacoesSel.value : null, unidadeFixa: unidadeFixa.value ? unidadeFixa.value.nome : null, condicaoFixa: condicaoFixa.value });
+  return resumir(aba.value.linhas, mapa, { contarPor: opcoes.contarPor, ano: Number(opcoes.ano), portePadrao: opcoes.portePadrao, porteFaixas: faixas, codigosPorte: cad.portes.map(p => p.codigo), situacoes: mapa.situacao != null ? situacoesSel.value : null, unidadeFixa: unidadeFixa.value ? unidadeFixa.value.nome : null, condicaoFixa: condicaoFixa.value, porteCliente });
 });
 const nomesArquivo = computed(() => (resumo.value ? Object.keys(resumo.value.porUnidade) : []));
 watch([nomesArquivo, unidadeFixa], ([nomes, fixa]) => {
@@ -78,6 +82,8 @@ watch(() => resumo.value && resumo.value.anosEncontrados, anos => { if (anos && 
 
 const totalMesUnidade = (nome, mes) => { const m = ((resumo.value || {}).porUnidade[nome] || {})[mes]; if (!m) return 0; return Object.values(m).reduce((s, portes) => s + Object.values(portes).reduce((a, b) => a + b, 0), 0); };
 const totalUnidade = nome => { let s = 0; for (let m = 1; m <= 12; m++) s += totalMesUnidade(nome, m); return s; };
+/** Esforço equivalente do mês (cada cliente × peso do porte); mostrado quando difere da contagem. */
+const ponderadoMesUnidade = (nome, mes) => { const m = ((resumo.value || {}).porUnidade[nome] || {})[mes]; if (!m) return 0; return Object.values(m).reduce((s, portes) => s + Object.entries(portes).reduce((a, [p, q]) => a + q * (cad.pesosPorte[p] || 1), 0), 0); };
 const atualMes = (nome, mes) => { const id = mapaUnidades[nome]; const u = id ? cad.unidadePorId[id] : null; const x = u ? ((u.mesesPorAno || {})[Number(opcoes.ano)] || {})[mes] : null; return x ? x.empresasVencidas + x.empresasExclusivaTst : 0; };
 const semUnidade = computed(() => nomesArquivo.value.filter(n => !mapaUnidades[n]));
 const linhasRpc = computed(() => (resumo.value ? montarLinhasRpc(resumo.value.porUnidade, mapaUnidades) : []));
@@ -95,6 +101,18 @@ const empresas = computed(() => {
     .sort((a, b) => (b.usada - a.usada) || ((a.mes || 99) - (b.mes || 99)) || a.cliente.localeCompare(b.cliente, 'pt-BR'));
 });
 const foraCount = computed(() => (resumo.value ? resumo.value.detalhes.filter(d => !d.usada).length : 0));
+const salvandoPorte = ref(false);
+/** Porte escolhido na lista: muda a prévia na hora e fica guardado para as próximas importações. */
+async function escolherPorte(d, porte) {
+  if (!d.chave) return;
+  porteCliente[d.chave] = porte;
+  if (!d.codigo) return; // sem código não dá para guardar com segurança
+  salvandoPorte.value = true;
+  try { await cad.salvarClientesPorte([{ codigo: d.codigo, nome: d.cliente, porte }]); }
+  catch (e) { ui.erro(e); }
+  finally { salvandoPorte.value = false; }
+}
+const nomePorte = c => { const p = cad.portes.find(x => x.codigo === c); return p ? p.nome : c; };
 const fmtData = d => (d ? d.toLocaleDateString('pt-BR') : '—');
 const rotuloCond = c => (c === 'exclusiva_tst' ? 'Exclusiva TST' : c === 'mensal' ? 'Mensal' : '—');
 
@@ -179,7 +197,7 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
                 <td class="text-left font-medium">{{ nome }}</td>
                 <td v-if="!unidadeFixa" class="text-left"><select v-model="mapaUnidades[nome]" class="input input-sm"><option :value="null">— não importar —</option><option v-for="u in cad.unidades" :key="u.id" :value="u.id">{{ u.nome }}</option></select></td>
                 <td v-for="mes in 12" :key="mes" :title="mapaUnidades[nome] ? `hoje: ${atualMes(nome, mes)}` : ''">
-                  <strong>{{ totalMesUnidade(nome, mes) || '–' }}</strong>
+                  <strong>{{ totalMesUnidade(nome, mes) || '–' }}</strong><small v-if="Math.abs(ponderadoMesUnidade(nome, mes) - totalMesUnidade(nome, mes)) > 0.05" class="muted" title="Esforço equivalente: cada cliente vale o peso do seu porte"> ({{ num(ponderadoMesUnidade(nome, mes), 1) }})</small>
                   <small v-if="mapaUnidades[nome] && atualMes(nome, mes) !== totalMesUnidade(nome, mes)" class="muted block text-[11px]">era {{ atualMes(nome, mes) }}</small>
                 </td>
                 <td class="bg-page font-semibold">{{ totalUnidade(nome) }}</td>
@@ -197,10 +215,13 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
       <div v-if="resumo && resumo.detalhes.length" class="mt-3">
           <button class="btn-link text-[13px]" type="button" @click="mostrarEmpresas = !mostrarEmpresas">{{ mostrarEmpresas ? 'Ocultar' : 'Ver' }} as {{ resumo.detalhes.length }} empresas do arquivo{{ foraCount ? ` (${foraCount} ficam de fora)` : '' }}</button>
           <div v-if="mostrarEmpresas" class="mt-2">
-            <input v-model="filtroEmpresas" class="input input-sm mb-2 w-72" placeholder="Filtrar por empresa, código ou situação…">
+            <div class="mb-2 flex flex-wrap items-center gap-3">
+              <input v-model="filtroEmpresas" class="input input-sm w-72" placeholder="Filtrar por empresa, código ou situação…">
+              <span class="muted text-[12.5px]">Na coluna Porte, escolha o porte de cada empresa: a prévia muda na hora e a escolha fica guardada pelo código do cliente para as próximas importações.{{ salvandoPorte ? ' Salvando…' : '' }}</span>
+            </div>
             <div class="table-wrap max-h-[420px] overflow-y-auto">
               <table class="table table-grade">
-                <thead><tr><th>Empresa</th><th>Código</th><th v-if="!unidadeFixa">Unidade</th><th>Vencimento</th><th>Mês</th><th>Condição</th><th>Porte</th><th>Situação</th><th>Entra?</th></tr></thead>
+                <thead><tr><th>Empresa</th><th>Código</th><th v-if="!unidadeFixa">Unidade</th><th>Vencimento</th><th>Mês</th><th>Condição</th><th title="Escolha o porte da empresa: muda a prévia na hora e fica guardado para as próximas importações">Porte</th><th>Situação</th><th>Entra?</th></tr></thead>
                 <tbody>
                   <tr v-for="d in empresas" :key="d.i" :class="d.usada ? '' : 'text-muted'">
                     <td class="font-medium">{{ d.cliente || '—' }}</td>
@@ -209,7 +230,7 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
                     <td class="whitespace-nowrap">{{ fmtData(d.data) }}</td>
                     <td>{{ d.mes ? MESES[d.mes - 1] + (d.ano && Number(opcoes.ano) !== d.ano ? '/' + d.ano : '') : '—' }}</td>
                     <td>{{ rotuloCond(d.condicao) }}</td>
-                    <td>{{ d.porte || '—' }}</td>
+                    <td><select v-if="d.chave" class="input input-sm" :value="d.porte" :title="d.codigo ? 'Fica guardado para este cliente' : 'Sem código: vale só nesta importação'" @change="escolherPorte(d, $event.target.value)"><option v-for="p in cad.portes" :key="p.codigo" :value="p.codigo">{{ p.nome }}</option></select><span v-else>{{ nomePorte(d.porte) }}</span></td>
                     <td>{{ d.situacao || '—' }}</td>
                     <td><span v-if="d.usada" class="chip bg-ok-bg text-ok">sim</span><span v-else class="chip bg-page text-muted" :title="d.motivo">não · {{ d.motivo }}</span></td>
                   </tr>
