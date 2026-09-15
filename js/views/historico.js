@@ -104,10 +104,10 @@ const ViewHistorico = {
   MES: ['', 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'],
 
   CAMPOS: {
-    unidades: { nome: 'nome', empresas_vencidas: 'clientes Mensal (padrão)', empresas_exclusiva_tst: 'clientes Exclusiva TST (padrão)',
+    unidades: { nome: 'nome', empresas_vencidas: 'clientes Mensal (padrão)', empresas_exclusiva_tst: 'clientes Exclusiva TST (padrão)', clientes_ativos: 'clientes ativos (padrão)',
                 empresas_em_dia: 'em dia (padrão)', empresas_vencendo: 'vencendo (padrão)', empresas_a_vencer: 'a vencer no mês (padrão)',
                 empresas_baixo: 'grau baixo (padrão)', empresas_medio: 'grau médio (padrão)', empresas_alto: 'grau alto (padrão)' },
-    unidade_empresas_mes: { empresas_vencidas: 'clientes Mensal', empresas_exclusiva_tst: 'clientes Exclusiva TST', ano: 'ano',
+    unidade_empresas_mes: { empresas_vencidas: 'clientes Mensal', empresas_exclusiva_tst: 'clientes Exclusiva TST', clientes_ativos: 'clientes ativos', ano: 'ano',
                             empresas_em_dia: 'em dia', empresas_vencendo: 'vencendo', empresas_a_vencer: 'a vencer no mês',
                             empresas_baixo: 'grau baixo', empresas_medio: 'grau médio', empresas_alto: 'grau alto' },
     colaboradores: { nome: 'nome', funcao: 'função', funcao_id: 'função', empresas_dia: 'empresas por dia', inspecoes_dia: 'inspeções por dia', relatorios_dia: 'relatórios por dia' },
@@ -165,7 +165,7 @@ const ViewHistorico = {
         const mes = (this.MES[Number(r.mes)] || `mês ${r.mes}`) + (r.ano ? `/${r.ano}` : '');
         const valores = x => {
           if (!x) return '';
-          if (x.empresas_vencidas != null) return `${x.empresas_vencidas} mensal${x.empresas_exclusiva_tst != null ? ` + ${x.empresas_exclusiva_tst} exclusiva TST` : ''}`;
+          if (x.empresas_vencidas != null) return `${x.empresas_vencidas} mensal${x.empresas_exclusiva_tst != null ? ` + ${x.empresas_exclusiva_tst} exclusiva TST` : ''}${x.clientes_ativos != null ? ` (${x.clientes_ativos} clientes ativos)` : ''}`;
           if (x.empresas_em_dia != null) return `${x.empresas_em_dia} / ${x.empresas_vencendo} / ${x.empresas_a_vencer} (em dia / vencendo / a vencer)`;
           return `${x.empresas_baixo} / ${x.empresas_medio} / ${x.empresas_alto} (baixo / médio / alto)`;
         };

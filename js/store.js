@@ -10,7 +10,8 @@
 
    Formato em JS (igual ao backup exportado, versão 2):
      unidades:      [{ id, nome, empresasVencidas (condição Mensal), empresasExclusivaTst, empresas (= soma),
-                       mesesPorAno: { [ano]: { [1..12]: { empresasVencidas, empresasExclusivaTst } } },  // valores próprios por ano/mês
+                       clientesAtivos (total de clientes; só informativo, fora das contas),
+                       mesesPorAno: { [ano]: { [1..12]: { empresasVencidas, empresasExclusivaTst, clientesAtivos } } },  // valores próprios por ano/mês
                        meses: { [1..12]: {...} } }]                                 // = mesesPorAno[Store.ano] (ano selecionado)
                     // empresas com documentos vencidos: cada uma exige o atendimento completo no mês
      documentos:    [{ id, nome, horas, periodicidadeMeses, responsavel }]   // periodicidade 0 = sob demanda
@@ -24,11 +25,15 @@
 
 const Store = (() => {
   const APP_ID = 'chabra-dimensiona';
-  const SCHEMA_VERSION = 10; // v10: condição Exclusiva TST (v9: empresasPorMes com ano)
+  const SCHEMA_VERSION = 11; // v11: clientesAtivos (v10: Exclusiva TST; v9: empresasPorMes com ano)
   /** Condições de cliente por unidade/mês (mesmo atendimento completo; separadas para enxergar cada uma). */
   const CONDICOES = [
     { campo: 'empresasVencidas',     coluna: 'empresas_vencidas',      rotulo: 'Mensal',        classe: 'cond-mensal',    ajuda: 'clientes com contrato mensal, com documentos vencidos no mês' },
     { campo: 'empresasExclusivaTst', coluna: 'empresas_exclusiva_tst', rotulo: 'Exclusiva TST', classe: 'cond-exclusiva', ajuda: 'clientes na condição Exclusiva TST (mesmo atendimento completo)' },
+  ];
+  /** Números só informativos por unidade/mês (não entram em nenhuma conta). */
+  const INFORMATIVOS = [
+    { campo: 'clientesAtivos', coluna: 'clientes_ativos', rotulo: 'Clientes ativos', classe: 'cond-ativos', ajuda: 'total de clientes da unidade no mês — só informativo, não entra em nenhuma conta' },
   ];
   const LOCAL_KEY = 'chabra-dimensiona:data';            // versão antiga (só localStorage)
   const LOCAL_BACKUP_KEY = 'chabra-dimensiona:backup-local'; // onde os dados locais ficam após a migração
@@ -97,7 +102,7 @@ const Store = (() => {
       const mes = Math.round(toNum(k, 0));
       const y = Math.round(toNum(a, anoCorrente()));
       if (!v || mes < 1 || mes > 12 || !anoValido(y)) return;
-      (out[y] = out[y] || {})[mes] = { empresasVencidas: vencidasDe(v), empresasExclusivaTst: Math.max(0, toInt(v.empresasExclusivaTst, 0)) };
+      (out[y] = out[y] || {})[mes] = { empresasVencidas: vencidasDe(v), empresasExclusivaTst: Math.max(0, toInt(v.empresasExclusivaTst, 0)), clientesAtivos: Math.max(0, toInt(v.clientesAtivos, 0)) };
     });
     return out;
   };
@@ -118,6 +123,7 @@ const Store = (() => {
     const exclusiva = Math.max(0, toInt(u.empresasExclusivaTst, 0));
     return {
       nome: toStr(u.nome), empresasVencidas: vencidas, empresasExclusivaTst: exclusiva, empresas: vencidas + exclusiva,
+      clientesAtivos: Math.max(0, toInt(u.clientesAtivos, 0)),
       mesesPorAno: buildMesesPorAno(u.empresasPorMes !== undefined ? u.empresasPorMes : (u.mesesPorAno !== undefined ? u.mesesPorAno : u.meses)),
     };
   };
@@ -193,10 +199,11 @@ const Store = (() => {
     unidades: {
       table: 'unidades',
       build: buildUnidade,
-      toRow: u => ({ nome: u.nome, empresas_vencidas: u.empresasVencidas, empresas_exclusiva_tst: u.empresasExclusivaTst }),
+      toRow: u => ({ nome: u.nome, empresas_vencidas: u.empresasVencidas, empresas_exclusiva_tst: u.empresasExclusivaTst, clientes_ativos: u.clientesAtivos }),
       fromRow: r => ({
         id: r.id, nome: r.nome,
         empresasVencidas: Number(r.empresas_vencidas), empresasExclusivaTst: Number(r.empresas_exclusiva_tst || 0),
+        clientesAtivos: Number(r.clientes_ativos || 0),
         empresas: Number(r.empresas_vencidas) + Number(r.empresas_exclusiva_tst || 0),
         mesesPorAno: {}, meses: {},
       }),
@@ -301,7 +308,7 @@ const Store = (() => {
           return ['_alocacoes', data];
         }));
     consultas.push(
-      db.from('unidade_empresas_mes').select('unidade_id, ano, mes, empresas_vencidas, empresas_exclusiva_tst')
+      db.from('unidade_empresas_mes').select('unidade_id, ano, mes, empresas_vencidas, empresas_exclusiva_tst, clientes_ativos')
         .then(({ data, error }) => {
           if (error) throw falha(error, 'Falha ao carregar a variação mensal de empresas.');
           return ['_meses', data];
@@ -318,7 +325,7 @@ const Store = (() => {
     const porUnidade = {};
     state._meses.forEach(m => {
       const porAno = (porUnidade[m.unidade_id] = porUnidade[m.unidade_id] || {});
-      (porAno[m.ano] = porAno[m.ano] || {})[m.mes] = { empresasVencidas: Number(m.empresas_vencidas), empresasExclusivaTst: Number(m.empresas_exclusiva_tst || 0) };
+      (porAno[m.ano] = porAno[m.ano] || {})[m.mes] = { empresasVencidas: Number(m.empresas_vencidas), empresasExclusivaTst: Number(m.empresas_exclusiva_tst || 0), clientesAtivos: Number(m.clientes_ativos || 0) };
     });
     delete state._meses;
     state.unidades.forEach(u => { u.mesesPorAno = porUnidade[u.id] || {}; aplicarAno(u); });
@@ -426,10 +433,11 @@ const Store = (() => {
           unidade_id: unidadeId, ano, mes,
           empresas_vencidas: Math.max(0, toInt(valores.empresasVencidas, 0)),
           empresas_exclusiva_tst: Math.max(0, toInt(valores.empresasExclusivaTst, 0)),
+          clientes_ativos: Math.max(0, toInt(valores.clientesAtivos, 0)),
         };
         const { error } = await db.from('unidade_empresas_mes').upsert(row, { onConflict: 'unidade_id,ano,mes' });
         if (error) throw falha(error, 'Não foi possível salvar o valor do mês.');
-        doAno[mes] = { empresasVencidas: row.empresas_vencidas, empresasExclusivaTst: row.empresas_exclusiva_tst };
+        doAno[mes] = { empresasVencidas: row.empresas_vencidas, empresasExclusivaTst: row.empresas_exclusiva_tst, clientesAtivos: row.clientes_ativos };
       } else {
         const { error } = await db.from('unidade_empresas_mes').delete().eq('unidade_id', unidadeId).eq('ano', ano).eq('mes', mes);
         if (error) throw falha(error, 'Não foi possível remover o valor do mês.');
@@ -596,6 +604,7 @@ const Store = (() => {
     TIPOS_PRODUCAO,
     COORDENA,
     CONDICOES,
+    INFORMATIVOS,
     DEFAULT_COLABORADOR,
     DEFAULT_PARAMETROS,
     funcoes: makeCollection('funcoes'),

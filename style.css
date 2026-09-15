@@ -923,3 +923,11 @@ form.busy { opacity: .7; pointer-events: none; }
 .table-matriz .col-media { background: #f3f6f4; color: var(--text-muted); }
 .table-matriz tr.linha-total-unidade td.col-media strong { color: var(--text); }
 .table-matriz tfoot th.col-soma, .table-matriz tfoot th.col-media { background: var(--primary-light); color: var(--primary-dark); }
+
+/* clientes ativos: linha só informativa */
+.cond-ativos { background: #eef1f0; color: var(--text-muted); }
+.table-matriz tr.linha-informativa td, .table-matriz tr.linha-informativa th { color: var(--text-muted); }
+.table-matriz tr.linha-informativa .input-mes, .table-matriz tr.linha-informativa .input-padrao { color: var(--text-muted); border-style: dashed; }
+.table-matriz tr.linha-informativa td.cel-excecao .input-mes { color: var(--text); }
+.table-matriz tfoot tr.linha-informativa th { background: #f7f9f8; font-weight: 500; }
+.stat .value.muted-value { color: var(--text-muted); }

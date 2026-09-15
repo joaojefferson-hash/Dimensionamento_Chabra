@@ -16,6 +16,9 @@ const ViewEmpresas = {
   title: 'Empresas por Unidade',
 
   get CONDICOES() { return Store.CONDICOES; },
+  get INFORMATIVOS() { return Store.INFORMATIVOS; },
+  /** Todos os campos gravados por mês (condições + informativos). */
+  get CAMPOS() { return [...Store.INFORMATIVOS, ...Store.CONDICOES]; },
   condSel: 'todas', // 'todas' | campo de uma condição
 
   /* ---------- helpers de valor ---------- */
@@ -30,7 +33,7 @@ const ViewEmpresas = {
     const unidades = Store.unidades.list();
     const MESES = Calculo.MESES;
     const ano = Store.ano;
-    const conds = this.condSel === 'todas' ? this.CONDICOES : this.CONDICOES.filter(c => c.campo === this.condSel);
+    const conds = this.condSel === 'todas' ? this.CONDICOES : this.CAMPOS.filter(c => c.campo === this.condSel);
     const mostrarTotal = this.condSel === 'todas';
     const nExc = u => Object.keys(u.meses || {}).length;
 
@@ -41,9 +44,12 @@ const ViewEmpresas = {
     const mediaTotal = unidades.reduce((s, u) => s + this.media(u, null), 0);
     const mediaPor = campo => unidades.reduce((s, u) => s + this.media(u, campo), 0);
     const picoMes = unidades.length ? Math.max(...MESES.map((_, i) => unidades.reduce((s, u) => s + this.totalMes(u, i + 1), 0))) : 0;
+    const ativos = this.INFORMATIVOS[0];
+    const mediaAtivos = unidades.reduce((s, u) => s + this.media(u, ativos.campo), 0);
+    const somaAtivosMes = m => unidades.reduce((s, u) => s + this.efetivo(u, m, ativos.campo), 0);
 
-    const linhaCond = (u, c, primeira, nLinhas) => `
-      <tr data-unidade="${u.id}" data-campo="${c.campo}" class="${primeira ? 'inicio-unidade' : ''}">
+    const linhaCond = (u, c, primeira, nLinhas, informativo = false) => `
+      <tr data-unidade="${u.id}" data-campo="${c.campo}" class="${primeira ? 'inicio-unidade' : ''} ${informativo ? 'linha-informativa' : ''}">
         ${primeira ? `<td class="col-nome" rowspan="${nLinhas}">
           <div class="nome-unidade">${UI.esc(u.nome)}</div>
           <div class="acoes-unidade" data-acoes="${u.id}">${nExc(u) ? `<button type="button" class="btn-link" data-action="limpar-mes" data-id="${u.id}" title="Apagar os valores próprios de ${ano} e usar o padrão o ano todo">usar padrão em ${ano}</button>` : ''}</div>
@@ -76,6 +82,7 @@ const ViewEmpresas = {
         <div class="stat" title="Média dos 12 meses de ${ano}, somando as unidades"><div class="label">Clientes por mês (${ano})</div><div class="value" id="stat-media">${UI.fmt(mediaTotal, 1)}</div></div>
         <div class="stat" title="Média mensal de ${ano} por condição"><div class="label">Mensal · Exclusiva TST</div><div class="value value-lista" id="stat-cond">${this.CONDICOES.map(c => `<span>${UI.fmt(mediaPor(c.campo), 1)}<small> ${c.rotulo.toLowerCase()}</small></span>`).join('')}</div></div>
         <div class="stat" title="Mês de ${ano} com mais clientes com documentos vencidos, somando as unidades"><div class="label">Mês mais apertado (${ano})</div><div class="value" id="stat-pico">${picoMes}</div></div>
+        <div class="stat" title="Média mensal de clientes ativos em ${ano}, somando as unidades (só informativo)"><div class="label">Clientes ativos (${ano})</div><div class="value muted-value" id="stat-ativos">${UI.fmt(mediaAtivos, 1)}</div></div>
       </div>
 
       ${unidades.length === 0 ? `
@@ -95,11 +102,12 @@ const ViewEmpresas = {
             <div class="seg" role="tablist">
               <button type="button" class="seg-btn ${this.condSel === 'todas' ? 'ativo' : ''}" data-action="cond" data-cond="todas">Todas</button>
               ${this.CONDICOES.map(c => `<button type="button" class="seg-btn ${this.condSel === c.campo ? 'ativo' : ''}" data-action="cond" data-cond="${c.campo}">Só ${c.rotulo}</button>`).join('')}
+              <button type="button" class="seg-btn ${this.condSel === ativos.campo ? 'ativo' : ''}" data-action="cond" data-cond="${ativos.campo}">Só ${ativos.rotulo}</button>
             </div>
             <label class="param-inline"><span class="muted">Ano</span> ${Programacao.seletorAnoHTML('empresas-ano')}</label>
           </div>
         </div>
-        <p class="muted">Cada unidade tem uma linha por condição. Os números dos meses são de <strong>${ano}</strong> (troque o ano ao lado para planejar outro ano). A coluna <strong>Padrão</strong> vale para todos os meses e anos sem valor próprio; digite um número em um mês só quando ele for diferente. Célula em azul = mês com valor próprio; apague o número para voltar ao padrão.</p>
+        <p class="muted">Cada unidade tem uma linha por condição, mais a linha <strong>Clientes ativos</strong> (total de clientes da unidade no mês — só informativo, para histórico; não entra em nenhuma conta). Os números dos meses são de <strong>${ano}</strong> (troque o ano ao lado para planejar outro ano). A coluna <strong>Padrão</strong> vale para todos os meses e anos sem valor próprio; digite um número em um mês só quando ele for diferente. Célula em azul = mês com valor próprio; apague o número para voltar ao padrão.</p>
         <div class="table-wrap">
           <table class="table table-matriz">
             <thead>
@@ -114,13 +122,23 @@ const ViewEmpresas = {
             </thead>
             <tbody>
               ${unidades.map(u => {
-                const nLinhas = conds.length + (mostrarTotal ? 1 : 0);
-                return conds.map((c, i) => linhaCond(u, c, i === 0, nLinhas)).join('').replace(/<tr /, mostrarTotal ? '<tr ' : '<tr data-fim ') + (mostrarTotal ? linhaTotal(u) : '');
+                if (this.condSel === ativos.campo) return linhaCond(u, ativos, true, 1, true).replace(/<tr /, '<tr data-fim ');
+                const nLinhas = conds.length + (mostrarTotal ? 2 : 0);
+                const infos = mostrarTotal ? linhaCond(u, ativos, true, nLinhas, true) : '';
+                return infos + conds.map((c, i) => linhaCond(u, c, !mostrarTotal && i === 0, nLinhas)).join('').replace(/<tr /, mostrarTotal ? '<tr ' : '<tr data-fim ') + (mostrarTotal ? linhaTotal(u) : '');
               }).join('')}
             </tbody>
             <tfoot>
+              ${mostrarTotal ? `
+              <tr class="linha-informativa">
+                <th class="col-nome" colspan="2">${ativos.rotulo} (todas)</th>
+                <th class="col-padrao" data-ativos-padrao>${this.fmt(unidades.reduce((s, u) => s + (u[ativos.campo] || 0), 0))}</th>
+                ${MESES.map((m, i) => `<th data-ativos-mes="${i + 1}">${this.fmt(somaAtivosMes(i + 1))}</th>`).join('')}
+                <th class="col-soma" data-ativos-soma>${this.fmt(unidades.reduce((s, u) => s + this.somaAno(u, ativos.campo), 0))}</th>
+                <th class="col-media" data-ativos-media>${this.fmt(mediaAtivos)}</th>
+              </tr>` : ''}
               <tr>
-                <th class="col-nome" colspan="2">Total das unidades</th>
+                <th class="col-nome" colspan="2">${this.condSel === ativos.campo ? `${ativos.rotulo} (todas)` : 'Total das unidades'}</th>
                 <th class="col-padrao" data-total-padrao>${this.fmt(somaPadrao)}</th>
                 ${MESES.map((m, i) => `<th data-total-mes="${i + 1}">${this.fmt(somaMes(i + 1))}</th>`).join('')}
                 <th class="col-soma" data-total-soma>${this.fmt(somaAnoTodas)}</th>
@@ -129,7 +147,7 @@ const ViewEmpresas = {
             </tfoot>
           </table>
         </div>
-        <p class="note">A programação usa a soma das duas condições em cada mês: para cada cliente com documentos vencidos, a equipe precisa fazer uma inspeção, um relatório e uma finalização naquele mês.</p>
+        <p class="note">A programação usa a soma das duas condições (Mensal + Exclusiva TST) em cada mês: para cada cliente com documentos vencidos, a equipe precisa fazer uma inspeção, um relatório e uma finalização naquele mês. <strong>Clientes ativos</strong> é só o registro de quantos clientes a unidade tinha no mês.</p>
       </section>`}
     `;
 
@@ -187,7 +205,7 @@ const ViewEmpresas = {
         const vazio = input.value.trim() === '';
         const excAtual = (u.meses || {})[mes];
         const padrao = {};
-        this.CONDICOES.forEach(c => { padrao[c.campo] = u[c.campo] || 0; });
+        this.CAMPOS.forEach(c => { padrao[c.campo] = u[c.campo] || 0; });
         let novo = null;
         if (!vazio) {
           novo = { ...(excAtual || padrao), [campo]: Math.max(0, Math.floor(UI.parseNum(input.value, 0))) };
@@ -195,7 +213,7 @@ const ViewEmpresas = {
         } else if (excAtual) {
           // apagou esta condição: se a outra ainda difere do padrão, mantém o mês com o padrão nesta
           const resto = { ...excAtual, [campo]: padrao[campo] };
-          const igualPadrao = this.CONDICOES.every(c => (resto[c.campo] || 0) === padrao[c.campo]);
+          const igualPadrao = this.CAMPOS.every(c => (resto[c.campo] || 0) === padrao[c.campo]);
           novo = igualPadrao ? null : resto;
         }
         input.disabled = true;
@@ -240,8 +258,14 @@ const ViewEmpresas = {
       const acoes = el.querySelector(`[data-acoes="${unidadeId}"]`);
       if (acoes) acoes.innerHTML = Object.keys(u.meses || {}).length ? `<button type="button" class="btn-link" data-action="limpar-mes" data-id="${u.id}" title="Apagar os valores próprios de ${ano} e usar o padrão o ano todo">usar padrão em ${ano}</button>` : '';
     }
-    const conds = this.condSel === 'todas' ? this.CONDICOES : this.CONDICOES.filter(c => c.campo === this.condSel);
+    const conds = this.condSel === 'todas' ? this.CONDICOES : this.CAMPOS.filter(c => c.campo === this.condSel);
     const set = (sel, v) => { const n = el.querySelector(sel); if (n) n.textContent = v; };
+    const ativos = this.INFORMATIVOS[0];
+    set('[data-ativos-padrao]', this.fmt(unidades.reduce((s, x) => s + (x[ativos.campo] || 0), 0)));
+    for (let m = 1; m <= 12; m++) set(`[data-ativos-mes="${m}"]`, this.fmt(unidades.reduce((s, x) => s + this.efetivo(x, m, ativos.campo), 0)));
+    set('[data-ativos-soma]', this.fmt(unidades.reduce((s, x) => s + this.somaAno(x, ativos.campo), 0)));
+    set('[data-ativos-media]', this.fmt(unidades.reduce((s, x) => s + this.media(x, ativos.campo), 0)));
+    set('#stat-ativos', UI.fmt(unidades.reduce((s, x) => s + this.media(x, ativos.campo), 0), 1));
     set('[data-total-padrao]', this.fmt(unidades.reduce((s, x) => s + conds.reduce((t, c) => t + (x[c.campo] || 0), 0), 0)));
     for (let m = 1; m <= 12; m++) set(`[data-total-mes="${m}"]`, this.fmt(unidades.reduce((s, x) => s + conds.reduce((t, c) => t + this.efetivo(x, m, c.campo), 0), 0)));
     set('[data-total-soma]', this.fmt(unidades.reduce((s, x) => s + conds.reduce((t, c) => t + this.somaAno(x, c.campo), 0), 0)));
