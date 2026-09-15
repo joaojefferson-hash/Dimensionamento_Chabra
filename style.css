@@ -948,3 +948,12 @@ form.busy { opacity: .7; pointer-events: none; }
 .stats-periodo { margin-top: -8px; }
 .stats-periodo .stat { background: #f7f9f8; }
 .stat-rotulo .value { font-size: 15px; color: var(--text); }
+
+/* rodapé da matriz: mais altura, separado do corpo e com linhas de grade */
+.table-matriz tfoot tr:first-child th { border-top: 14px solid var(--bg); }
+.table-matriz tfoot th { padding-top: 12px; padding-bottom: 12px; border: 1px solid #cfd8d3; border-top-width: 0; font-size: 13px; }
+.table-matriz tfoot tr:first-child th { border-top: 14px solid var(--bg); }
+.table-matriz tfoot tr th:first-child { border-left: 0; }
+.table-matriz tfoot tr th:last-child { border-right: 0; }
+.table-matriz tfoot tr + tr th { border-top: 1px solid #cfd8d3; }
+.table-matriz tfoot th.col-nome { padding-left: 8px; }
