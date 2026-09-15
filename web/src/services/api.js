@@ -144,6 +144,12 @@ export const demanda = {
     if (r.error) lancar(r.error, 'Não foi possível salvar os clientes ativos.');
     return q;
   },
+  /** Importação: substitui a demanda de um ano das unidades presentes nas linhas (RPC, uma transação). */
+  async substituirAno(ano, linhas) {
+    const { data, error } = await supabase.rpc('substituir_demanda_ano', { p_ano: ano, p_linhas: linhas });
+    if (error) lancar(error, 'Não foi possível importar a demanda.');
+    return data;
+  },
   async limparAno(unidadeId, ano) {
     const r1 = await supabase.from('demanda_mensal').delete().match({ unidade_id: unidadeId, ano });
     if (r1.error) lancar(r1.error, 'Não foi possível limpar os números do ano.');

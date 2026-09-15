@@ -144,6 +144,7 @@ export const useCadastrosStore = defineStore('cadastros', () => {
     const atual = mesDaUnidade(u, ano, mes);
     guardarMes(u, ano, mes, api.montarMes(atual.demanda, q));
   }
+  async function substituirDemandaAno(ano, linhas) { const r = await api.demanda.substituirAno(ano, linhas); await carregar(); return r; }
   async function limparAno(unidadeId, ano) {
     const u = unidadePorId.value[unidadeId]; if (!u) throw new Error('Unidade não encontrada.');
     await api.demanda.limparAno(unidadeId, ano);
@@ -185,7 +186,7 @@ export const useCadastrosStore = defineStore('cadastros', () => {
     adicionarFuncao, atualizarFuncao, removerFuncao,
     adicionarUnidade, atualizarUnidade, removerUnidade,
     adicionarColaborador, atualizarColaborador, removerColaborador,
-    definirDemanda, definirClientesAtivos, limparAno,
+    definirDemanda, definirClientesAtivos, limparAno, substituirDemandaAno,
     atualizarParametros, atualizarPorte,
     exportarBackup, importarBackup,
   };

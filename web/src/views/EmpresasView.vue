@@ -8,6 +8,7 @@ import { useCadastrosStore } from '../stores/cadastros.js';
 import { usePreferenciasStore } from '../stores/preferencias.js';
 import { useUiStore } from '../stores/ui.js';
 import { CONDICOES } from '../services/api.js';
+import ImportarPlanilha from '../components/empresas/ImportarPlanilha.vue';
 import { MESES, MESES_LONGO, num } from '../composables/useFormat.js';
 
 const auth = useAuthStore();
@@ -74,7 +75,8 @@ async function limpar(u) {
   </header>
 
   <section v-if="!cad.unidades.length" class="card"><p class="muted">Cadastre as unidades primeiro.</p></section>
-  <section v-else class="card">
+  <ImportarPlanilha v-if="cad.unidades.length && auth.podeEditar" />
+  <section v-if="cad.unidades.length" class="card">
     <div class="card-head">
       <h2>Clientes que vencem, por mês · {{ pref.ano }}</h2>
       <div class="flex flex-wrap items-center gap-2 text-[12px]">

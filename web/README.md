@@ -27,6 +27,7 @@ web/
     services/
       supabase.js           cliente único + erroAmigavel()
       api.js                única camada que fala com o banco; devolve objetos do domínio
+      importacao.js         importador de planilha (SGG): ler, detectar colunas, contar por unidade × mês (puro; testes em tests/)
     stores/  (Pinia)
       auth.js               sessão, papel (admin | supervisor | leitura), podeEditar, entrar/sair
       cadastros.js          FONTE ÚNICA DE DADOS: funcoes, unidades (mesesPorAno), colaboradores,
