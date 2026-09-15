@@ -12,6 +12,7 @@
    Regras:
      • uma linha = um documento (ou um cliente) com data de vencimento;
      • opcoes.unidadeFixa = nome: o arquivo inteiro conta para essa unidade (o relatório do SGG sai por região);
+     • opcoes.condicaoFixa = 'mensal' | 'exclusiva_tst': o arquivo inteiro vai para essa condição (ignora a coluna);
      • conta-se cada CLIENTE uma vez por unidade × mês (vários documentos do mesmo cliente
        vencendo no mesmo mês = 1 atendimento), a não ser que opcoes.contarPor = 'linha';
      • condição: valor contendo "exclus" ou "tst" → Exclusiva TST; senão Mensal (padrão quando não há coluna);
@@ -110,7 +111,7 @@ export function lerPorte(v, faixas = null, codigos = ['P', 'M', 'G']) {
 /* ---------- resumo por unidade × mês ---------- */
 
 export function resumir(linhas, mapa, opcoes = {}) {
-  const { contarPor = 'cliente', ano = null, condicaoPadrao = 'mensal', portePadrao = 'P', porteFaixas = null, codigosPorte = ['P', 'M', 'G'], situacoes = null, unidadeFixa = null } = opcoes;
+  const { contarPor = 'cliente', ano = null, condicaoPadrao = 'mensal', portePadrao = 'P', porteFaixas = null, codigosPorte = ['P', 'M', 'G'], situacoes = null, unidadeFixa = null, condicaoFixa = null } = opcoes;
   let foraSituacao = 0;
   const avisos = [];
   const anos = {};
@@ -130,7 +131,7 @@ export function resumir(linhas, mapa, opcoes = {}) {
     anos[y] = (anos[y] || 0) + 1;
     if (ano != null && y !== ano) { outroAno++; return; }
     const mes = data.getMonth() + 1;
-    const cond = mapa.condicao != null ? lerCondicao(l[mapa.condicao]) : condicaoPadrao;
+    const cond = condicaoFixa || (mapa.condicao != null ? lerCondicao(l[mapa.condicao]) : condicaoPadrao);
     const porte = mapa.porte != null ? lerPorte(l[mapa.porte], porteFaixas, codigosPorte) : portePadrao;
     // identidade do cliente: o código (cada estabelecimento tem o seu) ou, sem código, o nome
     const idCliente = mapa.clienteId != null ? l[mapa.clienteId] : mapa.cliente != null ? l[mapa.cliente] : null;

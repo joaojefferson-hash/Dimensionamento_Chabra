@@ -20,7 +20,9 @@ const abas = ref([]);
 const abaSel = ref(0);
 const mapa = reactive({ unidade: null, vencimento: null, cliente: null, clienteId: null, condicao: null, porte: null, situacao: null });
 const situacoesSel = ref(null); // valores da coluna Situação que entram (null = sem filtro)
-const opcoes = reactive({ unidadeId: '', contarPor: 'cliente', ano: pref.ano, condicaoPadrao: 'mensal', portePadrao: 'P', usarFaixas: false, faixaP: 19, faixaM: 99 });
+const opcoes = reactive({ unidadeId: '', condicao: 'mensal', contarPor: 'cliente', ano: pref.ano, portePadrao: 'P', usarFaixas: false, faixaP: 19, faixaM: 99 });
+// condição: '' = pela coluna do arquivo (quando há), 'mensal' ou 'exclusiva_tst' para o arquivo inteiro
+const condicaoFixa = computed(() => (opcoes.condicao === '' && mapa.condicao != null ? null : (opcoes.condicao || 'mensal')));
 const unidadeFixa = computed(() => (cad.unidadePorId[opcoes.unidadeId] || null));
 const mapaUnidades = reactive({});
 const gravando = ref(false);
@@ -64,7 +66,7 @@ function alternarSituacao(valor, on) { const s = new Set(situacoesSel.value || [
 const resumo = computed(() => {
   if (!aba.value) return null;
   const faixas = opcoes.usarFaixas ? { pequeno: Number(opcoes.faixaP), medio: Number(opcoes.faixaM) } : null;
-  return resumir(aba.value.linhas, mapa, { contarPor: opcoes.contarPor, ano: Number(opcoes.ano), condicaoPadrao: opcoes.condicaoPadrao, portePadrao: opcoes.portePadrao, porteFaixas: faixas, codigosPorte: cad.portes.map(p => p.codigo), situacoes: mapa.situacao != null ? situacoesSel.value : null, unidadeFixa: unidadeFixa.value ? unidadeFixa.value.nome : null });
+  return resumir(aba.value.linhas, mapa, { contarPor: opcoes.contarPor, ano: Number(opcoes.ano), portePadrao: opcoes.portePadrao, porteFaixas: faixas, codigosPorte: cad.portes.map(p => p.codigo), situacoes: mapa.situacao != null ? situacoesSel.value : null, unidadeFixa: unidadeFixa.value ? unidadeFixa.value.nome : null, condicaoFixa: condicaoFixa.value });
 });
 const nomesArquivo = computed(() => (resumo.value ? Object.keys(resumo.value.porUnidade) : []));
 watch([nomesArquivo, unidadeFixa], ([nomes, fixa]) => {
@@ -95,7 +97,7 @@ async function gravar() {
     emit('importado');
   } catch (e) { ui.erro(e); } finally { gravando.value = false; }
 }
-function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = ''; ultimo.value = null; opcoes.unidadeId = ''; Object.keys(mapaUnidades).forEach(k => delete mapaUnidades[k]); }
+function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = ''; ultimo.value = null; opcoes.unidadeId = ''; opcoes.condicao = 'mensal'; Object.keys(mapaUnidades).forEach(k => delete mapaUnidades[k]); }
 </script>
 
 <template>
@@ -130,6 +132,13 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
         <label><span class="mb-1 block font-medium">Unidade do cadastro</span>
           <select v-model="opcoes.unidadeId" class="input input-sm w-full"><option value="">— pela coluna do arquivo —</option><option v-for="u in cad.unidades" :key="u.id" :value="u.id">{{ u.nome }}</option></select>
           <small class="muted block">{{ unidadeFixa ? 'Todas as linhas contam para esta unidade.' : (mapa.unidade != null ? 'Cada linha vai para a unidade da coluna "' + cabecalhos[mapa.unidade] + '".' : 'Escolha a unidade: o arquivo não tem coluna de unidade.') }}</small></label>
+        <label><span class="mb-1 block font-medium">Condição</span>
+          <select v-model="opcoes.condicao" class="input input-sm w-full">
+            <option v-if="mapa.condicao != null" value="">— pela coluna "{{ cabecalhos[mapa.condicao] }}" —</option>
+            <option value="mensal">Mensal</option>
+            <option value="exclusiva_tst">Exclusiva TST</option>
+          </select>
+          <small class="muted block">{{ opcoes.condicao === '' && mapa.condicao != null ? 'Texto com "Exclusiva"/"TST" vira Exclusiva TST; o resto, Mensal.' : 'Todas as linhas contam nesta condição.' }}</small></label>
         <label><span class="mb-1 block font-medium">Ano a importar</span><select v-model="opcoes.ano" class="input input-sm w-full"><option v-for="a in cad.anosDisponiveis(Number(opcoes.ano))" :key="a" :value="a">{{ a }}</option></select>
           <small v-if="resumo && resumo.anosEncontrados.length" class="muted block">No arquivo: {{ resumo.anosEncontrados.map(a => `${a.ano} (${a.linhas})`).join(', ') }}</small></label>
         <label><span class="mb-1 block font-medium">Como contar</span><select v-model="opcoes.contarPor" class="input input-sm w-full"><option value="cliente">cada cliente uma vez por mês</option><option value="linha">cada linha (documento)</option></select>
@@ -138,7 +147,6 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
         <div v-if="situacoes.length" class="md:col-span-5"><span class="mb-1 block font-medium">Situações que entram</span>
           <div class="flex flex-wrap gap-3"><label v-for="s in situacoes" :key="s.valor" class="flex items-center gap-1"><input type="checkbox" :checked="(situacoesSel || []).includes(s.valor)" @change="alternarSituacao(s.valor, $event.target.checked)"> {{ s.valor }} <span class="muted">({{ s.n }})</span></label></div>
         </div>
-        <label v-if="mapa.condicao == null"><span class="mb-1 block font-medium">Condição (sem coluna)</span><select v-model="opcoes.condicaoPadrao" class="input input-sm w-full"><option value="mensal">Mensal</option><option value="exclusiva_tst">Exclusiva TST</option></select></label>
         <div v-if="mapa.porte == null"><span class="mb-1 block font-medium">Porte (sem coluna)</span><select v-model="opcoes.portePadrao" class="input input-sm w-full"><option v-for="p in cad.portes" :key="p.codigo" :value="p.codigo">{{ p.nome }}</option></select></div>
         <div v-else><label class="flex items-center gap-2"><input v-model="opcoes.usarFaixas" type="checkbox"> <span>A coluna de porte é nº de funcionários</span></label>
           <div v-if="opcoes.usarFaixas" class="mt-1 flex flex-wrap items-center gap-1"><span class="muted">Pequeno até</span><input v-model="opcoes.faixaP" class="input input-sm w-16" type="number" min="0"><span class="muted">· Médio até</span><input v-model="opcoes.faixaM" class="input input-sm w-16" type="number" min="0"><span class="muted">· acima: Grande</span></div>
