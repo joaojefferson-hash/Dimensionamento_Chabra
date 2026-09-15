@@ -957,3 +957,4 @@ form.busy { opacity: .7; pointer-events: none; }
 .table-matriz tfoot tr th:last-child { border-right: 0; }
 .table-matriz tfoot tr + tr th { border-top: 1px solid #cfd8d3; }
 .table-matriz tfoot th.col-nome { padding-left: 8px; }
+.table-matriz tfoot tr:first-child th { box-shadow: inset 0 1px 0 #cfd8d3; } /* linha de grade superior, abaixo da faixa de respiro */
