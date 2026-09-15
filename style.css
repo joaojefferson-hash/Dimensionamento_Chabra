@@ -914,3 +914,14 @@ form.busy { opacity: .7; pointer-events: none; }
 /* condições de cliente (Empresas por Unidade) */
 .cond-mensal    { background: #e3f2ea; color: #0b5d43; }
 .cond-exclusiva { background: #e7eef8; color: #2b4c7e; }
+
+/* matriz de empresas: respiro entre unidades e colunas Total / Média */
+.table-matriz tr.inicio-unidade td { border-top: 3px solid #cfd8d3; padding-top: 12px; }
+.table-matriz tr.inicio-unidade td.col-nome { padding-top: 16px; }
+.table-matriz tr.linha-total-unidade td { padding-top: 7px; padding-bottom: 12px; border-bottom: 0; }
+.table-matriz tr[data-fim] td { padding-bottom: 12px; }
+.table-matriz .col-soma { font-weight: 600; background: #f3f6f4; border-left: 1px solid var(--border); }
+.table-matriz th.col-soma { white-space: nowrap; }
+.table-matriz .col-media { background: #f3f6f4; color: var(--text-muted); }
+.table-matriz tr.linha-total-unidade td.col-media strong { color: var(--text); }
+.table-matriz tfoot th.col-soma, .table-matriz tfoot th.col-media { background: var(--primary-light); color: var(--primary-dark); }
