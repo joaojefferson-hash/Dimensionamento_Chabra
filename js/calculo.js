@@ -88,7 +88,8 @@ const Calculo = (() => {
    * Bloco de uma entrega num período.
    *   precisa, consegue (já com a folga aplicada), consegueMax, sobra, status,
    *   pessoas (FTE alocadas), producaoPessoa (uma pessoa inteira, com folga),
-   *   faltam (nº inteiro de pessoas a contratar), sobram (nº inteiro de pessoas de folga)
+   *   faltam (nº inteiro de pessoas a contratar), sobram (nº inteiro de pessoas de folga),
+   *   ideal (quadro ideal: pessoas inteiras para dar conta do que precisa no período)
    */
   function bloco(precisa, consegueMax, pessoas, producaoPessoaMax, p) {
     const alvo = n(p.ocupacaoAlvo) / 100;
@@ -104,6 +105,7 @@ const Calculo = (() => {
       pessoasEquivalentes,
       faltam: sobra < -1e-9 ? Math.ceil(-pessoasEquivalentes - 1e-9) : 0,
       sobram: sobra > 1e-9 ? Math.floor(pessoasEquivalentes + 1e-9) : 0,
+      ideal: producaoPessoa > 0 && precisa > 1e-9 ? Math.ceil(precisa / producaoPessoa - 1e-9) : 0,
     };
   }
 
@@ -113,10 +115,11 @@ const Calculo = (() => {
     const st = piorStatus(lista.map(b => b.status));
     const faltam = Math.max(...lista.map(b => b.faltam));
     const sobram = Math.min(...lista.map(b => b.sobram));
+    const ideal = Math.max(...lista.map(b => b.ideal)); // quadro ideal = o que a entrega mais exigente pede
     const limitante = lista.reduce((a, b) => (b.sobra < a.sobra ? b : a)); // entrega que limita
     const pessoas = lista[0].pessoas;
     return {
-      funcao, status: st, faltam, sobram, pessoas,
+      funcao, status: st, faltam, sobram, ideal, pessoas,
       atendeEmpresas: Math.min(...lista.map(b => b.consegue)), // empresas que a função dá conta no período
       precisa: limitante.precisa,
       limitante: ENTREGAS_DA_FUNCAO[funcao].find(e => entregas[e.id] === limitante),
@@ -273,6 +276,7 @@ const Calculo = (() => {
         const r = alvoTotal.funcoes[f];
         r.faltam = partes.reduce((s, x) => s + x.faltam, 0);
         r.sobram = partes.reduce((s, x) => s + x.sobram, 0);
+        r.ideal = partes.reduce((s, x) => s + x.ideal, 0); // quadro ideal do total = soma das unidades
         r.status = piorStatus(partes.map(x => x.status));
         r.recomendacao = recomendacao(f, r.status, r.faltam, r.sobram, r.pessoas);
       });

@@ -83,6 +83,16 @@ const ViewProgramacaoMensal = {
     const alvo = unidadeSel ? r.unidades.find(u => u.id === unidadeSel) : r.total;
     const alvoAno = unidadeSel ? rAno.unidades.find(u => u.id === unidadeSel) : rAno.total;
     const passados = alvoAno.meses.filter(m => m.mes < mesAtual);
+    // pendentes no fim de cada mês (a mesma conta da Fila de atendimento: o que ficou em aberto vai somando)
+    const fila = Calculo.fila(rAno, { mesAtual });
+    const filaAlvo = unidadeSel ? fila.unidades.find(u => u.id === unidadeSel).grupos : fila.total.grupos;
+    const pendenteFim = (f, mes) => filaAlvo[f].meses[mes].filaFim;
+    /** "Equipe 4 · Ideal 5" — quadro de hoje e quadro ideal do mês para o grupo. */
+    const quadroHTML = (m, f) => {
+      const g = m.funcoes[f];
+      const cls = g.faltam > 0 ? 'txt-deficit' : 'txt-ok'; // vermelho só quando falta gente de verdade (2,8 pessoas dão conta de um ideal "3")
+      return `<span class="quadro" title="Equipe de hoje: ${Programacao.numFte(m.pessoas[f])} · quadro ideal para dar conta do que vence no mês: ${g.ideal}">Equipe <strong>${Programacao.numFte(m.pessoas[f])}</strong> · Ideal <strong class="${cls}">${g.ideal}</strong></span>`;
+    };
     const titulo = unidadeSel ? alvo.nome : 'Todas as unidades';
     const TEC = Calculo.TEC, ADM = Calculo.ADM;
     const PLURAL = { [TEC]: 'técnicos', [ADM]: 'administrativos' };
@@ -99,9 +109,12 @@ const ViewProgramacaoMensal = {
         return { f, meses, pico: Math.max(0, ...meses.map(m => m.funcoes[f].faltam)) };
       });
       const mesesComFalta = passados.filter(m => ViewProgramacaoMensal.conclusaoMes(m).precisava);
+      const idealMax = f => Math.max(0, ...passados.map(m => m.funcoes[f].ideal));
+      const fraseQuadro = ` Quadro ideal para não faltar em nenhum desses meses: <strong>${singularOuPlural(TEC, idealMax(TEC))}</strong> e <strong>${singularOuPlural(ADM, idealMax(ADM))}</strong> (hoje: ${Programacao.numFte(alvoAno.pessoas[TEC])} e ${Programacao.numFte(alvoAno.pessoas[ADM])}). Pendente no fim de ${ate}: <strong>${Programacao.num(pendenteFim(TEC, passados[passados.length - 1].mes))}</strong> empresas.`;
       const frase = !mesesComFalta.length
         ? `De ${rotulo}, com a equipe de hoje, a equipe dava conta em todos os meses — <strong class="txt-ok">não precisava contratar</strong>.`
         : `De ${rotulo}, com a equipe de hoje, <strong class="txt-deficit">precisava contratar em ${mesesComFalta.length} de ${passados.length} ${passados.length === 1 ? 'mês' : 'meses'}</strong>: ${porGrupo.filter(g => g.meses.length).map(g => `<strong>${PLURAL[g.f]}</strong> em ${lista(g.meses.map(m => m.nomeLongo.toLowerCase()))} (no máximo ${singularOuPlural(g.f, g.pico)} num mês)`).join('; ')}.${mesesComFalta.length < passados.length ? ' Nos outros meses a equipe dava conta.' : ''}`;
+      const fraseCompleta = frase + fraseQuadro;
       // com todas as unidades: onde faltava, em cada mês
       const ondeHTML = m => {
         if (unidadeSel || rAno.unidades.length < 2) return '';
@@ -114,7 +127,7 @@ const ViewProgramacaoMensal = {
       };
       const celGrupo = (m, f) => {
         const g = m.funcoes[f];
-        return `<td class="num cel-${g.status}" title="${m.nomeLongo}: ${PLURAL[f]} dão conta de ${Programacao.num(g.atendeEmpresas)} de ${Programacao.num(m.precisa)} empresas · ${ViewProgramacaoMensal.textoPessoas(g, Calculo.FUNCAO_SINGULAR[f])}"><strong>${Programacao.num(g.atendeEmpresas)}</strong><small> de ${Programacao.num(m.precisa)}</small><div class="col-pessoas">${Programacao.pessoasHTML(g, Calculo.FUNCAO_SINGULAR[f])}</div></td>`;
+        return `<td class="num cel-${g.status}" title="${m.nomeLongo}: ${PLURAL[f]} dão conta de ${Programacao.num(g.atendeEmpresas)} de ${Programacao.num(m.precisa)} empresas · ${ViewProgramacaoMensal.textoPessoas(g, Calculo.FUNCAO_SINGULAR[f])}">${quadroHTML(m, f)}<div class="col-pessoas">${Programacao.pessoasHTML(g, Calculo.FUNCAO_SINGULAR[f])}<small> · ${Programacao.num(g.atendeEmpresas)} de ${Programacao.num(m.precisa)}</small></div></td>`;
       };
       return `
       <section class="card historico-projecao">
@@ -130,8 +143,9 @@ const ViewProgramacaoMensal = {
               <tr>
                 <th>Mês</th>
                 <th class="num" title="Clientes Mensal + Exclusiva TST que venceram no mês">Vencem</th>
-                <th class="num" title="Empresas que os técnicos dariam conta no mês (o que limita: a menor entre inspeções e relatórios) e quantos faltavam ou sobravam">Técnicos</th>
-                <th class="num" title="Empresas que os administrativos finalizariam no mês e quantos faltavam ou sobravam">Administrativos</th>
+                <th class="num" title="O que estava em aberto no fim do mês: o que venceu até ali e não foi atendido (vai somando mês a mês — a mesma conta da Fila de atendimento)">Pendente no fim do mês</th>
+                <th class="num" title="Quadro de técnicos de hoje e quadro ideal para dar conta do que venceu no mês (o que limita: a menor entre inspeções e relatórios); quantos faltavam ou sobravam">Técnicos · quadro ideal</th>
+                <th class="num" title="Quadro de administrativos de hoje e quadro ideal para finalizar o que venceu no mês; quantos faltavam ou sobravam">Administrativos · quadro ideal</th>
                 <th>Conclusão</th>
               </tr>
             </thead>
@@ -140,13 +154,14 @@ const ViewProgramacaoMensal = {
                 <tr class="${Programacao.classeLinha(Calculo.piorStatus([m.funcoes[TEC].status, m.funcoes[ADM].status]))}">
                   <td>${m.nomeLongo}</td>
                   <td class="num">${Programacao.num(m.precisa)}</td>
+                  <td class="num col-pendente" title="${m.nomeLongo}: ${Programacao.num(filaAlvo[TEC].meses[m.mes].filaInicio)} que já estavam em aberto + ${Programacao.num(m.precisa)} que venceram"><strong>${Programacao.num(pendenteFim(TEC, m.mes))}</strong></td>
                   ${celGrupo(m, TEC)}${celGrupo(m, ADM)}
                   <td class="col-conclusao">${ViewProgramacaoMensal.conclusaoMes(m).html}${ondeHTML(m)}</td>
                 </tr>`).join('')}
             </tbody>
           </table>
         </div>
-        <div class="frases-resumo"><p>${frase}</p></div>
+        <div class="frases-resumo"><p>${fraseCompleta}</p></div>
         <p class="note">Projeção feita com a equipe de hoje (e com a simulação "E se…?", se houver — simule uma pessoa a partir de um mês passado para ver se teria resolvido). O que ficou em aberto nesses meses não some: está na <strong>Fila de atendimento</strong> e na coluna "Acumulado" de Empresas por Unidade.</p>
       </section>`;
     };
@@ -176,8 +191,10 @@ const ViewProgramacaoMensal = {
                 <th class="num">Dias úteis</th>
                 <th class="num" title="Clientes Mensal + Exclusiva TST com documentos vencidos no mês — cada um precisa de inspeção, relatório e finalização">Clientes</th>
                 <th class="num" title="Pessoas do grupo contadas no mês (com a simulação, se houver)">Equipe</th>
+                <th class="num" title="Quadro ideal: pessoas inteiras para dar conta do que vence no mês (com a folga)">Ideal</th>
                 ${entregas.map(e => `<th class="num">${e.rotulo}</th>`).join('')}
                 <th class="num th-pessoas" title="Quantas pessoas faltam (ou sobram) para dar conta do mês, em relação à equipe de hoje. Não é acumulado: contratar o maior valor cobre todos os meses.">Faltam / sobram</th>
+                <th class="num" title="O que fica em aberto no fim do mês: o que veio acumulado + o que vence − o que a equipe atende (a mesma conta da Fila de atendimento)">Pendentes no fim do mês</th>
                 <th>Situação</th>
               </tr>
             </thead>
@@ -188,8 +205,10 @@ const ViewProgramacaoMensal = {
                   <td class="num">${m.diasUteis}</td>
                   <td class="num">${Programacao.num(m.precisa)}${m.excecao ? ' <span class="chip chip-blue" title="Quantidade própria deste mês">mês</span>' : ''}</td>
                   <td class="num">${Programacao.numFte(m.pessoas[f])}</td>
+                  <td class="num" title="Quadro ideal para o que vence em ${m.nomeLongo.toLowerCase()}"><strong class="${m.funcoes[f].faltam > 0 ? 'txt-deficit' : 'txt-ok'}">${m.funcoes[f].ideal}</strong></td>
                   ${entregas.map(e => celula(m.entregas[e.id], e)).join('')}
                   <td class="num col-pessoas">${Programacao.pessoasHTML(m.funcoes[f], singular)}</td>
+                  <td class="num col-pendente" title="${m.nomeLongo}: ${Programacao.num(filaAlvo[f].meses[m.mes].filaInicio)} que vieram de antes + ${Programacao.num(m.precisa)} que vencem − ${Programacao.num(filaAlvo[f].meses[m.mes].atendidas)} atendidas"><strong>${Programacao.num(pendenteFim(f, m.mes))}</strong></td>
                   <td>${Programacao.statusChip(m.funcoes[f].status)}</td>
                 </tr>`).join('')}
             </tbody>
@@ -199,8 +218,10 @@ const ViewProgramacaoMensal = {
                 <th class="num">${alvo.meses.reduce((s, m) => s + m.diasUteis, 0)}</th>
                 <th class="num">${Programacao.num(alvo.janela.precisa)}</th>
                 <th class="num" title="Média do período">${Programacao.numFte(resumo.pessoas)}</th>
+                <th class="num" title="Quadro ideal para não faltar em nenhum mês do período (o maior dos meses)"><strong class="${alvo.meses.some(m => m.funcoes[f].faltam > 0) ? 'txt-deficit' : 'txt-ok'}">${Math.max(0, ...alvo.meses.map(m => m.funcoes[f].ideal))}</strong></th>
                 ${entregas.map(e => { const b = alvo.janela.entregas[e.id]; return `<th class="num cel-${b.status}">${Programacao.num(b.consegue)}<small> de ${Programacao.num(b.precisa)}</small></th>`; }).join('')}
                 <th class="num col-pessoas" title="Conta do período inteiro (meses folgados compensam meses apertados). Para não faltar em nenhum mês, vale o maior valor mensal.">${Programacao.pessoasHTML(resumo, singular)}</th>
+                <th class="num col-pendente" title="Pendentes no fim de dezembro, sem contratar"><strong>${Programacao.num(pendenteFim(f, alvo.meses[alvo.meses.length - 1].mes))}</strong></th>
                 <th>${Programacao.statusChip(resumo.status)}</th>
               </tr>
             </tfoot>
