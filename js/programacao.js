@@ -1,6 +1,6 @@
 /* ==========================================================================
-   Programacao — utilitários compartilhados pelas telas Programação Mensal e
-   Programação Anual: período (salvo no navegador), barra de opções, frases
+   Programacao — utilitários compartilhados pela tela Dimensionamento (e pela
+   coluna Acumulado de Empresas por Unidade): período (salvo no navegador), barra de opções, frases
    em linguagem simples e sinais de situação (verde / amarelo / vermelho).
    ========================================================================== */
 
@@ -52,7 +52,7 @@ const Programacao = (() => {
    * HTML da barra. opções: { janela?, ocupacaoAlvo, unidades?, unidadeSel?, mesAtual?, prazoDias? }
    * Sempre mostra o ano; com `janela` mostra o período (de/até); com `mesAtual` o mês atual; com `prazoDias` o prazo.
    */
-  function barraHTML({ janela = null, ocupacaoAlvo, unidades = null, unidadeSel = '', mesAtual = null, prazoDias = null }) {
+  function barraHTML({ janela = null, ocupacaoAlvo, unidades = null, unidadeSel = '', mesAtual = null, prazoDias = null, folga: comFolga = true }) {
     const opcoesMes = sel => Calculo.MESES_LONGO.map((m, i) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${m}</option>`).join('');
     const folga = Math.round((100 - ocupacaoAlvo) * 10) / 10;
     return `
@@ -79,7 +79,7 @@ const Programacao = (() => {
           <span class="param-label">Mês atual</span>
           <div class="param-inline" data-local>
             <select class="input input-sm" name="mesAtual" aria-label="Mês atual">${opcoesMes(mesAtual)}</select>
-            <span class="param-ajuda" title="Separa o que já passou (histórico) do que vem daqui para a frente (plano). Vale para a Fila de atendimento, a Programação Mensal e a coluna Acumulado de Empresas por Unidade; fica só neste navegador.">?</span>
+            <span class="param-ajuda" title="Separa o que já passou do que vem daqui para a frente (plano). Vale para o Dimensionamento e para a coluna Acumulado de Empresas por Unidade; fica só neste navegador.">?</span>
           </div>
         </div>` : ''}
         ${unidades ? `
@@ -99,6 +99,7 @@ const Programacao = (() => {
             <span class="param-ajuda" title="Quantos dias a empresa tem para receber os documentos depois que vencem (ou depois de entrar). Vale para toda a equipe.">?</span>
           </div>
         </div>` : ''}
+        ${comFolga ? `
         <div class="param">
           <span class="param-label">Folga para imprevistos</span>
           <div class="param-inline">
@@ -106,7 +107,7 @@ const Programacao = (() => {
             <span class="muted">%</span>
             <span class="param-ajuda" title="Parte do tempo da equipe reservada para imprevistos (faltas, retrabalho, urgências). Com 15%, contamos que cada pessoa entrega até 85% do que declarou.">?</span>
           </div>
-        </div>
+        </div>` : ''}
       </form>`;
   }
 
@@ -143,6 +144,7 @@ const Programacao = (() => {
     }
 
     const folga = form.folga;
+    if (!folga) return;
     folga.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); folga.blur(); } });
     folga.addEventListener('change', async () => {
       const v = UI.parseNum(folga.value, NaN);

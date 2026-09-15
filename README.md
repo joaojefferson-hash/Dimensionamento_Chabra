@@ -117,36 +117,24 @@ pessoas que faltam/sobram    = sobra ÷ produção de uma pessoa inteira no per�
 - **Histórico**: gatilhos em todas as tabelas de cadastro gravam em `historico` (quem,
   quando, antes/depois); a tela Histórico mostra frases simples, com filtro. Importação
   de backup vira um único evento. Escrita só pelos gatilhos (security definer, fora da API).
-- Telas: **Programação Anual** (um cartão por unidade + total), **Programação Mensal**
-  (uma grade para técnicos e outra para administrativos: mês a mês consegue / precisa
-  por entrega, equipe do mês, coluna **Faltam / sobram** — sempre em relação à equipe de
-  hoje, não acumulado —, leitura "Mês a mês: … Contratando N a partir de X, nenhum mês
-  fica descoberto" e a grade unidade × mês só com sinais) e
-- **Fila de atendimento** (tela para a diretoria, `js/views/fila.js` + `Calculo.fila`): o
-  número lançado em Empresas por Unidade é **só o que vence** no mês (nos passados, o que venceu
-  e ainda está em aberto). Do primeiro mês em diante: pendentes = sobra do mês anterior +
-  lançado. Meses passados: atendidas = 0 (o lançado já é o que ficou em aberto; a equipe não é
-  descontada de novo) → tudo acumula até hoje. Mês atual e seguintes: atendidas =
-  min(pendentes, consegue) (gargalo do grupo: técnicos = a menor entre inspeções e relatórios);
-  sobra = pendentes − atendidas (nunca negativa) passa adiante. Editar um mês recalcula os seguintes. Situação = zerado /
-  fica menos de um mês de trabalho / fica mais de um mês. A partir do **mês atual** (seletor, por
-  navegador; padrão = mês do calendário) e do **prazo para atender** (`parametros.prazo_dias`,
-  padrão 60 = 2 meses): produção por dia da equipe, fila hoje (pendentes do mês atual, com o
-  detalhe "X vieram de meses anteriores"), o que vence nos meses seguintes do prazo,
-  **pessoas a contratar para cumprir o prazo** (por unidade,
-  somadas no total), quando a fila zera sem contratar e a fila em dezembro. **Período**
-  (de/até, o mesmo das programações): segunda linha de indicadores — fila no início,
-  entram, equipe consegue, contratar no período (zerar a fila até o fim dele), fila no fim —
-  e tabela/gráfico/grade só com os meses do período (a fila do primeiro mês já traz o
-  acumulado anterior). Gráfico de barras (uma série) da fila no fim de cada mês; a
-  simulação "E se…?" vale aqui também.
-- **Simulação "E se…?"** (card nas programações e na fila): linhas com unidade, grupo,
+- Tela **Dimensionamento** (`js/views/dimensionamento.js`; substituiu Programação Anual,
+  Programação Mensal e Fila de atendimento): barra ano · mês atual · unidade; bloco "Hoje"
+  (pendentes hoje; técnicos e administrativos "hoje → ideal", "+N para zerar em 60 dias",
+  produção por dia); tabela dos 12 meses (vencem, pendente no fim do mês, hoje → ideal por
+  área, conclusão: passado "deveria ter contratado…" / futuro "contratar…", com a unidade
+  onde falta); linha por unidade quando "Todas"; "E se…?" fechado (`<details>`); avisos.
+  Motor: `Calculo.calcular` (mês a mês, `funcoes[f].ideal` = ceil(precisa ÷ produção de
+  uma pessoa)) e `Calculo.fila` (pendentes: do primeiro mês em diante pendentes = sobra do
+  anterior + lançado; meses passados atendidas = 0 — o lançado já é o que ficou em aberto;
+  do mês atual em diante atendidas = min(pendentes, consegue), gargalo do grupo). No total,
+  faltas/sobras/ideal são somados por unidade (folga numa não cobre outra).
+- **Simulação "E se…?"** (bloco fechado no fim do Dimensionamento): linhas com unidade, grupo,
   quantidade (+ contratar / − desligar), meses e ritmo por dia; viram pessoas virtuais
   no motor (`simulacoes` em `Calculo.calcular`), ativas só nos meses escolhidos; a
   equipe nunca fica negativa. Guardada só no navegador (`localStorage`), não entra no
   cadastro nem no backup; as contagens mostram "(+2 simulados)".
-  **Calendário** (dias úteis por mês). Período e unidade ficam no navegador; folga,
-  pesos e calendário são compartilhados (tabela `parametros`).
+  **Calendário** (dias úteis por mês + folga para imprevistos + prazo para atender). Mês atual
+  e unidade ficam no navegador; folga, prazo e calendário são compartilhados (tabela `parametros`).
 - O Catálogo de Documentos ficou oculto (não entra no cálculo neste modelo); a tela e a
   tabela continuam no código para uma fase futura.
 
@@ -166,13 +154,11 @@ js/views/colaboradores.js   tela Colaboradores (CRUD; função vem do cadastro d
 js/organograma.js       organograma (hierarquia das funções de chefia + equipes por unidade) e barras por unidade
 js/views/funcoes.js         tela Funções (nome, tipo de produção, chefia, ordem)
 js/views/usuarios.js        tela Usuários (só admin) — chama a Edge Function `usuarios`
-js/views/calendario.js      tela Calendário (dias úteis por mês, dias de referência)
-js/views/programacao-mensal.js  tela Programação Mensal
-js/views/programacao-anual.js   tela Programação Anual
-js/views/fila.js            tela Fila de atendimento (backlog mês a mês, prazo, contratar para cumprir o prazo)
+js/views/calendario.js      tela Calendário (dias úteis por mês, folga, prazo)
+js/views/dimensionamento.js tela Dimensionamento (hoje, mês a mês, por unidade, "E se…?")
 js/views/historico.js       tela Histórico de alterações
 js/calculo.js           motor de dimensionamento (puro)
-js/programacao.js       utilitários das telas de programação (janela, barra, formatação)
+js/programacao.js       utilitários do Dimensionamento (mês atual, barra, simulação, formatação)
 js/app.js               inicialização, navegação por hash (#/unidades …), badges, backup
 supabase/migrations/    SQL do banco (0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico, 0012 = funções cadastráveis, 0013 = chefia, 0014 = coordena/responde_para, 0015 = situação da documentação no lugar do grau, 0016 = só documentos vencidos, 0017 = prazo para atender, 0018 = papéis na RLS, 0019 = ano nos valores por mês, 0020 = condição Exclusiva TST, 0021 = clientes ativos informativo)
 supabase/functions/usuarios/index.ts   Edge Function de gestão de usuários (chave secreta só no servidor)
@@ -197,9 +183,8 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
 - A quantidade de empresas com documentos vencidos pode **variar por mês e por ano**: o campo
   da unidade é o padrão (vale para todos os anos) e a tabela `unidade_empresas_mes` guarda os
   valores próprios por ano/mês. O **ano selecionado** (seletor em Empresas por Unidade e na
-  barra das programações/fila; fica no navegador, `Store.ano`) define `u.meses`. O motor
-  usa a quantidade de cada mês na demanda; a Programação Anual mostra a média na janela
-  e marca "varia".
+  barra do Dimensionamento; fica no navegador, `Store.ano`) define `u.meses`. O motor
+  usa a quantidade de cada mês na demanda.
 - Um colaborador pode atuar em várias unidades: `alocacoes = [{ unidadeId, percentual }]`.
   A capacidade dele entra em cada unidade multiplicada pelo percentual; a soma pode ser
   menor que 100% (o restante é "não alocado" e não conta) mas nunca maior. Salvo pela RPC
@@ -228,5 +213,7 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
 - **Fase 1 (feita):** cadastros + persistência na nuvem + login + backup + gestão de usuários.
 - **Fase 2 (feita):** graus de dificuldade, calendário, Programação Mensal/Anual com
   recomendação; depois simplificada para o modelo de produção diária com linguagem simples.
+- **Fase 3 (feita):** só documentos vencidos por mês, pendente acumulado, quadro ideal,
+  papéis de acesso; as três telas de resultado viraram uma só (Dimensionamento).
 - **Futuro:** apontamento de produção real por colaborador, feriados automáticos,
   distribuição não uniforme da demanda ao longo do ano.

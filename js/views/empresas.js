@@ -35,9 +35,9 @@ const ViewEmpresas = {
     const unidades = Store.unidades.list();
     const MESES = Calculo.MESES;
     const ano = Store.ano;
-    const mesAtual = Programacao.lerMesAtual(); // o mesmo "mês atual" da Fila de atendimento
+    const mesAtual = Programacao.lerMesAtual(); // o mesmo "mês atual" do Dimensionamento
     const mesAtualNome = MESES[mesAtual];
-    const tituloAcum = `Soma de janeiro até ${Calculo.MESES_LONGO[mesAtual].toLowerCase()}: o que venceu e ainda está em aberto nos meses passados + o que vence neste mês. É a "Fila hoje" da Fila de atendimento (mês atual escolhido lá).`;
+    const tituloAcum = `Soma de janeiro até ${Calculo.MESES_LONGO[mesAtual].toLowerCase()}: o que venceu e ainda está em aberto nos meses passados + o que vence neste mês. São os "Pendentes hoje" do Dimensionamento (o mês atual é escolhido lá).`;
     const conds = this.condSel === 'todas' ? this.CONDICOES : this.CAMPOS.filter(c => c.campo === this.condSel);
     const mostrarTotal = this.condSel === 'todas';
     const nExc = u => Object.keys(u.meses || {}).length;
@@ -45,9 +45,6 @@ const ViewEmpresas = {
     const somaMes = m => unidades.reduce((s, u) => s + conds.reduce((t, c) => t + this.efetivo(u, m, c.campo), 0), 0);
     const somaMedia = unidades.reduce((s, u) => s + conds.reduce((t, c) => t + this.media(u, c.campo), 0), 0);
     const somaAnoTodas = unidades.reduce((s, u) => s + conds.reduce((t, c) => t + this.somaAno(u, c.campo), 0), 0);
-    const mediaTotal = unidades.reduce((s, u) => s + this.media(u, null), 0);
-    const mediaPor = campo => unidades.reduce((s, u) => s + this.media(u, campo), 0);
-    const picoMes = unidades.length ? Math.max(...MESES.map((_, i) => unidades.reduce((s, u) => s + this.totalMes(u, i + 1), 0))) : 0;
     const ativos = this.INFORMATIVOS[0];
     const mediaAtivos = unidades.reduce((s, u) => s + this.media(u, ativos.campo), 0);
     const somaAtivosMes = m => unidades.reduce((s, u) => s + this.efetivo(u, m, ativos.campo), 0);
@@ -78,16 +75,8 @@ const ViewEmpresas = {
     el.innerHTML = `
       <header class="page-header">
         <h1>Empresas por Unidade</h1>
-        <p>Quantos clientes de cada unidade têm <strong>documentos vencendo em cada mês</strong> do ano selecionado, separados por condição: <strong>Mensal</strong> e <strong>Exclusiva TST</strong>. Os dois exigem o atendimento completo no mês: uma inspeção e um relatório (técnicos) e uma finalização (administrativos). <strong>Preencha em cada mês só os documentos que vencem naquele mês</strong> — nos meses que já passaram, os que venceram ali e ainda estão em aberto. Não precisa somar o que veio de meses anteriores: o sistema acumula isso sozinho na Fila de atendimento. A linha <strong>Clientes ativos</strong> é só o registro de quantos clientes a unidade tinha no mês. Célula vazia conta como zero; tudo é salvo automaticamente.</p>
+        <p>Quantos clientes de cada unidade têm <strong>documentos vencendo em cada mês</strong> do ano selecionado, separados por condição: <strong>Mensal</strong> e <strong>Exclusiva TST</strong>. Os dois exigem o atendimento completo no mês: uma inspeção e um relatório (técnicos) e uma finalização (administrativos). <strong>Preencha em cada mês só os documentos que vencem naquele mês</strong> — nos meses que já passaram, os que venceram ali e ainda estão em aberto. Não precisa somar o que veio de meses anteriores: o sistema acumula isso sozinho no Dimensionamento. A linha <strong>Clientes ativos</strong> é só o registro de quantos clientes a unidade tinha no mês. Célula vazia conta como zero; tudo é salvo automaticamente.</p>
       </header>
-
-      <div class="stats">
-        <div class="stat"><div class="label">Unidades</div><div class="value">${unidades.length}</div></div>
-        <div class="stat" title="Média dos 12 meses de ${ano}, somando as unidades"><div class="label">Clientes por mês (${ano})</div><div class="value" id="stat-media">${UI.fmt(mediaTotal, 1)}</div></div>
-        <div class="stat" title="Média mensal de ${ano} por condição"><div class="label">Mensal · Exclusiva TST</div><div class="value value-lista" id="stat-cond">${this.CONDICOES.map(c => `<span>${UI.fmt(mediaPor(c.campo), 1)}<small> ${c.rotulo.toLowerCase()}</small></span>`).join('')}</div></div>
-        <div class="stat" title="Mês de ${ano} com mais clientes com documentos vencidos, somando as unidades"><div class="label">Mês mais apertado (${ano})</div><div class="value" id="stat-pico">${picoMes}</div></div>
-        <div class="stat" title="Média mensal de clientes ativos em ${ano}, somando as unidades (só informativo)"><div class="label">Clientes ativos (${ano})</div><div class="value muted-value" id="stat-ativos">${UI.fmt(mediaAtivos, 1)}</div></div>
-      </div>
 
       ${unidades.length === 0 ? `
       <section class="card">
@@ -111,7 +100,7 @@ const ViewEmpresas = {
             <label class="param-inline"><span class="muted">Ano</span> ${Programacao.seletorAnoHTML('empresas-ano')}</label>
           </div>
         </div>
-        <p class="muted">Cada unidade tem uma linha por condição, mais a linha <strong>Clientes ativos</strong> (total de clientes da unidade no mês — só informativo, para histórico; não entra em nenhuma conta). Os números são de <strong>${ano}</strong> (troque o ano ao lado para planejar outro ano). Em cada mês, digite <strong>só o que vence naquele mês</strong> (nos passados, o que venceu e ainda está em aberto) — o acumulado é calculado na Fila de atendimento. Célula vazia conta como zero.</p>
+        <p class="muted">Cada unidade tem uma linha por condição, mais a linha <strong>Clientes ativos</strong> (total de clientes da unidade no mês — só informativo, para histórico; não entra em nenhuma conta). Os números são de <strong>${ano}</strong> (troque o ano ao lado para planejar outro ano). Em cada mês, digite <strong>só o que vence naquele mês</strong> (nos passados, o que venceu e ainda está em aberto) — o acumulado é calculado no Dimensionamento. Célula vazia conta como zero.</p>
         <div class="table-wrap">
           <table class="table table-matriz">
             <thead>
@@ -151,7 +140,7 @@ const ViewEmpresas = {
             </tfoot>
           </table>
         </div>
-        <p class="note">A programação usa a soma das duas condições (Mensal + Exclusiva TST) em cada mês: para cada cliente que vence, a equipe precisa fazer uma inspeção, um relatório e uma finalização. O que ficou em aberto vai somando mês a mês: a coluna <strong>Acumulado até ${mesAtualNome.toLowerCase()}</strong> é essa soma de janeiro até o mês atual (a "Fila hoje" da <strong>Fila de atendimento</strong>, onde o mês atual é escolhido). <strong>Clientes ativos</strong> é só o registro de quantos clientes a unidade tinha no mês.</p>
+        <p class="note">A programação usa a soma das duas condições (Mensal + Exclusiva TST) em cada mês: para cada cliente que vence, a equipe precisa fazer uma inspeção, um relatório e uma finalização. O que ficou em aberto vai somando mês a mês: a coluna <strong>Acumulado até ${mesAtualNome.toLowerCase()}</strong> é essa soma de janeiro até o mês atual (os "Pendentes hoje" do <strong>Dimensionamento</strong>, onde o mês atual é escolhido). <strong>Clientes ativos</strong> é só o registro de quantos clientes a unidade tinha no mês.</p>
       </section>`}
     `;
 
@@ -249,14 +238,10 @@ const ViewEmpresas = {
     for (let m = 1; m <= 12; m++) set(`[data-ativos-mes="${m}"]`, this.fmt(unidades.reduce((s, x) => s + this.efetivo(x, m, ativos.campo), 0)));
     set('[data-ativos-soma]', this.fmt(unidades.reduce((s, x) => s + this.somaAno(x, ativos.campo), 0)));
     set('[data-ativos-media]', this.fmt(unidades.reduce((s, x) => s + this.media(x, ativos.campo), 0)));
-    set('#stat-ativos', UI.fmt(unidades.reduce((s, x) => s + this.media(x, ativos.campo), 0), 1));
+
     for (let m = 1; m <= 12; m++) set(`[data-total-mes="${m}"]`, this.fmt(unidades.reduce((s, x) => s + conds.reduce((t, c) => t + this.efetivo(x, m, c.campo), 0), 0)));
     set('[data-total-soma]', this.fmt(unidades.reduce((s, x) => s + conds.reduce((t, c) => t + this.somaAno(x, c.campo), 0), 0)));
     if (this.condSel !== ativos.campo) set('[data-total-acum]', this.fmt(unidades.reduce((s, x) => s + conds.reduce((t, c) => t + this.acumulado(x, c.campo, mesAtual), 0), 0)));
     set('[data-total-media]', this.fmt(unidades.reduce((s, x) => s + conds.reduce((t, c) => t + this.media(x, c.campo), 0), 0)));
-    set('#stat-media', UI.fmt(unidades.reduce((s, x) => s + this.media(x, null), 0), 1));
-    const statCond = el.querySelector('#stat-cond');
-    if (statCond) statCond.innerHTML = this.CONDICOES.map(c => `<span>${UI.fmt(unidades.reduce((s, x) => s + this.media(x, c.campo), 0), 1)}<small> ${c.rotulo.toLowerCase()}</small></span>`).join('');
-    set('#stat-pico', Math.max(...Calculo.MESES.map((_, i) => unidades.reduce((s, x) => s + this.totalMes(x, i + 1), 0))));
   },
 };

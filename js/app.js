@@ -4,7 +4,7 @@
    ========================================================================== */
 
 const App = (() => {
-  const views = [ViewProgramacaoAnual, ViewProgramacaoMensal, ViewFila, ViewUnidades, ViewEmpresas, ViewCatalogo, ViewColaboradores, ViewFuncoes, ViewCalendario, ViewHistorico, ViewUsuarios];
+  const views = [ViewDimensionamento, ViewUnidades, ViewEmpresas, ViewCatalogo, ViewColaboradores, ViewFuncoes, ViewCalendario, ViewHistorico, ViewUsuarios];
   const content = document.getElementById('content');
   let current = null;
   let appReady = false;
@@ -31,9 +31,7 @@ const App = (() => {
 
   /** Quais papéis veem cada tela (o que não está aqui é para todos). */
   const ACESSO = {
-    'programacao-anual':  ['admin', 'leitura'],
-    'programacao-mensal': ['admin', 'leitura'],
-    fila:                 ['admin', 'leitura'],
+    dimensionamento:      ['admin', 'leitura'],
     unidades:             ['admin', 'supervisor', 'leitura'],
     empresas:             ['admin', 'supervisor', 'leitura'],
     colaboradores:        ['admin', 'supervisor', 'leitura'],

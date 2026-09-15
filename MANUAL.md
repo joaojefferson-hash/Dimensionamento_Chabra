@@ -13,7 +13,7 @@ O Chabra Dimensiona responde a três perguntas, com a equipe que a Chabra tem ho
 
 1. **Quanto a equipe produz?** Cada colaborador declara o seu ritmo por dia (inspeções, relatórios ou empresas finalizadas). O programa transforma isso em produção por mês, unidade por unidade.
 2. **Quanto trabalho existe?** Em cada unidade, mês a mês, quantos clientes têm documentos vencendo naquele mês — separados em **Mensal** e **Exclusiva TST**.
-3. **A equipe dá conta? Quantas pessoas faltam ou sobram?** As programações comparam produção e demanda e dizem, em frases simples e com sinais verde / amarelo / vermelho, se cada unidade dá conta, está no limite ou precisa contratar — e quantas pessoas. A **Fila de atendimento** mostra o acumulado (backlog) e quantas pessoas contratar para zerá-lo dentro do prazo.
+3. **A equipe dá conta? Qual o quadro ideal? Quanto fica pendente? Quantos contratar, e em qual área?** A tela **Dimensionamento** responde mês a mês, com sinais verde / amarelo / vermelho: o que já passou diz "deveria ter contratado…"; daqui para a frente, "contratar…"; e o pendente acumulado, com quantas pessoas a mais zeram tudo dentro do prazo.
 
 Tudo fica na nuvem, compartilhado pela equipe. Cada alteração de cadastro é registrada no **Histórico** (quem, quando, o que mudou).
 
@@ -27,9 +27,9 @@ O administrador cria os usuários (nome, sobrenome, e-mail, senha inicial) e esc
 |---|---|---|
 | **Administrador** | tudo | tudo; gerencia usuários; exporta/importa backup |
 | **Supervisão** | Cadastros (Unidades, Empresas por Unidade, Colaboradores, Funções, Calendário) e Histórico | os cadastros |
-| **Leitura** (diretoria, gerência, RH) | tudo: programações, fila, cadastros, histórico | nada |
+| **Leitura** (diretoria, gerência, RH) | tudo: dimensionamento, cadastros, histórico | nada |
 
-No acesso de **Leitura**, os formulários e botões que gravam ficam desligados e um aviso aparece no topo; continuam funcionando o período, o ano, os filtros, a alternância Cadastro/Organograma, a impressão e a simulação "E se…?" (tudo isso fica só no navegador de quem usa).
+No acesso de **Leitura**, os formulários e botões que gravam ficam desligados e um aviso aparece no topo; continuam funcionando o ano, o mês atual, os filtros, a alternância Cadastro/Organograma, a impressão e a simulação "E se…?" (tudo isso fica só no navegador de quem usa).
 
 A proteção não é só visual: o banco de dados recusa gravações de quem não pode editar.
 
@@ -41,18 +41,16 @@ Qualquer usuário troca a própria senha em **Senha** (rodapé do menu). Não h�
 
 | Seção | Tela | Para quê |
 |---|---|---|
-| Dimensionamento | **Programação Anual** | Um cartão por unidade (e o total): a equipe dá conta do ano/período? Quantas pessoas faltam ou sobram? |
-| Dimensionamento | **Programação Mensal** | Mês a mês, técnicos e administrativos em grades separadas: consegue × precisa e quantas pessoas faltam/sobram em cada mês. |
-| Dimensionamento | **Fila de atendimento** | O acumulado (backlog) hoje e sua evolução; quantas pessoas contratar para zerar dentro do prazo. Visão para a diretoria. |
+| Dimensionamento | **Dimensionamento** | A tela de resultado: pendentes hoje, equipe → quadro ideal, mês a mês (deveria ter contratado? contratar?), por unidade, "E se…?". |
 | Cadastros | **Unidades** | As unidades/filiais. |
 | Cadastros | **Empresas por Unidade** | Por unidade e mês: clientes ativos (informativo), Mensal e Exclusiva TST com documentos vencidos. |
 | Cadastros | **Colaboradores** | A equipe, com função, ritmo por dia e unidades onde atua. Modo **Organograma**. |
 | Cadastros | **Funções** | As funções (técnico, administrativo, supervisões, gerência), o que cada uma entrega e a hierarquia de chefia. |
-| Cadastros | **Calendário** | Dias úteis de cada mês. |
+| Cadastros | **Calendário** | Dias úteis de cada mês; folga para imprevistos e prazo para atender. |
 | Acompanhamento | **Histórico** | Tudo o que mudou nos cadastros: quem, quando, antes/depois. |
 | Administração | **Usuários** | Só admin: acessos, papéis, senhas e backup. |
 
-Configurações que ficam no **seu navegador** (não afetam os outros): ano selecionado, período (de/até), mês atual da fila, unidade escolhida, filtros, modo da tela Colaboradores, orientação de impressão e a simulação.
+Configurações que ficam no **seu navegador** (não afetam os outros): ano selecionado, mês atual, unidade escolhida, filtros, modo da tela Colaboradores, orientação de impressão e a simulação.
 
 Configurações **compartilhadas** (valem para toda a equipe, gravadas no banco): dias úteis, folga para imprevistos e prazo para atender.
 
@@ -75,9 +73,9 @@ A base da demanda. Para cada unidade há três linhas por mês (janeiro a dezemb
 
 Cada cliente do Total precisa, naquele mês, de **uma inspeção e um relatório** (técnicos) e **uma finalização** (administrativos).
 
-Como usar: digite o número em cada mês; célula vazia conta como zero; tudo salva automaticamente. O seletor **Mostrar** filtra por condição; o seletor **Ano** troca o ano (os números são por ano; dá para preencher 2027 sem mexer em 2026). "limpar 2026" apaga todos os números daquela unidade no ano. À direita, **Acumulado até [mês atual]** (soma de janeiro até o mês atual: o que venceu e ainda está em aberto + o que vence neste mês — é a "Fila hoje" da Fila de atendimento; o mês atual é o escolhido lá), **Total do ano** (soma dos 12 meses) e **Média** mensal; no rodapé, as somas de todas as unidades.
+Como usar: digite o número em cada mês; célula vazia conta como zero; tudo salva automaticamente. O seletor **Mostrar** filtra por condição; o seletor **Ano** troca o ano (os números são por ano; dá para preencher 2027 sem mexer em 2026). "limpar 2026" apaga todos os números daquela unidade no ano. À direita, **Acumulado até [mês atual]** (soma de janeiro até o mês atual: o que venceu e ainda está em aberto + o que vence neste mês — são os "Pendentes hoje" do Dimensionamento; o mês atual é o escolhido lá), **Total do ano** (soma dos 12 meses) e **Média** mensal; no rodapé, as somas de todas as unidades.
 
-> Preencha em cada mês **só os documentos que vencem naquele mês** — nos meses que já passaram, os que venceram ali e **ainda estão em aberto**. Não precisa somar o que veio de meses anteriores: o sistema acumula isso sozinho na Fila de atendimento (ver 6.3).
+> Preencha em cada mês **só os documentos que vencem naquele mês** — nos meses que já passaram, os que venceram ali e **ainda estão em aberto**. Não precisa somar o que veio de meses anteriores: o sistema acumula isso sozinho no Dimensionamento (ver 6.2).
 
 ### 4.3 Funções
 
@@ -109,6 +107,8 @@ Lista com busca, filtro por função/unidade/"só chefia" e colunas Unidades e T
 
 Dias úteis de cada mês (padrão 2026 = dias de semana menos feriados nacionais; botão para restaurar). É o que transforma ritmo por dia em produção por mês. O calendário é único, vale para todos os anos.
 
+Abaixo, os **parâmetros do dimensionamento**, compartilhados por todos: **folga para imprevistos** (%; padrão 15) e **prazo para atender** (dias; padrão 60).
+
 ---
 
 ## 5. Como as contas são feitas
@@ -122,7 +122,7 @@ produção de uma pessoa no mês = ritmo por dia × dias úteis do mês × % do 
 produção da equipe (consegue)  = soma das pessoas × (1 − folga para imprevistos)
 ```
 
-- **Folga para imprevistos** (barra das programações; padrão 15%): parte do tempo reservada a faltas, retrabalho e urgências. Com 15%, conta-se que cada pessoa entrega 85% do que declarou.
+- **Folga para imprevistos** (Calendário; padrão 15%): parte do tempo reservada a faltas, retrabalho e urgências. Com 15%, conta-se que cada pessoa entrega 85% do que declarou.
 - Técnicos têm duas entregas (inspeções e relatórios); a situação deles é a pior das duas. O que limita hoje são os relatórios (2 inspeções e 1 relatório por dia).
 
 ### 5.2 Demanda
@@ -138,51 +138,50 @@ Cada cliente exige uma inspeção, um relatório e uma finalização naquele mê
 - **Sobra** = consegue − precisa. **Dá conta** (verde) se sobra ≥ 10% do que consegue; **No limite** (amarelo) se sobra positiva mas menor que 10%; **Precisa contratar** (vermelho) se negativa.
 - **Faltam N pessoas** = quanto falta ÷ produção de uma pessoa inteira no mês (arredondado para cima). **Sobram N** = idem, para baixo.
 - No total "Todas as unidades", faltas e sobras são **somadas por unidade**: folga numa unidade não cobre falta em outra (a equipe não se desloca). Por isso o total pode "conseguir" mais do que precisa e ainda assim pedir contratação.
-- Os números de cada mês são **sempre em relação à equipe de hoje** e não somam entre si: contratar o maior valor mensal cobre todos os meses. A Programação Mensal diz isso em frase: "Contratando 2 administrativos a partir de setembro, nenhum mês do ano fica descoberto".
+- **Quadro ideal** = o que precisa no mês ÷ o que uma pessoa inteira faz no mês (com a folga), arredondado para cima. Os números de cada mês são **sempre em relação à equipe de hoje** e não somam entre si: o maior quadro ideal do ano cobre todos os meses ("Para não faltar em nenhum mês: 5 técnicos e 5 administrativos").
+- **Pendente** = o que vence no mês + o que sobrou do mês anterior − o que a equipe atende (só do mês atual em diante; nos meses passados o número lançado já é o que ficou em aberto). **Para zerar em N dias** = pessoas a mais para atender o pendente de hoje e o que vence dentro do prazo.
 
 ### 5.4 Simulação "E se…?"
 
-Card nas programações e na fila. Cada linha: unidade, grupo, pessoas (+ contratar / − desligar), **a partir de** um mês **até** outro (padrão dezembro — quem entra em setembro conta em outubro, novembro e dezembro) e ritmo por dia (sugerido pela média do grupo na unidade). Tudo recalcula na hora; as contagens mostram "(+2 simulados)". Fica só no navegador; não altera o cadastro nem o backup. Um desligamento maior que a equipe leva o grupo a zero, sem ficar negativo.
+Bloco fechado no fim do Dimensionamento. Cada linha: unidade, grupo, pessoas (+ contratar / − desligar), **a partir de** um mês **até** outro (padrão dezembro — quem entra em setembro conta em outubro, novembro e dezembro) e ritmo por dia (sugerido pela média do grupo na unidade). Tudo recalcula na hora; as contagens mostram "(+2 simulados)". Fica só no navegador; não altera o cadastro nem o backup. Um desligamento maior que a equipe leva o grupo a zero, sem ficar negativo.
 
 ---
 
-## 6. As telas de dimensionamento
+## 6. Dimensionamento (a tela de resultado)
 
-### 6.1 Programação Anual
+Uma tela só. Barra: **ano**, **mês atual** (separa o que já passou do plano; fica no seu navegador; padrão = mês do calendário) e **unidade** (ou todas). Folga, prazo e dias úteis ficam no Calendário.
 
-Barra: ano, período (de/até ou ano completo), folga. Um cartão "Todas as unidades" e um cartão por unidade, um embaixo do outro, cada um com a linha **Chefia:** (quem lidera a unidade), a demanda média por mês e dois quadros — Técnicos e Administrativos — com as frases "consegue × precisa" por entrega, o sinal de situação e a recomendação ("Faltam aproximadamente N…", "dão conta com folga — sobra o equivalente a N…"). Avisos no fim: pessoas sem unidade, tempo parcial, unidades sem gente.
+### 6.1 Hoje
 
-Se o período incluir meses que já passaram (antes do mês atual escolhido na Fila/Mensal), aparece um aviso com o atalho "veja só de [mês atual] a dezembro" (o plano) e o link para o histórico de projeção da Programação Mensal.
+Três números para o mês atual:
 
-### 6.2 Programação Mensal
+- **Pendentes hoje** — empresas em aberto: o que vence no mês + tudo o que ficou de meses anteriores ("645 ficaram de meses anteriores + 131 que vencem em setembro").
+- **Técnicos** e **Administrativos** — "11 hoje → 11 ideal em setembro": a equipe de hoje e o quadro ideal do mês; "Para zerar o pendente em 60 dias: +18 técnicos"; e quanto a equipe produz por dia. Em "Todas as unidades" pode aparecer "faltam 2 onde precisa · sobram 3 em outras unidades": cada unidade tem a sua equipe, quem sobra numa não atende a fila de outra.
 
-Barra: ano, **mês atual** (o mesmo da Fila e da coluna Acumulado), unidade, folga. A tela se divide em dois:
+### 6.2 Mês a mês
 
-- **Histórico de projeção** (meses antes do mês atual): uma linha por mês com o que venceu, o **pendente no fim do mês** (o que ficou em aberto, somando mês a mês — a mesma conta da Fila), o **quadro de técnicos e de administrativos** ("Equipe 4 · Ideal 5": a equipe de hoje e o quadro ideal, em pessoas inteiras, para dar conta do que venceu no mês; abaixo, faltam/sobram e consegue × vence) e a **conclusão** — "Deveria ter contratado 1 técnico e 2 administrativos" ou "Não precisava contratar". A frase-resumo diz ainda o quadro ideal para não faltar em nenhum desses meses e o pendente no fim do último mês. Com "Todas as unidades", cada conclusão diz em qual unidade faltava. Abaixo, a frase-resumo ("De janeiro a agosto, precisava contratar em 5 de 8 meses: técnicos em…; administrativos em…"). A projeção é feita com a equipe de hoje e com a simulação "E se…?", se houver — simule uma pessoa a partir de um mês passado para ver se teria resolvido. O que ficou em aberto nesses meses está na Fila de atendimento.
-- **Plano** (do mês atual a dezembro): uma grade para Técnicos e outra para Administrativos: por mês, dias úteis, clientes, equipe, **Ideal** (quadro ideal do mês, em pessoas inteiras), consegue × precisa por entrega, **Faltam / sobram**, **Pendentes no fim do mês** (o que fica em aberto: veio de antes + vence − atendidas, como na Fila) e situação; rodapé com o período (ideal = o maior dos meses; pendentes = dezembro). Abaixo, a frase do período e a leitura mês a mês. Com "Todas as unidades", uma grade unidade × mês com os sinais do grupo e faltam/sobram por unidade — clique numa unidade para ver o detalhe.
+Uma tabela com os 12 meses do ano selecionado:
 
-Com o mês atual em janeiro não há histórico e o plano é o ano inteiro.
+| Coluna | O que é |
+|---|---|
+| Vencem | Clientes Mensal + Exclusiva TST que vencem no mês (Empresas por Unidade). |
+| Pendente no fim do mês | O que fica em aberto: o que veio de antes + o que vence − o que a equipe atende. Nos meses passados o número lançado já é o que ficou em aberto, então só soma. |
+| Técnicos / Administrativos (hoje → ideal) | Equipe de hoje → quadro ideal do mês (pessoas inteiras para dar conta do que vence). Vermelho quando falta gente. Passe o mouse para ver inspeções, relatórios e dias úteis. |
+| Conclusão | Meses passados: "Deveria ter contratado 1 técnico e 2 administrativos" ou "Não precisava contratar". Mês atual e seguintes: "Contratar…" ou "Dá conta" (· no limite). Em "Todas as unidades", diz em qual unidade. |
 
-### 6.3 Fila de atendimento
+Linha do rodapé: total que vence no ano, pendente em dezembro sem contratar, o maior quadro ideal do ano e "Para não faltar em nenhum mês: N técnicos e N administrativos". A linha do mês atual fica em negrito; os meses passados, esmaecidos.
 
-Barra: ano, período, **mês atual**, unidade, **prazo para atender** (dias; padrão 60; compartilhado) e folga.
+Como o pendente é montado, do primeiro mês em diante: pendentes = sobra do mês anterior + o que vence. Nos **meses passados**, o número lançado é o que venceu e **ainda está em aberto** — a equipe já trabalhou de verdade e o que sobrou é esse número; por isso nada é descontado e tudo passa adiante. Do **mês atual em diante**, a equipe atende o que consegue (o que limita: nos técnicos, a menor entre inspeções e relatórios) e o resto passa para o mês seguinte. Mudar o número de um mês recalcula os seguintes.
 
-Como a fila é montada (por unidade e grupo), do primeiro mês com número em diante:
+### 6.3 Por unidade
 
-- **Pendentes** do mês = o que sobrou do mês anterior + o número lançado (o que vence no mês). Vale para todos os meses.
-- **Meses passados**: o número lançado já é o que venceu ali e **ainda está em aberto** — a equipe já trabalhou de verdade e o que sobrou é esse número. Por isso o programa não desconta a produção da equipe de novo: tudo passa para o mês seguinte e vai somando até hoje.
-- **Mês atual e seguintes**: **Atendidas** = o menor entre os pendentes e o que a equipe consegue no mês; **Ficam pendentes** = pendentes − atendidas (nunca negativo), que passa para o mês seguinte.
+Com "Todas as unidades": uma linha por unidade com os pendentes de hoje, técnicos e administrativos (hoje → ideal, e "+N para zerar em 60 dias") e a conclusão do mês atual. Clique numa unidade para ver o mês a mês dela.
 
-Mudar o número de um mês recalcula todos os seguintes. Exemplo: janeiro 25 e fevereiro 28 em aberto → em março já há 53 acumulados mais o que vence em março. A **Fila hoje** é o acumulado do mês atual (o que vence no mês + tudo o que ficou em aberto dos anteriores); logo abaixo do número aparece "Desse total, X vieram de meses anteriores ainda não atendidos".
+### 6.4 "E se…?"
 
-Para cada grupo:
+Fica fechado no fim da tela; abre num clique. Cada linha: unidade, grupo, pessoas (+ contratar / − desligar), a partir de um mês até outro (padrão dezembro) e ritmo por dia. Tudo recalcula na hora — inclusive os meses passados, para testar "se eu tivesse contratado em fevereiro". Fica só no navegador; quando há simulação ativa, o bloco abre sozinho e mostra o que está sendo simulado.
 
-- Indicadores de hoje: **Produção por dia** (por entrega, com o gargalo), **Fila hoje**, **Vencem até o prazo**, **Contratar para cumprir o prazo** (pessoas a mais para zerar fila + o que vence dentro do prazo) e **Fila em dezembro** sem contratar.
-- Indicadores do período: **A atender** (pendentes + o que vence, do mês atual em diante), **Equipe consegue**, **Contratar até [mês final]**, **Fila no fim**.
-- Frases prontas com tudo isso; gráfico da fila no fim de cada mês; tabela mês a mês (Vencem no mês · Pendentes · Consegue · Atendidas · Ficam pendentes · Situação) e, com todas as unidades, a grade por unidade (equipe, fila hoje, contratar em N dias, contratar até o fim do período e pendentes no fim de cada mês).
-- Situação do mês: **dá conta** = zerado no fim do mês; **no limite** = fica menos de um mês de trabalho; **precisa contratar** = fica mais de um mês de trabalho (prazo em risco).
-
-Empresas novas: cada uma tem 60 dias para receber os documentos; é só somá-la ao número do mês em que esse prazo vence.
+No fim da tela aparecem avisos de cadastro (pessoas sem unidade, tempo parcial, unidades sem gente).
 
 ---
 
@@ -202,8 +201,8 @@ Tela Usuários (admin) → **Backup dos dados**: **Exportar JSON** baixa tudo (f
 
 1. **Todo mês**: em Empresas por Unidade, lançar em cada unidade os clientes ativos e quantos Mensal e Exclusiva TST **vencem no mês** (só o do mês; o acumulado o programa calcula) — e, se souber, o que vence nos próximos meses.
 2. Manter Colaboradores em dia: quem entrou/saiu, ritmo por dia, unidades e percentuais.
-3. Conferir na **Programação Mensal** onde faltam pessoas e na **Fila de atendimento** o acumulado e o prazo.
-4. Para a diretoria: Fila de atendimento (mês atual + prazo de 60 dias), com a simulação "E se…?" para testar contratações antes de decidir.
+3. Conferir no **Dimensionamento**: pendentes hoje, quadro ideal por área, quantos contratar para zerar no prazo e em qual unidade.
+4. Para a diretoria: a mesma tela, com a simulação "E se…?" para testar contratações antes de decidir.
 5. De tempos em tempos, exportar um backup.
 
 ---
@@ -222,7 +221,7 @@ Tela Usuários (admin) → **Backup dos dados**: **Exportar JSON** baixa tudo (f
 | Pessoa inteira | Uma pessoa 100% do tempo. Quem divide o tempo conta proporcionalmente (ex.: 2,8 pessoas). |
 | Fila / pendentes | O que vence no mês + o que sobrou dos meses anteriores sem atender. |
 | Prazo para atender | Dias que uma empresa tem para receber os documentos depois de vencer (padrão 60). |
-| Chefia | Função que lidera pessoas; aparece nos cartões e no organograma. |
+| Chefia | Função que lidera pessoas; aparece no Dimensionamento e no organograma. |
 | Simulação | Pessoas a mais/menos só para testar; não altera o cadastro. |
 
 ---
