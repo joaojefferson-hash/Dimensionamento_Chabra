@@ -1,7 +1,8 @@
 <script setup>
-/* Dashboard — os mesmos números do Dimensionamento, em gráficos:
-   pendentes mês a mês · vencem × equipe consegue · equipe hoje × ideal · por unidade · custo. */
-import { computed } from 'vue';
+/* Dashboard — os mesmos números do Dimensionamento, em gráficos, sempre de UMA unidade
+   (sem o total "Todas as unidades", para não confundir): pendentes mês a mês · vencem × equipe
+   consegue · equipe hoje × ideal · custo. */
+import { computed, watch } from 'vue';
 import Calculo from '../engine/calculo.js';
 import BarraOpcoes from '../components/BarraOpcoes.vue';
 import Grafico from '../components/ui/Grafico.vue';
@@ -15,15 +16,19 @@ const pref = usePreferenciasStore();
 const dim = useDimensionamentoStore();
 const TEC = Calculo.TEC, ADM = Calculo.ADM;
 
+// sempre uma unidade: sem escolha (ou "Todas"), usa a primeira do cadastro
+watch(() => [cad.unidades.length, pref.unidadeSel], () => {
+  if (cad.unidades.length && !cad.unidades.some(u => u.id === pref.unidadeSel)) pref.unidadeSel = cad.unidades[0].id;
+}, { immediate: true });
+
 /* Cores: identidade fixa por série (nunca por posição) */
 const COR = {
   pendente: '#c8781e', pendentePassado: 'rgba(200, 120, 30, .45)', pendenteHoje: '#8f1d17',
   vencem: '#e0a800',
   tecnicos: '#006b54', tecnicosClaro: 'rgba(0, 107, 84, .35)',
   administrativos: '#274b8f', administrativosClaro: 'rgba(39, 75, 143, .35)',
-  ok: '#2f9e6b', atencao: '#e0a800', deficit: '#c0392b',
+  deficit: '#c0392b',
 };
-const corStatus = s => (s === 'deficit' ? COR.deficit : s === 'atencao' ? COR.atencao : COR.ok);
 const meses = computed(() => dim.alvo.meses);
 const rotulos = MESES.map((m, i) => m);
 const barra = { borderRadius: 4, borderSkipped: false, maxBarThickness: 34 };
@@ -59,23 +64,6 @@ const gEquipe = f => computed(() => ({
 const gTec = gEquipe(TEC), gAdm = gEquipe(ADM);
 const oEquipe = { scales: { y: { ticks: { precision: 1 } } }, plugins: { tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${numFte(c.parsed.y)}` } } } };
 
-/* 4. Por unidade (quando "Todas"): pendentes hoje e contratar para zerar no prazo */
-const unidades = computed(() => (dim.varias ? dim.resultado.unidades : []));
-const gUnidadesPendentes = computed(() => ({
-  labels: unidades.value.map(u => u.nome),
-  datasets: [{ label: 'Pendentes hoje', data: unidades.value.map(u => dim.fila.unidades.find(x => x.id === u.id).grupos[TEC].meses[pref.mesAtual].pendentes), ...barra,
-    backgroundColor: unidades.value.map(u => corStatus(u.meses[pref.mesAtual].status)) }],
-}));
-const gUnidadesContratar = computed(() => ({
-  labels: unidades.value.map(u => u.nome),
-  datasets: [
-    { label: 'Técnicos', data: unidades.value.map(u => dim.fila.unidades.find(x => x.id === u.id).grupos[TEC].resumo.pessoasPrazo), backgroundColor: COR.tecnicos, ...barra },
-    { label: 'Administrativos', data: unidades.value.map(u => dim.fila.unidades.find(x => x.id === u.id).grupos[ADM].resumo.pessoasPrazo), backgroundColor: COR.administrativos, ...barra },
-  ],
-}));
-const oHorizontal = { indexAxis: 'y', scales: { x: { beginAtZero: true, grid: { color: '#eef1f0' }, border: { display: false }, ticks: { precision: 0 } }, y: { grid: { display: false }, border: { color: '#dfe5e2' } } } };
-const oHorizontalEmpilhado = { ...oHorizontal, scales: { x: { ...oHorizontal.scales.x, stacked: true }, y: { ...oHorizontal.scales.y, stacked: true } } };
-
 /* 5. Custo (quando há custo cadastrado) */
 const gCusto = computed(() => ({
   labels: rotulos,
@@ -93,10 +81,10 @@ const p = computed(() => cad.parametros);
 <template>
   <header class="page-header">
     <h1>Dashboard</h1>
-    <p>Os números do Dimensionamento em gráficos — {{ dim.titulo }}, {{ pref.ano }}. Passe o mouse para ver os valores; a tabela completa está no Dimensionamento.</p>
+    <p>Os números do Dimensionamento em gráficos, uma unidade por vez — {{ dim.titulo }}, {{ pref.ano }}. Passe o mouse para ver os valores; a tabela completa está no Dimensionamento.</p>
   </header>
 
-  <BarraOpcoes />
+  <BarraOpcoes sem-todas />
 
   <section v-if="cad.unidades.length === 0" class="card"><p class="muted">Cadastre unidades, empresas por unidade e colaboradores para ver os gráficos.</p></section>
   <template v-else>
@@ -124,16 +112,6 @@ const p = computed(() => cad.parametros);
         <div class="card-head"><div><h2>Administrativos: equipe hoje × quadro ideal</h2><div class="muted text-[13px]">Ideal em vermelho = falta gente naquele mês.</div></div></div>
         <Grafico type="bar" :data="gAdm" :options="oEquipe" :height="220" />
       </section>
-      <template v-if="dim.varias">
-        <section class="card">
-          <div class="card-head"><div><h2>Pendentes hoje, por unidade</h2><div class="muted text-[13px]">Cor = situação da unidade em {{ mesMin(pref.mesAtual) }}.</div></div></div>
-          <Grafico type="bar" :data="gUnidadesPendentes" :options="oHorizontal" :height="40 + unidades.length * 34" />
-        </section>
-        <section class="card">
-          <div class="card-head"><div><h2>Contratar para zerar em {{ p.prazoDias }} dias, por unidade</h2><div class="muted text-[13px]">Pessoas a mais para zerar o pendente de hoje e o que vence dentro do prazo.</div></div></div>
-          <Grafico type="bar" :data="gUnidadesContratar" :options="oHorizontalEmpilhado" :height="40 + unidades.length * 34" />
-        </section>
-      </template>
       <section v-if="dim.temCusto" class="card xl:col-span-2">
         <div class="card-head"><div><h2>Impacto em R$, mês a mês</h2><div class="muted text-[13px]">Custo mensal de contratar quem falta e custo das pessoas inteiras que sobram (salário + encargos das Funções).</div></div></div>
         <Grafico type="bar" :data="gCusto" :options="oCusto" />

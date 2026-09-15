@@ -5,6 +5,7 @@ import { useCadastrosStore } from '../stores/cadastros.js';
 import { usePreferenciasStore } from '../stores/preferencias.js';
 import { MESES_LONGO } from '../composables/useFormat.js';
 
+const props = defineProps({ semTodas: { type: Boolean, default: false } }); // sem a opção "Todas as unidades"
 const cad = useCadastrosStore();
 const pref = usePreferenciasStore();
 const anos = computed(() => cad.anosDisponiveis(pref.ano));
@@ -27,7 +28,7 @@ const anos = computed(() => cad.anosDisponiveis(pref.ano));
     <label class="text-[12px]">
       <span class="mb-1 block font-semibold uppercase tracking-wider text-muted">Unidade</span>
       <select v-model="pref.unidadeSel" class="input input-sm">
-        <option value="">Todas as unidades</option>
+        <option v-if="!props.semTodas" value="">Todas as unidades</option>
         <option v-for="u in cad.unidades" :key="u.id" :value="u.id">{{ u.nome }}</option>
       </select>
     </label>
