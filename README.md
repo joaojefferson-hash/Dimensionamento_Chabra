@@ -164,7 +164,7 @@ js/views/historico.js       tela Histórico de alterações
 js/calculo.js           motor de dimensionamento (puro)
 js/programacao.js       utilitários das telas de programação (janela, barra, formatação)
 js/app.js               inicialização, navegação por hash (#/unidades …), badges, backup
-supabase/migrations/    SQL do banco (0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico, 0012 = funções cadastráveis, 0013 = chefia, 0014 = coordena/responde_para, 0015 = situação da documentação no lugar do grau, 0016 = só documentos vencidos, 0017 = prazo para atender, 0018 = papéis na RLS)
+supabase/migrations/    SQL do banco (0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico, 0012 = funções cadastráveis, 0013 = chefia, 0014 = coordena/responde_para, 0015 = situação da documentação no lugar do grau, 0016 = só documentos vencidos, 0017 = prazo para atender, 0018 = papéis na RLS, 0019 = ano nos valores por mês)
 supabase/functions/usuarios/index.ts   Edge Function de gestão de usuários (chave secreta só no servidor)
 ```
 
@@ -180,12 +180,14 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
 | `funcoes`       | `id, nome (único), tipo_producao (tecnico/administrativo/nenhuma), chefia (bool), coordena (todos/tecnicos/administrativos), responde_para → funcoes, ordem` |
 | `colaboradores` | `id, nome, funcao_id → funcoes, empresas_dia, inspecoes_dia, relatorios_dia` (ritmo por dia) |
 | `colaborador_unidades` | `colaborador_id, unidade_id, percentual (0–100; soma por colaborador ≤ 100, gatilho)` |
-| `unidade_empresas_mes` | `unidade_id, mes (1–12), empresas_vencidas` — exceção mensal; sem linha = padrão |
+| `unidade_empresas_mes` | `unidade_id, ano, mes (1–12), empresas_vencidas` — valor próprio do mês naquele ano; sem linha = padrão |
 | `parametros`    | linha única: `dias_uteis[12], ocupacao_alvo, prazo_dias` |
 
 - `periodicidade_meses = 0` significa **sob demanda** (documento sem renovação periódica).
-- A quantidade de empresas com documentos vencidos pode **variar por mês**: o campo da unidade
-  é o padrão e a tabela `unidade_empresas_mes` guarda as exceções. O motor
+- A quantidade de empresas com documentos vencidos pode **variar por mês e por ano**: o campo
+  da unidade é o padrão (vale para todos os anos) e a tabela `unidade_empresas_mes` guarda os
+  valores próprios por ano/mês. O **ano selecionado** (seletor em Empresas por Unidade e na
+  barra das programações/fila; fica no navegador, `Store.ano`) define `u.meses`. O motor
   usa a quantidade de cada mês na demanda; a Programação Anual mostra a média na janela
   e marca "varia".
 - Um colaborador pode atuar em várias unidades: `alocacoes = [{ unidadeId, percentual }]`.
@@ -193,8 +195,8 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
   menor que 100% (o restante é "não alocado" e não conta) mas nunca maior. Salvo pela RPC
   `definir_alocacoes(colaborador, jsonb)` numa transação.
 - No JS/backup as chaves são camelCase (`periodicidadeMeses`, `horasMes`, `empresasBaixo`…);
-  o backup v8 inclui `funcoes[{nome, tipoProducao, chefia, coordena, respondePara (nome), ordem}]`, `parametros`,
-  `empresasVencidas` + `empresasPorMes[{mes, empresasVencidas}]` nas unidades e `alocacoes[{unidadeNome, percentual}]`
+  o backup v9 inclui `funcoes[{nome, tipoProducao, chefia, coordena, respondePara (nome), ordem}]`, `parametros`,
+  `empresasVencidas` + `empresasPorMes[{ano, mes, empresasVencidas}]` nas unidades (sem `ano` → ano corrente) e `alocacoes[{unidadeNome, percentual}]`
   + `funcao` (nome) nos colaboradores (a importação resolve unidade e função pelo nome;
   função desconhecida → função técnica padrão; funções do backup são criadas/atualizadas,
   nunca apagadas). Backups antigos: `empresasVencendo + empresasAVencer` → vencidas;
