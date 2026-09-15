@@ -75,7 +75,7 @@ A base da demanda. Para cada unidade há três linhas por mês (janeiro a dezemb
 
 Cada cliente do Total precisa, naquele mês, de **uma inspeção e um relatório** (técnicos) e **uma finalização** (administrativos).
 
-Como usar: digite o número em cada mês; célula vazia conta como zero; tudo salva automaticamente. O seletor **Mostrar** filtra por condição; o seletor **Ano** troca o ano (os números são por ano; dá para preencher 2027 sem mexer em 2026). "limpar 2026" apaga todos os números daquela unidade no ano. À direita, **Total do ano** (soma dos 12 meses) e **Média** mensal; no rodapé, as somas de todas as unidades.
+Como usar: digite o número em cada mês; célula vazia conta como zero; tudo salva automaticamente. O seletor **Mostrar** filtra por condição; o seletor **Ano** troca o ano (os números são por ano; dá para preencher 2027 sem mexer em 2026). "limpar 2026" apaga todos os números daquela unidade no ano. À direita, **Acumulado até [mês atual]** (soma de janeiro até o mês atual: o que venceu e ainda está em aberto + o que vence neste mês — é a "Fila hoje" da Fila de atendimento; o mês atual é o escolhido lá), **Total do ano** (soma dos 12 meses) e **Média** mensal; no rodapé, as somas de todas as unidades.
 
 > Preencha em cada mês **só os documentos que vencem naquele mês** — nos meses que já passaram, os que venceram ali e **ainda estão em aberto**. Não precisa somar o que veio de meses anteriores: o sistema acumula isso sozinho na Fila de atendimento (ver 6.3).
 

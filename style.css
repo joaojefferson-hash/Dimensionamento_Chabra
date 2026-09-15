@@ -960,3 +960,11 @@ form.busy { opacity: .7; pointer-events: none; }
 .table-matriz tfoot tr:first-child th { box-shadow: inset 0 1px 0 #cfd8d3; } /* linha de grade superior, abaixo da faixa de respiro */
 
 .stat .stat-detalhe { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.35; }
+
+/* matriz: acumulado até o mês atual (= fila hoje) e marcação dos meses passados/atual */
+.table-matriz .col-acum { font-weight: 600; background: #fff7e6; border-left: 1px solid var(--border); text-align: center; }
+.table-matriz th.col-acum { white-space: nowrap; color: #8a5a00; }
+.table-matriz tfoot th.col-acum { background: #ffedcc; color: #8a5a00; }
+.table-matriz tr.linha-informativa td.col-acum { font-weight: 400; }
+.table-matriz thead th.th-mes-passado { color: var(--text-muted); }
+.table-matriz thead th.th-mes-atual { color: var(--primary-dark); text-decoration: underline; text-underline-offset: 3px; }

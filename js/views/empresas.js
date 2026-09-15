@@ -4,8 +4,8 @@
    Mensal e Exclusiva TST (as duas exigem o atendimento completo: inspeção,
    relatório e finalização — a separação é para enxergar cada uma).
 
-   Por unidade e condição: Jan … Dez | Total do ano | Média, mais a linha Total
-   da unidade. Digitar num mês grava o valor daquele mês (as outras linhas do
+   Por unidade e condição: Jan … Dez | Acumulado até o mês atual (= Fila hoje) |
+   Total do ano | Média, mais a linha Total da unidade. Digitar num mês grava o valor daquele mês (as outras linhas do
    mês ficam como estão); célula vazia conta como zero. Tudo salva
    automaticamente. (O "padrão" da unidade continua existindo no modelo, mas
    não aparece: fica em zero.)
@@ -27,12 +27,17 @@ const ViewEmpresas = {
   totalMes(u, mes) { return this.CONDICOES.reduce((s, c) => s + this.efetivo(u, mes, c.campo), 0); },
   somaAno(u, campo) { let s = 0; for (let m = 1; m <= 12; m++) s += campo ? this.efetivo(u, m, campo) : this.totalMes(u, m); return s; },
   media(u, campo) { return this.somaAno(u, campo) / 12; },
+  /** Acumulado até o mês atual (0..11): soma de janeiro até esse mês — o que venceu e ainda está em aberto + o que vence neste mês (= Fila hoje). */
+  acumulado(u, campo, mesAtual) { let s = 0; for (let m = 1; m <= mesAtual + 1; m++) s += campo ? this.efetivo(u, m, campo) : this.totalMes(u, m); return s; },
   fmt(v) { return Number.isInteger(v) ? String(v) : UI.fmt(v, 1); },
 
   render(el) {
     const unidades = Store.unidades.list();
     const MESES = Calculo.MESES;
     const ano = Store.ano;
+    const mesAtual = Programacao.lerMesAtual(); // o mesmo "mês atual" da Fila de atendimento
+    const mesAtualNome = MESES[mesAtual];
+    const tituloAcum = `Soma de janeiro até ${Calculo.MESES_LONGO[mesAtual].toLowerCase()}: o que venceu e ainda está em aberto nos meses passados + o que vence neste mês. É a "Fila hoje" da Fila de atendimento (mês atual escolhido lá).`;
     const conds = this.condSel === 'todas' ? this.CONDICOES : this.CAMPOS.filter(c => c.campo === this.condSel);
     const mostrarTotal = this.condSel === 'todas';
     const nExc = u => Object.keys(u.meses || {}).length;
@@ -56,6 +61,7 @@ const ViewEmpresas = {
         <td class="col-grau"><span class="chip-grau ${c.classe}" title="${c.ajuda}">${c.rotulo}</span></td>
         ${MESES.map((m, i) => { const mes = i + 1; const exc = (u.meses || {})[mes]; return `
           <td class="${exc ? 'cel-excecao' : ''}"><input type="number" class="input input-sm input-num input-mes" min="0" step="1" inputmode="numeric" data-id="${u.id}" data-mes="${mes}" data-campo="${c.campo}" value="${exc ? (exc[c.campo] || 0) : ''}" placeholder="${u[c.campo] || '–'}" aria-label="${UI.esc(u.nome)} ${c.rotulo} — ${Calculo.MESES_LONGO[i]}"></td>`; }).join('')}
+        <td class="col-acum" data-acum>${informativo ? '<span class="muted">—</span>' : this.fmt(this.acumulado(u, c.campo, mesAtual))}</td>
         <td class="col-soma" data-soma>${this.fmt(this.somaAno(u, c.campo))}</td>
         <td class="col-media" data-media>${this.fmt(this.media(u, c.campo))}</td>
       </tr>`;
@@ -64,6 +70,7 @@ const ViewEmpresas = {
       <tr class="linha-total-unidade" data-unidade="${u.id}" data-total>
         <td class="col-grau"><strong>Total</strong></td>
         ${MESES.map((m, i) => `<td data-mes-total="${i + 1}"><strong>${this.totalMes(u, i + 1)}</strong></td>`).join('')}
+        <td class="col-acum" data-acum><strong>${this.fmt(this.acumulado(u, null, mesAtual))}</strong></td>
         <td class="col-soma" data-soma><strong>${this.fmt(this.somaAno(u, null))}</strong></td>
         <td class="col-media" data-media><strong>${this.fmt(this.media(u, null))}</strong></td>
       </tr>`;
@@ -111,7 +118,8 @@ const ViewEmpresas = {
               <tr>
                 <th class="col-nome">Unidade</th>
                 <th class="col-grau">Condição</th>
-                ${MESES.map(m => `<th>${m}</th>`).join('')}
+                ${MESES.map((m, i) => `<th class="${i < mesAtual ? 'th-mes-passado' : i === mesAtual ? 'th-mes-atual' : ''}" title="${i < mesAtual ? 'Mês passado: o que venceu e ainda está em aberto' : i === mesAtual ? 'Mês atual' : ''}">${m}</th>`).join('')}
+                <th class="col-acum" title="${UI.esc(tituloAcum)}">Acumulado até ${mesAtualNome.toLowerCase()}</th>
                 <th class="col-soma" title="Soma dos 12 meses de ${ano}">Total ${ano}</th>
                 <th class="col-media" title="Média dos 12 meses">Média</th>
               </tr>
@@ -129,19 +137,21 @@ const ViewEmpresas = {
               <tr class="linha-informativa">
                 <th class="col-nome" colspan="2">${ativos.rotulo} (todas)</th>
                 ${MESES.map((m, i) => `<th data-ativos-mes="${i + 1}">${this.fmt(somaAtivosMes(i + 1))}</th>`).join('')}
+                <th class="col-acum"><span class="muted">—</span></th>
                 <th class="col-soma" data-ativos-soma>${this.fmt(unidades.reduce((s, u) => s + this.somaAno(u, ativos.campo), 0))}</th>
                 <th class="col-media" data-ativos-media>${this.fmt(mediaAtivos)}</th>
               </tr>` : ''}
               <tr>
                 <th class="col-nome" colspan="2">${this.condSel === ativos.campo ? `${ativos.rotulo} (todas)` : 'Total das unidades'}</th>
                 ${MESES.map((m, i) => `<th data-total-mes="${i + 1}">${this.fmt(somaMes(i + 1))}</th>`).join('')}
+                <th class="col-acum" data-total-acum>${this.condSel === ativos.campo ? '<span class="muted">—</span>' : this.fmt(unidades.reduce((s, u) => s + conds.reduce((t, c) => t + this.acumulado(u, c.campo, mesAtual), 0), 0))}</th>
                 <th class="col-soma" data-total-soma>${this.fmt(somaAnoTodas)}</th>
                 <th class="col-media" data-total-media>${this.fmt(somaMedia)}</th>
               </tr>
             </tfoot>
           </table>
         </div>
-        <p class="note">A programação usa a soma das duas condições (Mensal + Exclusiva TST) em cada mês: para cada cliente que vence, a equipe precisa fazer uma inspeção, um relatório e uma finalização. O que ficou em aberto vai somando mês a mês — isso aparece na <strong>Fila de atendimento</strong>, não aqui. <strong>Clientes ativos</strong> é só o registro de quantos clientes a unidade tinha no mês.</p>
+        <p class="note">A programação usa a soma das duas condições (Mensal + Exclusiva TST) em cada mês: para cada cliente que vence, a equipe precisa fazer uma inspeção, um relatório e uma finalização. O que ficou em aberto vai somando mês a mês: a coluna <strong>Acumulado até ${mesAtualNome.toLowerCase()}</strong> é essa soma de janeiro até o mês atual (a "Fila hoje" da <strong>Fila de atendimento</strong>, onde o mês atual é escolhido). <strong>Clientes ativos</strong> é só o registro de quantos clientes a unidade tinha no mês.</p>
       </section>`}
     `;
 
@@ -209,6 +219,7 @@ const ViewEmpresas = {
     const unidades = Store.unidades.list();
     const u = unidades.find(x => x.id === unidadeId);
     const ano = Store.ano;
+    const mesAtual = Programacao.lerMesAtual();
     if (u) {
       el.querySelectorAll(`tr[data-unidade="${unidadeId}"][data-campo]`).forEach(tr => {
         const campo = tr.dataset.campo;
@@ -220,10 +231,12 @@ const ViewEmpresas = {
         });
         tr.querySelector('[data-media]').textContent = this.fmt(this.media(u, campo));
         tr.querySelector('[data-soma]').textContent = this.fmt(this.somaAno(u, campo));
+        if (!tr.classList.contains('linha-informativa')) tr.querySelector('[data-acum]').textContent = this.fmt(this.acumulado(u, campo, mesAtual));
       });
       const trTotal = el.querySelector(`tr[data-unidade="${unidadeId}"][data-total]`);
       if (trTotal) {
         for (let m = 1; m <= 12; m++) trTotal.querySelector(`[data-mes-total="${m}"]`).innerHTML = `<strong>${this.totalMes(u, m)}</strong>`;
+        trTotal.querySelector('[data-acum]').innerHTML = `<strong>${this.fmt(this.acumulado(u, null, mesAtual))}</strong>`;
         trTotal.querySelector('[data-soma]').innerHTML = `<strong>${this.fmt(this.somaAno(u, null))}</strong>`;
         trTotal.querySelector('[data-media]').innerHTML = `<strong>${this.fmt(this.media(u, null))}</strong>`;
       }
@@ -239,6 +252,7 @@ const ViewEmpresas = {
     set('#stat-ativos', UI.fmt(unidades.reduce((s, x) => s + this.media(x, ativos.campo), 0), 1));
     for (let m = 1; m <= 12; m++) set(`[data-total-mes="${m}"]`, this.fmt(unidades.reduce((s, x) => s + conds.reduce((t, c) => t + this.efetivo(x, m, c.campo), 0), 0)));
     set('[data-total-soma]', this.fmt(unidades.reduce((s, x) => s + conds.reduce((t, c) => t + this.somaAno(x, c.campo), 0), 0)));
+    if (this.condSel !== ativos.campo) set('[data-total-acum]', this.fmt(unidades.reduce((s, x) => s + conds.reduce((t, c) => t + this.acumulado(x, c.campo, mesAtual), 0), 0)));
     set('[data-total-media]', this.fmt(unidades.reduce((s, x) => s + conds.reduce((t, c) => t + this.media(x, c.campo), 0), 0)));
     set('#stat-media', UI.fmt(unidades.reduce((s, x) => s + this.media(x, null), 0), 1));
     const statCond = el.querySelector('#stat-cond');
