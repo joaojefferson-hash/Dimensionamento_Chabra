@@ -938,3 +938,8 @@ form.busy { opacity: .7; pointer-events: none; }
 .table-matriz td, .table-matriz th { text-align: center; }
 .table-matriz .col-soma, .table-matriz .col-media { text-align: center; }
 .table-matriz tr.linha-total-unidade td strong { display: inline-block; min-width: 52px; }
+
+/* fila: segunda linha de indicadores (período) */
+.stats-periodo { margin-top: -8px; }
+.stats-periodo .stat { background: #f7f9f8; }
+.stat-rotulo .value { font-size: 15px; color: var(--text); }

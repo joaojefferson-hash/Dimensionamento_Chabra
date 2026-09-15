@@ -381,10 +381,31 @@ const Calculo = (() => {
        pessoasPrazo = pessoas a contratar para zerar isso dentro do prazo
      ---------------------------------------------------- */
 
-  function fila(resultado, { mesAtual = 0, prazoMeses = 2 } = {}) {
+  function fila(resultado, { mesAtual = 0, prazoMeses = 2, periodo = null } = {}) {
     const t = clampMes(mesAtual, 0);
     const pm = Math.max(1, Math.round(n(prazoMeses)) || 1);
     const nomeMes = i => MESES_LONGO[i];
+    const pDe = clampMes(periodo && periodo.de, 0), pAte = clampMes(periodo && periodo.ate, 11);
+    const per = { de: Math.min(pDe, pAte), ate: Math.max(pDe, pAte) };
+
+    /** Resumo de um trecho de meses (período escolhido): fila no início, entradas, o que a equipe consegue, fila no fim, pessoas. */
+    const resumoPeriodo = meses => {
+      const trecho = meses.slice(per.de, per.ate + 1);
+      const soma = campo => trecho.reduce((s, m) => s + m[campo], 0);
+      const filaInicio = trecho.length ? trecho[0].filaInicio : 0;
+      const filaFim = trecho.length ? trecho[trecho.length - 1].filaFim : 0;
+      const entram = soma('entram'), consegue = soma('consegue'), atendidas = soma('atendidas');
+      const producaoPessoa = soma('producaoPessoa');
+      const falta = Math.max(0, filaInicio + entram - consegue);
+      const sobra = Math.max(0, consegue - (filaInicio + entram));
+      return {
+        de: per.de, ate: per.ate, nMeses: trecho.length,
+        filaInicio, entram, consegue, atendidas, filaFim, falta,
+        pessoas: falta > 1e-9 && producaoPessoa > 0 ? Math.ceil(falta / producaoPessoa - 1e-9) : 0,
+        pessoasSobram: sobra > 1e-9 && producaoPessoa > 0 ? Math.floor(sobra / producaoPessoa + 1e-9) : 0,
+        status: trecho.length ? piorStatus(trecho.map(m => m.status)) : 'ok',
+      };
+    };
 
     const filaGrupo = (item, f) => {
       const entregas = ENTREGAS_DA_FUNCAO[f];
@@ -410,7 +431,7 @@ const Calculo = (() => {
           status: filaFim <= 1e-9 ? 'ok' : filaFim <= entram + 1e-9 ? 'atencao' : 'deficit',
         };
       });
-      return { meses, resumo: resumoFila(meses, f) };
+      return { meses, resumo: resumoFila(meses, f), periodo: resumoPeriodo(meses) };
     };
 
     const resumoFila = (meses, f) => {
@@ -466,10 +487,14 @@ const Calculo = (() => {
       resumo.pessoasPrazo = unidades.reduce((s, u) => s + u.grupos[f].resumo.pessoasPrazo, 0);
       resumo.pessoasSobram = unidades.reduce((s, u) => s + u.grupos[f].resumo.pessoasSobram, 0);
       resumo.faltaPrazo = unidades.reduce((s, u) => s + u.grupos[f].resumo.faltaPrazo, 0);
-      grupos[f] = { meses, resumo };
+      const periodoTotal = resumoPeriodo(meses);
+      periodoTotal.pessoas = unidades.reduce((s, u) => s + u.grupos[f].periodo.pessoas, 0);
+      periodoTotal.pessoasSobram = unidades.reduce((s, u) => s + u.grupos[f].periodo.pessoasSobram, 0);
+      periodoTotal.falta = unidades.reduce((s, u) => s + u.grupos[f].periodo.falta, 0);
+      grupos[f] = { meses, resumo, periodo: periodoTotal };
     });
 
-    return { mesAtual: t, prazoMeses: pm, unidades, total: { grupos } };
+    return { mesAtual: t, prazoMeses: pm, periodo: per, unidades, total: { grupos } };
   }
 
   return {

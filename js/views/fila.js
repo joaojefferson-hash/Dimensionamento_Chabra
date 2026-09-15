@@ -17,6 +17,7 @@ const ViewFila = {
 
   render(el) {
     const mesAtual = Programacao.lerMesAtual();
+    const janela = Programacao.lerJanela();
     const filtros = Programacao.lerFiltros();
     const unidades = Store.unidades.list();
     const unidadeSel = unidades.some(u => u.id === filtros.unidade) ? filtros.unidade : '';
@@ -24,7 +25,9 @@ const ViewFila = {
     const prazoMeses = Math.max(1, Math.round(p.prazoDias / 30));
     const simulacoes = Programacao.lerSimulacao();
     const r = Calculo.calcular({ unidades, colaboradores: Store.colaboradores.list(), parametros: p, janela: { de: 0, ate: 11 }, simulacoes });
-    const fila = Calculo.fila(r, { mesAtual, prazoMeses });
+    const fila = Calculo.fila(r, { mesAtual, prazoMeses, periodo: janela });
+    const noPeriodo = lista => lista.slice(janela.de, janela.ate + 1);
+    const rotuloPeriodo = Programacao.descricaoJanela(janela);
     const alvo = unidadeSel ? fila.unidades.find(u => u.id === unidadeSel) : fila.total;
     const alvoCalc = unidadeSel ? r.unidades.find(u => u.id === unidadeSel) : r.total;
     const titulo = unidadeSel ? alvo.nome : 'Todas as unidades';
@@ -63,23 +66,31 @@ const ViewFila = {
       } else {
         out.push(`<strong class="txt-deficit">Sem contratar, a fila não zera este ano</strong>: dezembro termina com <strong>${num(s.filaDezembro)} empresas</strong> pendentes.`);
       }
+      const pr = g.periodo;
+      if (pr.nMeses > 0) {
+        const cabe = pr.pessoas === 0;
+        out.push(`<strong>No período (${rotuloPeriodo}):</strong> ${pr.filaInicio > 0.5 ? `começa com <strong>${num(pr.filaInicio)}</strong> na fila, ` : ''}entram <strong>${num(pr.entram)}</strong> empresas e a equipe consegue atender <strong>${num(pr.consegue)}</strong>; termina com <strong>${num(pr.filaFim)}</strong> na fila. `
+          + (cabe
+            ? `<span class="txt-ok">A equipe dá conta do período</span>${pr.pessoasSobram > 0 ? ` — sobra o equivalente a ${pr.pessoasSobram} ${plural(pr.pessoasSobram)}` : ''}.`
+            : `<span class="txt-deficit">Para zerar a fila dentro do período, faltam ${pr.pessoas} ${plural(pr.pessoas)}</span> (a partir de ${M[pr.de].toLowerCase()}).`));
+      }
       return out.map(t => `<p class="rec-linha">${t}</p>`).join('');
     };
 
     /** Gráfico de barras (uma série): fila no fim de cada mês; mês atual marcado; rótulos só no mês atual e no maior. */
     const grafico = f => {
-      const meses = alvo.grupos[f].meses;
+      const meses = noPeriodo(alvo.grupos[f].meses);
       const max = Math.max(1, ...meses.map(m => m.filaFim));
       const idxMax = meses.reduce((a, m, i) => (m.filaFim > meses[a].filaFim ? i : a), 0);
       return `
         <div class="fila-grafico" role="img" aria-label="Fila no fim de cada mês, ${PLURAL[f]}">
-          <div class="fila-grafico-titulo">Fila no fim de cada mês <span class="muted">(empresas pendentes)</span></div>
+          <div class="fila-grafico-titulo">Fila no fim de cada mês <span class="muted">(empresas pendentes · ${rotuloPeriodo})</span></div>
           <div class="fila-barras">
             ${meses.map((m, i) => {
               const h = Math.round((m.filaFim / max) * 100);
-              const rotulo = (i === mesAtual || (i === idxMax && m.filaFim > 0)) ? `<span class="fila-rotulo">${num(m.filaFim)}</span>` : '';
+              const rotulo = (m.mes === mesAtual || (i === idxMax && m.filaFim > 0)) ? `<span class="fila-rotulo">${num(m.filaFim)}</span>` : '';
               return `
-              <div class="fila-col ${i < mesAtual ? 'passado' : ''} ${i === mesAtual ? 'atual' : ''}" title="${m.nomeLongo}: ${num(m.filaFim)} pendentes no fim do mês (entraram ${num(m.entram)}, atendidas ${num(m.atendidas)})">
+              <div class="fila-col ${m.mes < mesAtual ? 'passado' : ''} ${m.mes === mesAtual ? 'atual' : ''}" title="${m.nomeLongo}: ${num(m.filaFim)} pendentes no fim do mês (entraram ${num(m.entram)}, atendidas ${num(m.atendidas)})">
                 <div class="fila-barra-area">${rotulo}<div class="fila-barra" style="height:${h}%"></div></div>
                 <div class="fila-mes">${m.nome}</div>
               </div>`; }).join('')}
@@ -109,6 +120,14 @@ const ViewFila = {
           <div class="stat" title="Pessoas a contratar para atender a fila e as entradas dentro do prazo"><div class="label">Contratar para cumprir o prazo</div><div class="value ${s.pessoasPrazo > 0 ? 'neg' : 'txt-ok'}">${s.pessoasPrazo > 0 ? `${s.pessoasPrazo}<small> ${plural(s.pessoasPrazo)}</small>` : 'ninguém'}</div></div>
           <div class="stat" title="Como termina o ano sem contratar"><div class="label">Fila em dezembro</div><div class="value ${s.filaDezembro > 0.5 ? 'neg' : 'txt-ok'}">${num(s.filaDezembro)}<small> empresas</small></div></div>
         </div>
+        <div class="stats stats-fila stats-periodo">
+          <div class="stat stat-rotulo"><div class="label">Período</div><div class="value value-lista"><span>${UI.esc(rotuloPeriodo.charAt(0).toUpperCase() + rotuloPeriodo.slice(1))}</span></div></div>
+          <div class="stat" title="Fila no início do primeiro mês do período"><div class="label">Fila no início</div><div class="value ${g.periodo.filaInicio > 0.5 ? 'neg' : ''}">${num(g.periodo.filaInicio)}<small> empresas</small></div></div>
+          <div class="stat" title="Empresas que entram no período"><div class="label">Entram no período</div><div class="value">${num(g.periodo.entram)}<small> empresas</small></div></div>
+          <div class="stat" title="O que a equipe consegue atender no período (já com a folga)"><div class="label">Equipe consegue</div><div class="value">${num(g.periodo.consegue)}<small> empresas</small></div></div>
+          <div class="stat" title="Pessoas a contratar para zerar a fila até o fim do período"><div class="label">Contratar no período</div><div class="value ${g.periodo.pessoas > 0 ? 'neg' : 'txt-ok'}">${g.periodo.pessoas > 0 ? `${g.periodo.pessoas}<small> ${plural(g.periodo.pessoas)}</small>` : 'ninguém'}</div></div>
+          <div class="stat" title="Como termina o período sem contratar"><div class="label">Fila no fim</div><div class="value ${g.periodo.filaFim > 0.5 ? 'neg' : 'txt-ok'}">${num(g.periodo.filaFim)}<small> empresas</small></div></div>
+        </div>
 
         <div class="frases-resumo">${frases(f)}</div>
 
@@ -130,9 +149,9 @@ const ViewFila = {
               </tr>
             </thead>
             <tbody>
-              ${g.meses.map((m, i) => `
-                <tr class="${Programacao.classeLinha(m.status)} ${i < mesAtual ? 'mes-passado' : ''} ${i === mesAtual ? 'mes-atual' : ''}">
-                  <td>${m.nomeLongo}${i === mesAtual ? ' <span class="chip chip-blue">hoje</span>' : ''}</td>
+              ${noPeriodo(g.meses).map(m => `
+                <tr class="${Programacao.classeLinha(m.status)} ${m.mes < mesAtual ? 'mes-passado' : ''} ${m.mes === mesAtual ? 'mes-atual' : ''}">
+                  <td>${m.nomeLongo}${m.mes === mesAtual ? ' <span class="chip chip-blue">hoje</span>' : ''}</td>
                   <td class="num">${m.diasUteis}</td>
                   <td class="num">${fte(m.pessoas)}</td>
                   <td class="num">${num(m.entram)}</td>
@@ -145,7 +164,7 @@ const ViewFila = {
             </tbody>
           </table>
         </div>
-        <p class="note">Situação do mês: <strong>dá conta</strong> = fila zerada no fim do mês; <strong>no limite</strong> = sobrou menos de um mês de entradas; <strong>precisa contratar</strong> = sobrou mais de um mês de entradas (o prazo de ${p.prazoDias} dias fica em risco). Meses passados aparecem esmaecidos: são a origem da fila de hoje.</p>
+        <p class="note">A tabela mostra o período escolhido (${rotuloPeriodo}); a fila do primeiro mês já traz o acumulado dos meses anteriores. Situação do mês: <strong>dá conta</strong> = fila zerada no fim do mês; <strong>no limite</strong> = sobrou menos de um mês de entradas; <strong>precisa contratar</strong> = sobrou mais de um mês de entradas (o prazo de ${p.prazoDias} dias fica em risco). Meses passados aparecem esmaecidos.</p>
 
         ${!unidadeSel && fila.unidades.length > 1 ? `
         <div class="card-head sub-head">
@@ -159,8 +178,9 @@ const ViewFila = {
                 <th>Unidade</th>
                 <th class="num">Equipe</th>
                 <th class="num">Fila hoje</th>
-                <th class="num" title="Pessoas a contratar para atender no prazo">Contratar</th>
-                ${g.meses.slice(mesAtual).map(m => `<th class="num">${m.nome}</th>`).join('')}
+                <th class="num" title="Pessoas a contratar para atender no prazo de ${p.prazoDias} dias">Contratar (prazo)</th>
+                <th class="num" title="Pessoas a contratar para zerar a fila até o fim do período">Contratar (período)</th>
+                ${noPeriodo(g.meses).map(m => `<th class="num">${m.nome}</th>`).join('')}
               </tr>
             </thead>
             <tbody>
@@ -170,7 +190,8 @@ const ViewFila = {
                   <td class="num">${fte(su.pessoas)}</td>
                   <td class="num ${su.filaHoje > 0.5 ? 'txt-deficit' : ''}">${num(su.filaHoje)}</td>
                   <td class="num">${su.pessoasPrazo > 0 ? `<span class="delta delta-falta">contratar ${su.pessoasPrazo}</span>` : '<span class="delta delta-ok">ok</span>'}</td>
-                  ${gu.meses.slice(mesAtual).map(m => `<td class="num cel-${m.status}" title="${m.nomeLongo}: entram ${num(m.entram)}, atendidas ${num(m.atendidas)}">${num(m.filaFim)}</td>`).join('')}
+                  <td class="num">${gu.periodo.pessoas > 0 ? `<span class="delta delta-falta">contratar ${gu.periodo.pessoas}</span>` : '<span class="delta delta-ok">ok</span>'}</td>
+                  ${noPeriodo(gu.meses).map(m => `<td class="num cel-${m.status}" title="${m.nomeLongo}: entram ${num(m.entram)}, atendidas ${num(m.atendidas)}">${num(m.filaFim)}</td>`).join('')}
                 </tr>`; }).join('')}
             </tbody>
           </table>
@@ -184,7 +205,7 @@ const ViewFila = {
         <p>Quanto a equipe produz por dia, quanto entra de empresas com documentos vencidos em cada mês e o que fica acumulado. O que não é atendido num mês passa para o seguinte. A partir do mês atual, mostra quantas pessoas contratar para atender tudo dentro do prazo.</p>
       </header>
 
-      ${Programacao.barraHTML({ ocupacaoAlvo: p.ocupacaoAlvo, unidades, unidadeSel, mesAtual, prazoDias: p.prazoDias })}
+      ${Programacao.barraHTML({ janela, ocupacaoAlvo: p.ocupacaoAlvo, unidades, unidadeSel, mesAtual, prazoDias: p.prazoDias })}
 
       ${unidades.length === 0 ? `
         <section class="card"><div class="empty"><strong>Nenhuma unidade cadastrada</strong>Cadastre unidades, empresas por unidade e colaboradores para ver a fila.</div></section>` : `
@@ -219,6 +240,7 @@ const ViewFila = {
       App.render();
     }));
     Programacao.bindBarra(el, {
+      onJanela: () => App.render(),
       onUnidade: id => { Programacao.salvarFiltros({ ...Programacao.lerFiltros(), unidade: id }); App.render(); },
       onMesAtual: () => App.render(),
     });

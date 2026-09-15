@@ -128,8 +128,12 @@ pessoas que faltam/sobram    = sobra ÷ produção de uma pessoa inteira no per�
   navegador; padrão = mês do calendário) e do **prazo para atender** (`parametros.prazo_dias`,
   padrão 60 = 2 meses): produção por dia da equipe, fila hoje (acumulado de janeiro ao mês
   anterior), entradas no prazo, **pessoas a contratar para cumprir o prazo** (por unidade,
-  somadas no total), quando a fila zera sem contratar e a fila em dezembro. Gráfico de
-  barras (uma série) da fila no fim de cada mês; a simulação "E se…?" vale aqui também.
+  somadas no total), quando a fila zera sem contratar e a fila em dezembro. **Período**
+  (de/até, o mesmo das programações): segunda linha de indicadores — fila no início,
+  entram, equipe consegue, contratar no período (zerar a fila até o fim dele), fila no fim —
+  e tabela/gráfico/grade só com os meses do período (a fila do primeiro mês já traz o
+  acumulado anterior). Gráfico de barras (uma série) da fila no fim de cada mês; a
+  simulação "E se…?" vale aqui também.
 - **Simulação "E se…?"** (card nas programações e na fila): linhas com unidade, grupo,
   quantidade (+ contratar / − desligar), meses e ritmo por dia; viram pessoas virtuais
   no motor (`simulacoes` em `Calculo.calcular`), ativas só nos meses escolhidos; a
