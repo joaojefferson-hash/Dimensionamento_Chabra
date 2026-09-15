@@ -77,7 +77,7 @@ Cada cliente do Total precisa, naquele mês, de **uma inspeção e um relatório
 
 Como usar: digite o número em cada mês; célula vazia conta como zero; tudo salva automaticamente. O seletor **Mostrar** filtra por condição; o seletor **Ano** troca o ano (os números são por ano; dá para preencher 2027 sem mexer em 2026). "limpar 2026" apaga todos os números daquela unidade no ano. À direita, **Total do ano** (soma dos 12 meses) e **Média** mensal; no rodapé, as somas de todas as unidades.
 
-> Preencha em cada mês **só os documentos que vencem naquele mês**. Não precisa somar o que já estava em aberto de meses anteriores — o sistema soma isso sozinho na Fila de atendimento (ver 6.3).
+> Preencha em cada mês **só os documentos que vencem naquele mês** — nos meses que já passaram, os que venceram ali e **ainda estão em aberto**. Não precisa somar o que veio de meses anteriores: o sistema acumula isso sozinho na Fila de atendimento (ver 6.3).
 
 ### 4.3 Funções
 
@@ -160,13 +160,13 @@ Sempre os 12 meses do ano selecionado (barra: ano, unidade, folga). Uma grade pa
 
 Barra: ano, período, **mês atual**, unidade, **prazo para atender** (dias; padrão 60; compartilhado) e folga.
 
-Como a fila é montada (por unidade e grupo), com a **mesma regra para todos os meses** — passados, atual e futuros — do primeiro mês com número em diante:
+Como a fila é montada (por unidade e grupo), do primeiro mês com número em diante:
 
-- **Pendentes** do mês = o que sobrou do mês anterior + o número lançado (o que vence no mês).
-- **Atendidas** = o menor entre os pendentes e o que a equipe consegue no mês.
-- **Ficam pendentes** = pendentes − atendidas (nunca negativo); passa para o mês seguinte.
+- **Pendentes** do mês = o que sobrou do mês anterior + o número lançado (o que vence no mês). Vale para todos os meses.
+- **Meses passados**: o número lançado já é o que venceu ali e **ainda está em aberto** — a equipe já trabalhou de verdade e o que sobrou é esse número. Por isso o programa não desconta a produção da equipe de novo: tudo passa para o mês seguinte e vai somando até hoje.
+- **Mês atual e seguintes**: **Atendidas** = o menor entre os pendentes e o que a equipe consegue no mês; **Ficam pendentes** = pendentes − atendidas (nunca negativo), que passa para o mês seguinte.
 
-Mudar o número de um mês recalcula todos os seguintes. Nenhum mês fica "congelado": se em fevereiro venceram 71 e a equipe deu conta de 43, os 28 que sobraram somam-se aos que vencem em março, e assim por diante. A **Fila hoje** é o acumulado do mês atual (o que vence no mês + o que sobrou dos anteriores); logo abaixo do número aparece "Desse total, X vieram de meses anteriores ainda não atendidos".
+Mudar o número de um mês recalcula todos os seguintes. Exemplo: janeiro 25 e fevereiro 28 em aberto → em março já há 53 acumulados mais o que vence em março. A **Fila hoje** é o acumulado do mês atual (o que vence no mês + tudo o que ficou em aberto dos anteriores); logo abaixo do número aparece "Desse total, X vieram de meses anteriores ainda não atendidos".
 
 Para cada grupo:
 

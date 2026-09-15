@@ -71,7 +71,7 @@ const ViewEmpresas = {
     el.innerHTML = `
       <header class="page-header">
         <h1>Empresas por Unidade</h1>
-        <p>Quantos clientes de cada unidade têm <strong>documentos vencendo em cada mês</strong> do ano selecionado, separados por condição: <strong>Mensal</strong> e <strong>Exclusiva TST</strong>. Os dois exigem o atendimento completo no mês: uma inspeção e um relatório (técnicos) e uma finalização (administrativos). <strong>Preencha aqui só os documentos que vencem naquele mês.</strong> Não precisa somar o que já estava em aberto de meses anteriores — o sistema soma isso sozinho na Fila de atendimento. A linha <strong>Clientes ativos</strong> é só o registro de quantos clientes a unidade tinha no mês. Célula vazia conta como zero; tudo é salvo automaticamente.</p>
+        <p>Quantos clientes de cada unidade têm <strong>documentos vencendo em cada mês</strong> do ano selecionado, separados por condição: <strong>Mensal</strong> e <strong>Exclusiva TST</strong>. Os dois exigem o atendimento completo no mês: uma inspeção e um relatório (técnicos) e uma finalização (administrativos). <strong>Preencha em cada mês só os documentos que vencem naquele mês</strong> — nos meses que já passaram, os que venceram ali e ainda estão em aberto. Não precisa somar o que veio de meses anteriores: o sistema acumula isso sozinho na Fila de atendimento. A linha <strong>Clientes ativos</strong> é só o registro de quantos clientes a unidade tinha no mês. Célula vazia conta como zero; tudo é salvo automaticamente.</p>
       </header>
 
       <div class="stats">
@@ -104,7 +104,7 @@ const ViewEmpresas = {
             <label class="param-inline"><span class="muted">Ano</span> ${Programacao.seletorAnoHTML('empresas-ano')}</label>
           </div>
         </div>
-        <p class="muted">Cada unidade tem uma linha por condição, mais a linha <strong>Clientes ativos</strong> (total de clientes da unidade no mês — só informativo, para histórico; não entra em nenhuma conta). Os números são de <strong>${ano}</strong> (troque o ano ao lado para planejar outro ano). Em cada mês, digite <strong>só o que vence naquele mês</strong> — o acumulado de meses anteriores é calculado na Fila de atendimento. Célula vazia conta como zero.</p>
+        <p class="muted">Cada unidade tem uma linha por condição, mais a linha <strong>Clientes ativos</strong> (total de clientes da unidade no mês — só informativo, para histórico; não entra em nenhuma conta). Os números são de <strong>${ano}</strong> (troque o ano ao lado para planejar outro ano). Em cada mês, digite <strong>só o que vence naquele mês</strong> (nos passados, o que venceu e ainda está em aberto) — o acumulado é calculado na Fila de atendimento. Célula vazia conta como zero.</p>
         <div class="table-wrap">
           <table class="table table-matriz">
             <thead>
@@ -141,7 +141,7 @@ const ViewEmpresas = {
             </tfoot>
           </table>
         </div>
-        <p class="note">A programação usa a soma das duas condições (Mensal + Exclusiva TST) em cada mês: para cada cliente que vence, a equipe precisa fazer uma inspeção, um relatório e uma finalização. O que a equipe não dá conta num mês passa para o seguinte — isso aparece na <strong>Fila de atendimento</strong>, não aqui. <strong>Clientes ativos</strong> é só o registro de quantos clientes a unidade tinha no mês.</p>
+        <p class="note">A programação usa a soma das duas condições (Mensal + Exclusiva TST) em cada mês: para cada cliente que vence, a equipe precisa fazer uma inspeção, um relatório e uma finalização. O que ficou em aberto vai somando mês a mês — isso aparece na <strong>Fila de atendimento</strong>, não aqui. <strong>Clientes ativos</strong> é só o registro de quantos clientes a unidade tinha no mês.</p>
       </section>`}
     `;
 

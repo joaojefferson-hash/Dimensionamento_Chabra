@@ -372,10 +372,13 @@ const Calculo = (() => {
 
   /* ---------- fila de atendimento (backlog) ----------
      O número lançado em Empresas por Unidade é SÓ o que VENCE naquele mês (nunca um
-     acumulado). O programa acumula sozinho, do primeiro mês em diante, para TODOS os
-     meses — passados, atual e futuros — sem congelar nenhum como histórico:
-       pendentes(mês) = sobra do mês anterior + lançado(mês)
-       atendidas(mês) = mínimo(pendentes, o que a equipe consegue no mês)
+     acumulado). Nos meses passados é o que venceu ali e AINDA ESTÁ EM ABERTO — a equipe
+     já trabalhou de verdade e o que sobrou é esse número. O programa acumula sozinho,
+     do primeiro mês em diante:
+       pendentes(mês) = sobra do mês anterior + lançado(mês)          (todos os meses)
+       meses passados : atendidas = 0 → tudo passa adiante (o lançado já é o que ficou em aberto;
+                        não se desconta a produção da equipe de novo)
+       mês atual e seguintes: atendidas = mínimo(pendentes, o que a equipe consegue no mês)
        sobra(mês)     = pendentes − atendidas   (nunca negativa; passa para o mês seguinte)
      Editar o lançado de um mês recalcula todos os seguintes.
      Roda em cima do resultado de calcular() para o ano inteiro (janela 0..11), por unidade e grupo.
@@ -427,13 +430,15 @@ const Calculo = (() => {
         // entrega gargalo do grupo no mês (técnicos: inspeções ou relatórios, a menor)
         const gargaloEntrega = entregas.reduce((a, b) => (m.entregas[b.id].consegue < m.entregas[a.id].consegue ? b : a));
         const gargalo = m.entregas[gargaloEntrega.id];
-        const informado = n(m.precisa); // número lançado no mês = o que vence no mês
+        const informado = n(m.precisa); // número lançado no mês = o que vence no mês (nos passados, o que venceu e ainda está em aberto)
         const consegue = Math.max(0, n(gargalo.consegue));
-        // mesma regra para todos os meses: sobra do anterior + o que vence; atende o que consegue; o resto passa adiante
+        // sempre: pendentes = o que sobrou do mês anterior + o que vence no mês
         const filaInicio = pend;
         const entram = informado;
         const pendentes = filaInicio + entram;
-        const atendidas = Math.min(pendentes, consegue);
+        // meses passados: o lançado já é o que ficou em aberto — não se desconta a equipe de novo; tudo passa adiante
+        // do mês atual em diante: a equipe atende o que consegue; o resto passa para o mês seguinte
+        const atendidas = i < t ? 0 : Math.min(pendentes, consegue);
         const filaFim = Math.max(0, pendentes - atendidas);
         pend = filaFim;
         const producaoDiaPor = {};

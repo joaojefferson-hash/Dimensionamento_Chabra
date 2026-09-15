@@ -90,7 +90,7 @@ const ViewFila = {
               const h = Math.round((m.filaFim / max) * 100);
               const rotulo = (m.mes === mesAtual || (i === idxMax && m.filaFim > 0)) ? `<span class="fila-rotulo">${num(m.filaFim)}</span>` : '';
               return `
-              <div class="fila-col ${m.mes < mesAtual ? 'passado' : ''} ${m.mes === mesAtual ? 'atual' : ''}" title="${m.nomeLongo}: ${num(m.filaFim)} pendentes no fim do mês (${num(m.pendentes)} para atender, ${num(m.atendidas)} atendidas)">
+              <div class="fila-col ${m.mes < mesAtual ? 'passado' : ''} ${m.mes === mesAtual ? 'atual' : ''}" title="${m.nomeLongo}: ${num(m.filaFim)} pendentes no fim do mês${m.passado ? ' (em aberto, acumulado)' : ` (${num(m.pendentes)} para atender, ${num(m.atendidas)} atendidas)`}">
                 <div class="fila-barra-area">${rotulo}<div class="fila-barra" style="height:${h}%"></div></div>
                 <div class="fila-mes">${m.nome}</div>
               </div>`; }).join('')}
@@ -156,14 +156,14 @@ const ViewFila = {
                   <td class="num">${num(m.informado)}</td>
                   <td class="num" title="${num(m.filaInicio)} que sobraram do mês anterior + ${num(m.informado)} que vencem">${num(m.pendentes)}</td>
                   <td class="num">${num(m.consegue)}</td>
-                  <td class="num">${num(m.atendidas)}</td>
+                  <td class="num">${m.passado ? '<span class="muted" title="Mês passado: o número lançado já é o que ficou em aberto">—</span>' : num(m.atendidas)}</td>
                   <td class="num"><strong>${num(m.filaFim)}</strong></td>
                   <td>${Programacao.statusChip(m.status)}</td>
                 </tr>`).join('')}
             </tbody>
           </table>
         </div>
-        <p class="note">O número lançado em Empresas por Unidade é só o que <strong>vence</strong> no mês. Em todos os meses a conta é a mesma: pendentes = o que sobrou do mês anterior + o que vence; a equipe atende o que consegue; o resto passa para o mês seguinte. Mudar o número de um mês recalcula todos os seguintes. Meses passados aparecem esmaecidos. Situação: <strong>dá conta</strong> = zerado no fim do mês; <strong>no limite</strong> = fica menos de um mês de trabalho; <strong>precisa contratar</strong> = fica mais de um mês de trabalho (prazo de ${p.prazoDias} dias em risco).</p>
+        <p class="note">O número lançado em Empresas por Unidade é só o que <strong>vence</strong> no mês. Nos meses passados (esmaecidos) é o que venceu ali e <strong>ainda está em aberto</strong>: vai somando, mês a mês, sem descontar a equipe de novo — o que a equipe fez de verdade já está fora desse número. De ${M[mesAtual].toLowerCase()} em diante: pendentes = o que sobrou do mês anterior + o que vence; a equipe atende o que consegue; o resto passa para o mês seguinte. Mudar o número de um mês recalcula todos os seguintes. Situação: <strong>dá conta</strong> = zerado no fim do mês; <strong>no limite</strong> = fica menos de um mês de trabalho; <strong>precisa contratar</strong> = fica mais de um mês de trabalho (prazo de ${p.prazoDias} dias em risco).</p>
 
         ${!unidadeSel && fila.unidades.length > 1 ? `
         <div class="card-head sub-head">
@@ -194,7 +194,7 @@ const ViewFila = {
                   <td class="num ${su.filaHoje > 0.5 ? 'txt-deficit' : ''}">${num(su.filaHoje)}</td>
                   <td class="num">${su.pessoasPrazo > 0 ? `<span class="delta delta-falta">contratar ${su.pessoasPrazo}</span>` : '<span class="delta delta-ok">ok</span>'}</td>
                   <td class="num">${gu.periodo.pessoas > 0 ? `<span class="delta delta-falta">contratar ${gu.periodo.pessoas}</span>` : '<span class="delta delta-ok">ok</span>'}</td>
-                  ${noPeriodo(gu.meses).map(m => `<td class="num cel-${m.status}" title="${m.nomeLongo}: ${num(m.pendentes)} para atender (${num(m.filaInicio)} de antes + ${num(m.informado)} que vencem), ${num(m.atendidas)} atendidas">${num(m.filaFim)}</td>`).join('')}
+                  ${noPeriodo(gu.meses).map(m => `<td class="num cel-${m.status}" title="${m.nomeLongo}: ${num(m.pendentes)} em aberto (${num(m.filaInicio)} de antes + ${num(m.informado)} que vencem)${m.passado ? '' : `, ${num(m.atendidas)} atendidas`}">${num(m.filaFim)}</td>`).join('')}
                 </tr>`; }).join('')}
             </tbody>
           </table>
@@ -205,7 +205,7 @@ const ViewFila = {
     el.innerHTML = `
       <header class="page-header">
         <h1>Fila de atendimento</h1>
-        <p>Quanto a equipe produz por dia, quantas empresas vencem em cada mês e o que fica acumulado: o que a equipe não dá conta num mês passa para o seguinte e soma-se ao que vence — em todos os meses, do primeiro lançado em diante. A partir do mês atual, a tela mostra quantas pessoas contratar para zerar tudo dentro do prazo.</p>
+        <p>Quanto a equipe produz por dia, quantas empresas vencem em cada mês e o que fica acumulado. O que foi lançado nos meses passados é o que venceu e ainda está em aberto — vai somando até hoje. A partir do mês atual, a equipe atende o que consegue, o resto passa para o mês seguinte e soma-se ao que vence; a tela mostra quantas pessoas contratar para zerar tudo dentro do prazo.</p>
       </header>
 
       ${Programacao.barraHTML({ janela, ocupacaoAlvo: p.ocupacaoAlvo, unidades, unidadeSel, mesAtual, prazoDias: p.prazoDias })}
