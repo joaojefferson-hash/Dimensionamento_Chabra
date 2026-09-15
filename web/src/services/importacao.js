@@ -11,6 +11,7 @@
 
    Regras:
      • uma linha = um documento (ou um cliente) com data de vencimento;
+     • opcoes.unidadeFixa = nome: o arquivo inteiro conta para essa unidade (o relatório do SGG sai por região);
      • conta-se cada CLIENTE uma vez por unidade × mês (vários documentos do mesmo cliente
        vencendo no mesmo mês = 1 atendimento), a não ser que opcoes.contarPor = 'linha';
      • condição: valor contendo "exclus" ou "tst" → Exclusiva TST; senão Mensal (padrão quando não há coluna);
@@ -109,20 +110,21 @@ export function lerPorte(v, faixas = null, codigos = ['P', 'M', 'G']) {
 /* ---------- resumo por unidade × mês ---------- */
 
 export function resumir(linhas, mapa, opcoes = {}) {
-  const { contarPor = 'cliente', ano = null, condicaoPadrao = 'mensal', portePadrao = 'P', porteFaixas = null, codigosPorte = ['P', 'M', 'G'], situacoes = null } = opcoes;
+  const { contarPor = 'cliente', ano = null, condicaoPadrao = 'mensal', portePadrao = 'P', porteFaixas = null, codigosPorte = ['P', 'M', 'G'], situacoes = null, unidadeFixa = null } = opcoes;
   let foraSituacao = 0;
   const avisos = [];
   const anos = {};
   const vistos = new Set();
   const porUnidade = {};
   let usadas = 0, semData = 0, semUnidade = 0, outroAno = 0;
-  if (mapa.unidade == null || mapa.vencimento == null) return { ano, porUnidade, avisos: ['Escolha as colunas de unidade e de data de vencimento.'], totalLinhas: linhas.length, linhasUsadas: 0, anosEncontrados: [] };
+  if (mapa.vencimento == null) return { ano, porUnidade, avisos: ['Escolha a coluna de data de vencimento.'], totalLinhas: linhas.length, linhasUsadas: 0, anosEncontrados: [] };
+  if (mapa.unidade == null && !unidadeFixa) return { ano, porUnidade, avisos: ['Escolha a unidade do cadastro (o arquivo não tem coluna de unidade).'], totalLinhas: linhas.length, linhasUsadas: 0, anosEncontrados: [] };
 
   linhas.forEach(l => {
     if (mapa.situacao != null && situacoes) { const sv = String(l[mapa.situacao] ?? '').trim() || '(vazio)'; if (!situacoes.includes(sv)) { foraSituacao++; return; } }
     const data = lerData(l[mapa.vencimento]);
     if (!data) { semData++; return; }
-    const unidade = String(l[mapa.unidade] ?? '').trim();
+    const unidade = unidadeFixa || String(l[mapa.unidade] ?? '').trim();
     if (!unidade) { semUnidade++; return; }
     const y = data.getFullYear();
     anos[y] = (anos[y] || 0) + 1;

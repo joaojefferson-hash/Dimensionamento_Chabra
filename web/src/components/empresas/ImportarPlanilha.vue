@@ -20,7 +20,8 @@ const abas = ref([]);
 const abaSel = ref(0);
 const mapa = reactive({ unidade: null, vencimento: null, cliente: null, clienteId: null, condicao: null, porte: null, situacao: null });
 const situacoesSel = ref(null); // valores da coluna Situação que entram (null = sem filtro)
-const opcoes = reactive({ contarPor: 'cliente', ano: pref.ano, condicaoPadrao: 'mensal', portePadrao: 'P', usarFaixas: false, faixaP: 19, faixaM: 99 });
+const opcoes = reactive({ unidadeId: '', contarPor: 'cliente', ano: pref.ano, condicaoPadrao: 'mensal', portePadrao: 'P', usarFaixas: false, faixaP: 19, faixaM: 99 });
+const unidadeFixa = computed(() => (cad.unidadePorId[opcoes.unidadeId] || null));
 const mapaUnidades = reactive({});
 const gravando = ref(false);
 const ultimo = ref(null);
@@ -28,7 +29,7 @@ const ultimo = ref(null);
 const aba = computed(() => abas.value[abaSel.value] || null);
 const cabecalhos = computed(() => (aba.value ? aba.value.cabecalhos : []));
 const CAMPOS = [
-  { id: 'unidade', rotulo: 'Unidade', obrig: true, ajuda: 'em qual unidade o cliente é atendido' },
+  { id: 'unidade', rotulo: 'Unidade (coluna)', obrig: false, ajuda: 'só quando o arquivo mistura unidades; com a unidade escolhida acima, é ignorada' },
   { id: 'vencimento', rotulo: 'Data de vencimento', obrig: true, ajuda: 'a data que define o mês' },
   { id: 'cliente', rotulo: 'Cliente (nome)', obrig: false, ajuda: 'para contar cada cliente uma vez por mês' },
   { id: 'clienteId', rotulo: 'Código do cliente', obrig: false, ajuda: 'identifica cada estabelecimento (dois códigos = dois atendimentos); sem código, usa o nome' },
@@ -46,6 +47,8 @@ async function escolher(ev) {
     abas.value = lidas; abaSel.value = lidas.findIndex(a => a.linhas.length);
     arquivoNome.value = f.name; ultimo.value = null;
     aplicarDeteccao();
+    // unidade: a que está filtrada no Dimensionamento; senão, a única do cadastro; senão, pela coluna do arquivo
+    if (!opcoes.unidadeId) opcoes.unidadeId = cad.unidades.some(u => u.id === pref.unidadeSel) ? pref.unidadeSel : (cad.unidades.length === 1 ? cad.unidades[0].id : '');
   } catch (e) { ui.toast('Não foi possível ler o arquivo: ' + e.message, 'error'); }
 }
 function aplicarDeteccao() {
@@ -61,12 +64,12 @@ function alternarSituacao(valor, on) { const s = new Set(situacoesSel.value || [
 const resumo = computed(() => {
   if (!aba.value) return null;
   const faixas = opcoes.usarFaixas ? { pequeno: Number(opcoes.faixaP), medio: Number(opcoes.faixaM) } : null;
-  return resumir(aba.value.linhas, mapa, { contarPor: opcoes.contarPor, ano: Number(opcoes.ano), condicaoPadrao: opcoes.condicaoPadrao, portePadrao: opcoes.portePadrao, porteFaixas: faixas, codigosPorte: cad.portes.map(p => p.codigo), situacoes: mapa.situacao != null ? situacoesSel.value : null });
+  return resumir(aba.value.linhas, mapa, { contarPor: opcoes.contarPor, ano: Number(opcoes.ano), condicaoPadrao: opcoes.condicaoPadrao, portePadrao: opcoes.portePadrao, porteFaixas: faixas, codigosPorte: cad.portes.map(p => p.codigo), situacoes: mapa.situacao != null ? situacoesSel.value : null, unidadeFixa: unidadeFixa.value ? unidadeFixa.value.nome : null });
 });
 const nomesArquivo = computed(() => (resumo.value ? Object.keys(resumo.value.porUnidade) : []));
-watch(nomesArquivo, nomes => {
+watch([nomesArquivo, unidadeFixa], ([nomes, fixa]) => {
   const auto = casarUnidades(nomes, cad.unidades);
-  nomes.forEach(n => { if (mapaUnidades[n] === undefined) mapaUnidades[n] = auto[n]; });
+  nomes.forEach(n => { if (fixa) mapaUnidades[n] = fixa.id; else if (mapaUnidades[n] === undefined) mapaUnidades[n] = auto[n]; });
 }, { immediate: true });
 // ano: quando o arquivo tem um só ano, usa ele
 watch(() => resumo.value && resumo.value.anosEncontrados, anos => { if (anos && anos.length === 1 && Number(opcoes.ano) !== anos[0].ano) opcoes.ano = anos[0].ano; });
@@ -92,7 +95,7 @@ async function gravar() {
     emit('importado');
   } catch (e) { ui.erro(e); } finally { gravando.value = false; }
 }
-function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = ''; ultimo.value = null; Object.keys(mapaUnidades).forEach(k => delete mapaUnidades[k]); }
+function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = ''; ultimo.value = null; opcoes.unidadeId = ''; Object.keys(mapaUnidades).forEach(k => delete mapaUnidades[k]); }
 </script>
 
 <template>
@@ -123,13 +126,16 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
         </div>
       </div>
 
-      <div class="mt-4 grid gap-4 text-[13px] md:grid-cols-4">
+      <div class="mt-4 grid gap-4 text-[13px] md:grid-cols-5">
+        <label><span class="mb-1 block font-medium">Unidade do cadastro</span>
+          <select v-model="opcoes.unidadeId" class="input input-sm w-full"><option value="">— pela coluna do arquivo —</option><option v-for="u in cad.unidades" :key="u.id" :value="u.id">{{ u.nome }}</option></select>
+          <small class="muted block">{{ unidadeFixa ? 'Todas as linhas contam para esta unidade.' : (mapa.unidade != null ? 'Cada linha vai para a unidade da coluna "' + cabecalhos[mapa.unidade] + '".' : 'Escolha a unidade: o arquivo não tem coluna de unidade.') }}</small></label>
         <label><span class="mb-1 block font-medium">Ano a importar</span><select v-model="opcoes.ano" class="input input-sm w-full"><option v-for="a in cad.anosDisponiveis(Number(opcoes.ano))" :key="a" :value="a">{{ a }}</option></select>
           <small v-if="resumo && resumo.anosEncontrados.length" class="muted block">No arquivo: {{ resumo.anosEncontrados.map(a => `${a.ano} (${a.linhas})`).join(', ') }}</small></label>
         <label><span class="mb-1 block font-medium">Como contar</span><select v-model="opcoes.contarPor" class="input input-sm w-full"><option value="cliente">cada cliente uma vez por mês</option><option value="linha">cada linha (documento)</option></select>
           <small v-if="opcoes.contarPor === 'cliente' && mapa.cliente == null && mapa.clienteId == null" class="block text-warn">Sem coluna de cliente, cada linha conta uma vez.</small>
           <small v-else-if="opcoes.contarPor === 'cliente'" class="muted block">Identifica pelo {{ mapa.clienteId != null ? 'código' : 'nome' }}.</small></label>
-        <div v-if="situacoes.length" class="md:col-span-4"><span class="mb-1 block font-medium">Situações que entram</span>
+        <div v-if="situacoes.length" class="md:col-span-5"><span class="mb-1 block font-medium">Situações que entram</span>
           <div class="flex flex-wrap gap-3"><label v-for="s in situacoes" :key="s.valor" class="flex items-center gap-1"><input type="checkbox" :checked="(situacoesSel || []).includes(s.valor)" @change="alternarSituacao(s.valor, $event.target.checked)"> {{ s.valor }} <span class="muted">({{ s.n }})</span></label></div>
         </div>
         <label v-if="mapa.condicao == null"><span class="mb-1 block font-medium">Condição (sem coluna)</span><select v-model="opcoes.condicaoPadrao" class="input input-sm w-full"><option value="mensal">Mensal</option><option value="exclusiva_tst">Exclusiva TST</option></select></label>
@@ -145,11 +151,11 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
         <h3 class="mt-4 mb-2 text-[14px] font-semibold">Prévia — clientes que vencem por mês em {{ opcoes.ano }} <span class="muted font-normal">({{ num(resumo.linhasUsadas) }} de {{ num(resumo.totalLinhas) }} linhas usadas · Mensal {{ num(porCondicao.mensal) }} · Exclusiva TST {{ num(porCondicao.exclusiva_tst) }})</span></h3>
         <div class="table-wrap">
           <table class="table text-center [&_td]:px-1.5 [&_th]:px-1.5">
-            <thead><tr><th class="text-left">No arquivo</th><th class="text-left">Unidade do cadastro</th><th v-for="m in MESES" :key="m">{{ m }}</th><th class="bg-page">Total</th></tr></thead>
+            <thead><tr><th class="text-left">{{ unidadeFixa ? 'Unidade' : 'No arquivo' }}</th><th v-if="!unidadeFixa" class="text-left">Unidade do cadastro</th><th v-for="m in MESES" :key="m">{{ m }}</th><th class="bg-page">Total</th></tr></thead>
             <tbody>
               <tr v-for="nome in nomesArquivo" :key="nome" :class="mapaUnidades[nome] ? '' : 'bg-danger-bg'">
                 <td class="text-left font-medium">{{ nome }}</td>
-                <td class="text-left"><select v-model="mapaUnidades[nome]" class="input input-sm"><option :value="null">— não importar —</option><option v-for="u in cad.unidades" :key="u.id" :value="u.id">{{ u.nome }}</option></select></td>
+                <td v-if="!unidadeFixa" class="text-left"><select v-model="mapaUnidades[nome]" class="input input-sm"><option :value="null">— não importar —</option><option v-for="u in cad.unidades" :key="u.id" :value="u.id">{{ u.nome }}</option></select></td>
                 <td v-for="mes in 12" :key="mes" :title="mapaUnidades[nome] ? `hoje: ${atualMes(nome, mes)}` : ''">
                   <strong>{{ totalMesUnidade(nome, mes) || '–' }}</strong>
                   <small v-if="mapaUnidades[nome] && atualMes(nome, mes) !== totalMesUnidade(nome, mes)" class="muted block text-[11px]">era {{ atualMes(nome, mes) }}</small>
@@ -159,7 +165,7 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
             </tbody>
           </table>
         </div>
-        <p v-if="semUnidade.length" class="mt-2 text-[12.5px] text-danger-dark">Sem unidade do cadastro (não serão importadas): {{ semUnidade.join(', ') }}. Escolha a unidade na coluna ao lado ou cadastre-a em Unidades.</p>
+        <p v-if="semUnidade.length" class="mt-2 text-[12.5px] text-danger-dark">Sem unidade do cadastro (não serão importadas): {{ semUnidade.join(', ') }}. Escolha a unidade na coluna ao lado, ou escolha uma unidade única lá em cima, ou cadastre-a em Unidades.</p>
         <div class="mt-3 flex items-center gap-3">
           <button class="btn btn-primary" type="button" :disabled="gravando || !linhasRpc.length" @click="gravar">{{ gravando ? 'Importando…' : `Importar ${num(totalImportar)} clientes para ${opcoes.ano}` }}</button>
           <span class="muted text-[12.5px]">Substitui Mensal e Exclusiva TST de {{ opcoes.ano }} nas unidades acima (todos os meses). Clientes ativos não mudam.</span>
