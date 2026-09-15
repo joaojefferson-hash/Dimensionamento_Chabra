@@ -18,7 +18,7 @@
      colaboradores: [{ id, nome, funcaoId, funcao (nome), tipoProducao, chefia, coordena, empresasDia, inspecoesDia, relatoriosDia,
                        alocacoes: [{ unidadeId, unidadeNome, percentual }] }]
                     // produção declarada por dia; alocações somam ≤ 100% (o restante é "não alocado")
-     parametros:    { diasUteis[12], ocupacaoAlvo }
+     parametros:    { diasUteis[12], ocupacaoAlvo, prazoDias }  // prazoDias = régua da fila de atendimento (padrão 60)
    ========================================================================== */
 
 const Store = (() => {
@@ -41,7 +41,7 @@ const Store = (() => {
   const DEFAULT_COLABORADOR = { empresasDia: 2, inspecoesDia: 2, relatoriosDia: 2 };
   const DEFAULT_PARAMETROS = {
     diasUteis: [21, 18, 22, 20, 20, 21, 23, 21, 21, 21, 19, 22],
-    ocupacaoAlvo: 85,
+    ocupacaoAlvo: 85, prazoDias: 60,
   };
 
   // Mesmos valores do seed da migration 0001 (sugestões, editáveis).
@@ -154,10 +154,11 @@ const Store = (() => {
     return {
       diasUteis: dias,
       ocupacaoAlvo: clamp(pos(base.ocupacaoAlvo, DEFAULT_PARAMETROS.ocupacaoAlvo), 1, 100),
+      prazoDias: clamp(Math.round(pos(base.prazoDias, DEFAULT_PARAMETROS.prazoDias)), 1, 365),
     };
   };
-  const parametrosToRow = q => ({ dias_uteis: q.diasUteis, ocupacao_alvo: q.ocupacaoAlvo });
-  const parametrosFromRow = r => buildParametros({ diasUteis: r.dias_uteis, ocupacaoAlvo: r.ocupacao_alvo });
+  const parametrosToRow = q => ({ dias_uteis: q.diasUteis, ocupacao_alvo: q.ocupacaoAlvo, prazo_dias: q.prazoDias });
+  const parametrosFromRow = r => buildParametros({ diasUteis: r.dias_uteis, ocupacaoAlvo: r.ocupacao_alvo, prazoDias: r.prazo_dias });
 
   const TABELAS = {
     funcoes: {

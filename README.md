@@ -105,7 +105,17 @@ pessoas que faltam/sobram    = sobra ÷ produção de uma pessoa inteira no per�
   por entrega, equipe do mês, coluna **Faltam / sobram** — sempre em relação à equipe de
   hoje, não acumulado —, leitura "Mês a mês: … Contratando N a partir de X, nenhum mês
   fica descoberto" e a grade unidade × mês só com sinais) e
-- **Simulação "E se…?"** (card nas duas programações): linhas com unidade, grupo,
+- **Fila de atendimento** (tela para a diretoria, `js/views/fila.js` + `Calculo.fila`): o que
+  não é atendido num mês **acumula** no seguinte. Por unidade e grupo, mês a mês: entram
+  (docs. vencidos), fila no início, o que a equipe consegue (gargalo do grupo: técnicos =
+  a menor entre inspeções e relatórios), atendidas, fila no fim; situação = fila zerada /
+  menos de um mês de entradas / mais de um mês. A partir do **mês atual** (seletor, por
+  navegador; padrão = mês do calendário) e do **prazo para atender** (`parametros.prazo_dias`,
+  padrão 60 = 2 meses): produção por dia da equipe, fila hoje (acumulado de janeiro ao mês
+  anterior), entradas no prazo, **pessoas a contratar para cumprir o prazo** (por unidade,
+  somadas no total), quando a fila zera sem contratar e a fila em dezembro. Gráfico de
+  barras (uma série) da fila no fim de cada mês; a simulação "E se…?" vale aqui também.
+- **Simulação "E se…?"** (card nas programações e na fila): linhas com unidade, grupo,
   quantidade (+ contratar / − desligar), meses e ritmo por dia; viram pessoas virtuais
   no motor (`simulacoes` em `Calculo.calcular`), ativas só nos meses escolhidos; a
   equipe nunca fica negativa. Guardada só no navegador (`localStorage`), não entra no
@@ -134,11 +144,12 @@ js/views/usuarios.js        tela Usuários (só admin) — chama a Edge Function
 js/views/calendario.js      tela Calendário (dias úteis por mês, dias de referência)
 js/views/programacao-mensal.js  tela Programação Mensal
 js/views/programacao-anual.js   tela Programação Anual
+js/views/fila.js            tela Fila de atendimento (backlog mês a mês, prazo, contratar para cumprir o prazo)
 js/views/historico.js       tela Histórico de alterações
 js/calculo.js           motor de dimensionamento (puro)
 js/programacao.js       utilitários das telas de programação (janela, barra, formatação)
 js/app.js               inicialização, navegação por hash (#/unidades …), badges, backup
-supabase/migrations/    SQL do banco (0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico, 0012 = funções cadastráveis, 0013 = chefia, 0014 = coordena/responde_para, 0015 = situação da documentação no lugar do grau, 0016 = só documentos vencidos)
+supabase/migrations/    SQL do banco (0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico, 0012 = funções cadastráveis, 0013 = chefia, 0014 = coordena/responde_para, 0015 = situação da documentação no lugar do grau, 0016 = só documentos vencidos, 0017 = prazo para atender)
 supabase/functions/usuarios/index.ts   Edge Function de gestão de usuários (chave secreta só no servidor)
 ```
 
@@ -155,7 +166,7 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
 | `colaboradores` | `id, nome, funcao_id → funcoes, empresas_dia, inspecoes_dia, relatorios_dia` (ritmo por dia) |
 | `colaborador_unidades` | `colaborador_id, unidade_id, percentual (0–100; soma por colaborador ≤ 100, gatilho)` |
 | `unidade_empresas_mes` | `unidade_id, mes (1–12), empresas_vencidas` — exceção mensal; sem linha = padrão |
-| `parametros`    | linha única: `dias_uteis[12], ocupacao_alvo` |
+| `parametros`    | linha única: `dias_uteis[12], ocupacao_alvo, prazo_dias` |
 
 - `periodicidade_meses = 0` significa **sob demanda** (documento sem renovação periódica).
 - A quantidade de empresas com documentos vencidos pode **variar por mês**: o campo da unidade

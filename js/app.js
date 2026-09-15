@@ -4,7 +4,7 @@
    ========================================================================== */
 
 const App = (() => {
-  const views = [ViewProgramacaoAnual, ViewProgramacaoMensal, ViewUnidades, ViewEmpresas, ViewCatalogo, ViewColaboradores, ViewFuncoes, ViewCalendario, ViewHistorico, ViewUsuarios];
+  const views = [ViewProgramacaoAnual, ViewProgramacaoMensal, ViewFila, ViewUnidades, ViewEmpresas, ViewCatalogo, ViewColaboradores, ViewFuncoes, ViewCalendario, ViewHistorico, ViewUsuarios];
   const content = document.getElementById('content');
   let current = null;
   let appReady = false;

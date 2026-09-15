@@ -8,6 +8,14 @@ const Programacao = (() => {
   const KEY_JANELA = 'chabra-dimensiona:janela';
   const KEY_FILTROS = 'chabra-dimensiona:filtros-programacao';
   const KEY_SIM = 'chabra-dimensiona:simulacao';
+  const KEY_MES_ATUAL = 'chabra-dimensiona:mes-atual';
+
+  /** Mês atual da fila (0..11), por navegador; padrão = mês do calendário. */
+  function lerMesAtual() {
+    try { const v = Number(localStorage.getItem(KEY_MES_ATUAL)); if (Number.isInteger(v) && v >= 0 && v <= 11 && localStorage.getItem(KEY_MES_ATUAL) !== null) return v; } catch (_) { /* ignora */ }
+    return new Date().getMonth();
+  }
+  function salvarMesAtual(m) { try { localStorage.setItem(KEY_MES_ATUAL, String(m)); } catch (_) { /* ignora */ } }
 
   /* ---------- período (de/até em meses 0..11), por navegador ---------- */
 
@@ -30,12 +38,16 @@ const Programacao = (() => {
 
   /* ---------- barra de opções ---------- */
 
-  /** HTML da barra. opções: { janela, ocupacaoAlvo, unidades?, unidadeSel? } */
-  function barraHTML({ janela, ocupacaoAlvo, unidades = null, unidadeSel = '' }) {
+  /**
+   * HTML da barra. opções: { janela?, ocupacaoAlvo, unidades?, unidadeSel?, mesAtual?, prazoDias? }
+   * Com `janela` mostra o período (de/até); com `mesAtual` mostra o mês atual; com `prazoDias` o prazo para atender.
+   */
+  function barraHTML({ janela = null, ocupacaoAlvo, unidades = null, unidadeSel = '', mesAtual = null, prazoDias = null }) {
     const opcoesMes = sel => Calculo.MESES_LONGO.map((m, i) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${m}</option>`).join('');
     const folga = Math.round((100 - ocupacaoAlvo) * 10) / 10;
     return `
       <form class="barra-params" id="barra-params" autocomplete="off">
+        ${janela ? `
         <div class="param">
           <span class="param-label">Período</span>
           <div class="param-inline">
@@ -44,7 +56,15 @@ const Programacao = (() => {
             <select class="input input-sm" name="ate" aria-label="Mês final">${opcoesMes(janela.ate)}</select>
             <button type="button" class="btn btn-ghost btn-sm" data-action="ano-completo" ${janela.de === 0 && janela.ate === 11 ? 'disabled' : ''}>Ano completo</button>
           </div>
-        </div>
+        </div>` : ''}
+        ${mesAtual !== null ? `
+        <div class="param">
+          <span class="param-label">Mês atual</span>
+          <div class="param-inline">
+            <select class="input input-sm" name="mesAtual" aria-label="Mês atual">${opcoesMes(mesAtual)}</select>
+            <span class="param-ajuda" title="A fila de hoje é o que se acumulou de janeiro até o mês anterior a este. O que entra e o que a equipe consegue são contados deste mês em diante.">?</span>
+          </div>
+        </div>` : ''}
         ${unidades ? `
         <div class="param">
           <span class="param-label">Unidade</span>
@@ -52,6 +72,15 @@ const Programacao = (() => {
             <option value="" ${!unidadeSel ? 'selected' : ''}>Todas as unidades</option>
             ${unidades.map(u => `<option value="${u.id}" ${u.id === unidadeSel ? 'selected' : ''}>${UI.esc(u.nome)}</option>`).join('')}
           </select>
+        </div>` : ''}
+        ${prazoDias !== null ? `
+        <div class="param">
+          <span class="param-label">Prazo para atender</span>
+          <div class="param-inline">
+            <input class="input input-sm input-num input-pct" type="number" name="prazoDias" min="1" max="365" step="1" inputmode="numeric" value="${prazoDias}" aria-label="Prazo para atender (dias)">
+            <span class="muted">dias</span>
+            <span class="param-ajuda" title="Quantos dias a empresa tem para receber os documentos depois que vencem (ou depois de entrar). Vale para toda a equipe.">?</span>
+          </div>
         </div>` : ''}
         <div class="param">
           <span class="param-label">Folga para imprevistos</span>
@@ -64,22 +93,36 @@ const Programacao = (() => {
       </form>`;
   }
 
-  /** Liga os eventos da barra. callbacks: { onJanela(j), onUnidade(id) }. A folga é salva no Supabase (vale para toda a equipe). */
-  function bindBarra(el, { onJanela, onUnidade }) {
+  /** Liga os eventos da barra. callbacks: { onJanela(j), onUnidade(id), onMesAtual(m) }. Folga e prazo são salvos no Supabase (valem para toda a equipe). */
+  function bindBarra(el, { onJanela, onUnidade, onMesAtual }) {
     const form = el.querySelector('#barra-params');
     if (!form) return;
     form.addEventListener('submit', e => e.preventDefault());
 
-    const aplicarJanela = () => {
-      let de = Number(form.de.value), ate = Number(form.ate.value);
-      if (de > ate) [de, ate] = [ate, de];
-      salvarJanela({ de, ate });
-      onJanela({ de, ate });
-    };
-    form.de.addEventListener('change', aplicarJanela);
-    form.ate.addEventListener('change', aplicarJanela);
-    form.querySelector('[data-action="ano-completo"]').addEventListener('click', () => { salvarJanela({ de: 0, ate: 11 }); onJanela({ de: 0, ate: 11 }); });
+    if (form.de && form.ate && onJanela) {
+      const aplicarJanela = () => {
+        let de = Number(form.de.value), ate = Number(form.ate.value);
+        if (de > ate) [de, ate] = [ate, de];
+        salvarJanela({ de, ate });
+        onJanela({ de, ate });
+      };
+      form.de.addEventListener('change', aplicarJanela);
+      form.ate.addEventListener('change', aplicarJanela);
+      form.querySelector('[data-action="ano-completo"]').addEventListener('click', () => { salvarJanela({ de: 0, ate: 11 }); onJanela({ de: 0, ate: 11 }); });
+    }
+    if (form.mesAtual && onMesAtual) form.mesAtual.addEventListener('change', () => { salvarMesAtual(Number(form.mesAtual.value)); onMesAtual(Number(form.mesAtual.value)); });
     if (form.unidade && onUnidade) form.unidade.addEventListener('change', () => onUnidade(form.unidade.value));
+    if (form.prazoDias) {
+      const prazo = form.prazoDias;
+      prazo.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); prazo.blur(); } });
+      prazo.addEventListener('change', async () => {
+        const v = Math.round(UI.parseNum(prazo.value, NaN));
+        if (!(v >= 1 && v <= 365)) { UI.toast('O prazo deve ficar entre 1 e 365 dias.', 'error'); prazo.value = Store.parametros.get().prazoDias; return; }
+        prazo.disabled = true;
+        try { await Store.parametros.update({ prazoDias: v }); }
+        catch (err) { UI.toast(err.message, 'error'); prazo.value = Store.parametros.get().prazoDias; prazo.disabled = false; }
+      });
+    }
 
     const folga = form.folga;
     folga.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); folga.blur(); } });
@@ -316,6 +359,6 @@ const Programacao = (() => {
     lerJanela, salvarJanela, lerFiltros, salvarFiltros, descricaoJanela,
     barraHTML, bindBarra,
     num, numFte, statusChip, statusDot, classeLinha, fraseEntrega, recomendacaoHTML, legendaHTML, avisosHTML, chefiaHTML, pessoasHTML,
-    lerSimulacao, salvarSimulacao, simulacaoHTML, bindSimulacao, descricaoSimulacao, pessoasTexto,
+    lerSimulacao, salvarSimulacao, simulacaoHTML, bindSimulacao, descricaoSimulacao, pessoasTexto, lerMesAtual, salvarMesAtual,
   };
 })();

@@ -370,9 +370,111 @@ const Calculo = (() => {
     return ENTREGAS_DA_FUNCAO[tipo].map(e => `${f(c[e.campo])} ${e.unidade}`).join(' · ') + ' por dia';
   }
 
+  /* ---------- fila de atendimento (backlog) ----------
+     O que não é atendido num mês passa para o seguinte. Roda em cima do resultado de
+     calcular() para o ano inteiro (janela 0..11), por unidade e por grupo:
+       fila no início do mês + entram no mês − atendidas (limitado ao que a equipe consegue) = fila no fim
+     Situação do mês: ok = fila zerada; atenção = sobrou menos de um mês de entrada;
+     precisa contratar = sobrou mais de um mês de entrada (prazo em risco).
+     Resumo (a partir do mês atual, dentro do prazo em meses):
+       faltaPrazo = fila hoje + entradas do prazo − o que a equipe consegue no prazo
+       pessoasPrazo = pessoas a contratar para zerar isso dentro do prazo
+     ---------------------------------------------------- */
+
+  function fila(resultado, { mesAtual = 0, prazoMeses = 2 } = {}) {
+    const t = clampMes(mesAtual, 0);
+    const pm = Math.max(1, Math.round(n(prazoMeses)) || 1);
+    const nomeMes = i => MESES_LONGO[i];
+
+    const filaGrupo = (item, f) => {
+      const entregas = ENTREGAS_DA_FUNCAO[f];
+      let pend = 0;
+      const meses = item.meses.map(m => {
+        // entrega gargalo do grupo no mês (técnicos: inspeções ou relatórios, a menor)
+        const gargaloEntrega = entregas.reduce((a, b) => (m.entregas[b.id].consegue < m.entregas[a.id].consegue ? b : a));
+        const gargalo = m.entregas[gargaloEntrega.id];
+        const entram = n(m.precisa);
+        const consegue = Math.max(0, n(gargalo.consegue));
+        const filaInicio = pend;
+        const atendidas = Math.min(filaInicio + entram, consegue);
+        const filaFim = Math.max(0, filaInicio + entram - atendidas);
+        pend = filaFim;
+        const producaoDiaPor = {};
+        entregas.forEach(e => { producaoDiaPor[e.id] = m.diasUteis > 0 ? Math.max(0, n(m.entregas[e.id].consegue)) / m.diasUteis : 0; });
+        return {
+          mes: m.mes, nome: m.nome, nomeLongo: m.nomeLongo, diasUteis: m.diasUteis,
+          entram, filaInicio, consegue, atendidas, filaFim,
+          pessoas: n(m.pessoas[f]), producaoPessoa: n(gargalo.producaoPessoa),
+          producaoDia: m.diasUteis > 0 ? consegue / m.diasUteis : 0,
+          producaoDiaPor, gargaloId: gargaloEntrega.id,
+          status: filaFim <= 1e-9 ? 'ok' : filaFim <= entram + 1e-9 ? 'atencao' : 'deficit',
+        };
+      });
+      return { meses, resumo: resumoFila(meses, f) };
+    };
+
+    const resumoFila = (meses, f) => {
+      const hoje = meses[t];
+      const prazo = meses.slice(t, Math.min(12, t + pm));
+      const filaHoje = hoje ? hoje.filaInicio : 0;
+      const entramPrazo = prazo.reduce((s, m) => s + m.entram, 0);
+      const conseguePrazo = prazo.reduce((s, m) => s + m.consegue, 0);
+      const producaoPessoaPrazo = prazo.reduce((s, m) => s + m.producaoPessoa, 0);
+      const faltaPrazo = Math.max(0, filaHoje + entramPrazo - conseguePrazo);
+      const pessoasPrazo = faltaPrazo > 1e-9 && producaoPessoaPrazo > 0 ? Math.ceil(faltaPrazo / producaoPessoaPrazo - 1e-9) : 0;
+      const sobraPrazo = Math.max(0, conseguePrazo - (filaHoje + entramPrazo));
+      const pessoasSobram = sobraPrazo > 1e-9 && producaoPessoaPrazo > 0 ? Math.floor(sobraPrazo / producaoPessoaPrazo + 1e-9) : 0;
+      const zeraIdx = meses.findIndex((m, i) => i >= t && m.filaFim <= 1e-9);
+      const entramResto = meses.slice(t).reduce((s, m) => s + m.entram, 0);
+      return {
+        funcao: f, mesAtual: t, prazoMeses: pm,
+        filaHoje, entramHoje: hoje ? hoje.entram : 0, entramPrazo, conseguePrazo, faltaPrazo, pessoasPrazo, pessoasSobram,
+        entramResto, filaDezembro: meses[11].filaFim,
+        zeraEm: zeraIdx >= 0 ? zeraIdx : null, zeraEmNome: zeraIdx >= 0 ? nomeMes(zeraIdx) : null,
+        pessoas: hoje ? hoje.pessoas : 0, producaoDia: hoje ? hoje.producaoDia : 0,
+        producaoDiaPor: hoje ? hoje.producaoDiaPor : {}, gargaloId: hoje ? hoje.gargaloId : null,
+        status: piorStatus(meses.slice(t).map(m => m.status)),
+      };
+    };
+
+    const unidades = resultado.unidades.map(u => {
+      const grupos = {};
+      FUNCOES.forEach(f => { grupos[f] = filaGrupo(u, f); });
+      return { id: u.id, nome: u.nome, grupos };
+    });
+
+    // total = soma das unidades (a fila de uma unidade não é atendida pela equipe de outra)
+    const grupos = {};
+    FUNCOES.forEach(f => {
+      const meses = resultado.total.meses.map((m, i) => {
+        const partes = unidades.map(u => u.grupos[f].meses[i]);
+        const soma = campo => partes.reduce((s, x) => s + x[campo], 0);
+        const filaFim = soma('filaFim'), entram = soma('entram');
+        const producaoDiaPor = {};
+        ENTREGAS_DA_FUNCAO[f].forEach(e => { producaoDiaPor[e.id] = partes.reduce((s, x) => s + (x.producaoDiaPor[e.id] || 0), 0); });
+        const gargaloId = ENTREGAS_DA_FUNCAO[f].reduce((a, b) => (producaoDiaPor[b.id] < producaoDiaPor[a.id] ? b : a)).id;
+        return {
+          mes: m.mes, nome: m.nome, nomeLongo: m.nomeLongo, diasUteis: m.diasUteis,
+          entram, filaInicio: soma('filaInicio'), consegue: soma('consegue'), atendidas: soma('atendidas'), filaFim,
+          pessoas: soma('pessoas'), producaoPessoa: soma('producaoPessoa') / Math.max(1, partes.length), producaoDia: soma('producaoDia'),
+          producaoDiaPor, gargaloId,
+          status: partes.length ? piorStatus(partes.map(x => x.status)) : 'ok',
+        };
+      });
+      const resumo = resumoFila(meses, f);
+      // pessoas a contratar no total = soma das unidades (folga numa não cobre fila de outra)
+      resumo.pessoasPrazo = unidades.reduce((s, u) => s + u.grupos[f].resumo.pessoasPrazo, 0);
+      resumo.pessoasSobram = unidades.reduce((s, u) => s + u.grupos[f].resumo.pessoasSobram, 0);
+      resumo.faltaPrazo = unidades.reduce((s, u) => s + u.grupos[f].resumo.faltaPrazo, 0);
+      grupos[f] = { meses, resumo };
+    });
+
+    return { mesAtual: t, prazoMeses: pm, unidades, total: { grupos } };
+  }
+
   return {
     MESES, MESES_LONGO, TEC, ADM, FUNCOES, FUNCAO_CURTA, FUNCAO_SINGULAR, ENTREGAS, ENTREGAS_DA_FUNCAO, COLAB_PADRAO, MARGEM_ATENCAO, colaboradoresSimulados,
-    empresasDoMes, empresasPonderadas, producaoMes, precisaMes, calcular, normalizarParametros, ritmoTexto, piorStatus,
+    empresasDoMes, empresasPonderadas, producaoMes, precisaMes, calcular, fila, normalizarParametros, ritmoTexto, piorStatus,
   };
 })();
 

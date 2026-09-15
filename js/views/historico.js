@@ -113,7 +113,7 @@ const ViewHistorico = {
     colaboradores: { nome: 'nome', funcao: 'função', funcao_id: 'função', empresas_dia: 'empresas por dia', inspecoes_dia: 'inspeções por dia', relatorios_dia: 'relatórios por dia' },
     funcoes: { nome: 'nome', tipo_producao: 'tipo de produção', chefia: 'chefia de equipe', coordena: 'coordena', responde_para: 'responde para', ordem: 'ordem' },
     colaborador_unidades: { percentual: '% do tempo' },
-    parametros: { peso_em_dia: 'peso de "em dia"', peso_vencendo: 'peso de "vencendo"', peso_a_vencer: 'peso de "a vencer no mês"', ocupacao_alvo: 'folga para imprevistos', dias_uteis: 'dias úteis',
+    parametros: { peso_em_dia: 'peso de "em dia"', peso_vencendo: 'peso de "vencendo"', peso_a_vencer: 'peso de "a vencer no mês"', ocupacao_alvo: 'folga para imprevistos', dias_uteis: 'dias úteis', prazo_dias: 'prazo para atender (dias)',
                   fator_baixo: 'peso do grau baixo', fator_medio: 'peso do grau médio', fator_alto: 'peso do grau alto', meses_por_inspecao: 'frequência de inspeção', meses_por_relatorio: 'frequência de relatório', meses_por_finalizacao: 'frequência de finalização' },
     documentos: { nome: 'nome', horas: 'horas', periodicidade_meses: 'periodicidade', responsavel: 'produzido por' },
   },
