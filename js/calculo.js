@@ -371,13 +371,17 @@ const Calculo = (() => {
   }
 
   /* ---------- fila de atendimento (backlog) ----------
-     O que não é atendido num mês passa para o seguinte. Roda em cima do resultado de
-     calcular() para o ano inteiro (janela 0..11), por unidade e por grupo:
-       fila no início do mês + entram no mês − atendidas (limitado ao que a equipe consegue) = fila no fim
-     Situação do mês: ok = fila zerada; atenção = sobrou menos de um mês de entrada;
-     precisa contratar = sobrou mais de um mês de entrada (prazo em risco).
+     O número lançado em Empresas por Unidade é o que está PENDENTE naquele mês
+     (o acumulado real, que já deveria ter sido zerado). Roda em cima do resultado
+     de calcular() para o ano inteiro (janela 0..11), por unidade e por grupo:
+       meses passados  → pendentes = número informado (histórico; não se recalcula)
+       mês atual       → fila hoje = número informado; atendidas = o que a equipe consegue; sobra passa adiante
+       meses seguintes → pendentes = o que sobrou do mês anterior + número informado (o que vence);
+                         atendidas limitado ao que a equipe consegue; sobra passa adiante
+     Situação do mês: ok = zerado no fim; atenção = ficou menos de um mês de trabalho;
+     precisa contratar = ficou mais de um mês de trabalho (prazo em risco).
      Resumo (a partir do mês atual, dentro do prazo em meses):
-       faltaPrazo = fila hoje + entradas do prazo − o que a equipe consegue no prazo
+       faltaPrazo = fila hoje + o que vence nos meses seguintes do prazo − o que a equipe consegue no prazo
        pessoasPrazo = pessoas a contratar para zerar isso dentro do prazo
      ---------------------------------------------------- */
 
@@ -401,11 +405,13 @@ const Calculo = (() => {
       const somaF = campo => futuro.reduce((s, m) => s + m[campo], 0);
       const producaoPessoa = somaF('producaoPessoa');
       const filaInicioF = futuro.length ? futuro[0].filaInicio : 0;
+      const entramF = somaF('entram');
       const falta = futuro.length ? Math.max(0, filaInicioF + somaF('entram') - somaF('consegue')) : 0;
       const sobra = futuro.length ? Math.max(0, somaF('consegue') - (filaInicioF + somaF('entram'))) : 0;
       return {
         de: per.de, ate: per.ate, nMeses: trecho.length, contratarDe: inicioContratacao,
         filaInicio, entram, consegue, atendidas, filaFim, falta,
+        aAtender: filaInicioF + entramF, consegueFuturo: somaF('consegue'), // dali para a frente
         pessoas: falta > 1e-9 && producaoPessoa > 0 ? Math.ceil(falta / producaoPessoa - 1e-9) : 0,
         pessoasSobram: sobra > 1e-9 && producaoPessoa > 0 ? Math.floor(sobra / producaoPessoa + 1e-9) : 0,
         status: trecho.length ? piorStatus(trecho.map(m => m.status)) : 'ok',
@@ -415,25 +421,35 @@ const Calculo = (() => {
     const filaGrupo = (item, f) => {
       const entregas = ENTREGAS_DA_FUNCAO[f];
       let pend = 0;
-      const meses = item.meses.map(m => {
+      const meses = item.meses.map((m, i) => {
         // entrega gargalo do grupo no mês (técnicos: inspeções ou relatórios, a menor)
         const gargaloEntrega = entregas.reduce((a, b) => (m.entregas[b.id].consegue < m.entregas[a.id].consegue ? b : a));
         const gargalo = m.entregas[gargaloEntrega.id];
-        const entram = n(m.precisa);
+        const informado = n(m.precisa); // número lançado no mês
         const consegue = Math.max(0, n(gargalo.consegue));
-        const filaInicio = pend;
-        const atendidas = Math.min(filaInicio + entram, consegue);
-        const filaFim = Math.max(0, filaInicio + entram - atendidas);
+        let filaInicio, entram, atendidas, filaFim;
+        if (i < t) {
+          // passado: o informado é o que ficou pendente naquele mês (histórico)
+          filaInicio = informado; entram = 0; atendidas = 0; filaFim = informado;
+        } else if (i === t) {
+          // hoje: o informado é a fila de hoje; a equipe atende o que consegue
+          filaInicio = informado; entram = 0; atendidas = Math.min(informado, consegue); filaFim = Math.max(0, informado - atendidas);
+        } else {
+          // futuro: sobra do mês anterior + o que vence no mês
+          filaInicio = pend; entram = informado; atendidas = Math.min(filaInicio + entram, consegue); filaFim = Math.max(0, filaInicio + entram - atendidas);
+        }
         pend = filaFim;
         const producaoDiaPor = {};
         entregas.forEach(e => { producaoDiaPor[e.id] = m.diasUteis > 0 ? Math.max(0, n(m.entregas[e.id].consegue)) / m.diasUteis : 0; });
+        const pendentes = filaInicio + entram; // o que havia para atender no mês
         return {
           mes: m.mes, nome: m.nome, nomeLongo: m.nomeLongo, diasUteis: m.diasUteis,
-          entram, filaInicio, consegue, atendidas, filaFim,
+          passado: i < t, hoje: i === t,
+          informado, entram, filaInicio, pendentes, consegue, atendidas, filaFim,
           pessoas: n(m.pessoas[f]), producaoPessoa: n(gargalo.producaoPessoa),
           producaoDia: m.diasUteis > 0 ? consegue / m.diasUteis : 0,
           producaoDiaPor, gargaloId: gargaloEntrega.id,
-          status: filaFim <= 1e-9 ? 'ok' : filaFim <= entram + 1e-9 ? 'atencao' : 'deficit',
+          status: filaFim <= 1e-9 ? 'ok' : filaFim <= consegue + 1e-9 ? 'atencao' : 'deficit',
         };
       });
       return { meses, resumo: resumoFila(meses, f), periodo: resumoPeriodo(meses) };
@@ -443,7 +459,7 @@ const Calculo = (() => {
       const hoje = meses[t];
       const prazo = meses.slice(t, Math.min(12, t + pm));
       const filaHoje = hoje ? hoje.filaInicio : 0;
-      const entramPrazo = prazo.reduce((s, m) => s + m.entram, 0);
+      const entramPrazo = prazo.reduce((s, m) => s + m.entram, 0); // o que vence nos meses seguintes dentro do prazo
       const conseguePrazo = prazo.reduce((s, m) => s + m.consegue, 0);
       const producaoPessoaPrazo = prazo.reduce((s, m) => s + m.producaoPessoa, 0);
       const faltaPrazo = Math.max(0, filaHoje + entramPrazo - conseguePrazo);
@@ -454,7 +470,7 @@ const Calculo = (() => {
       const entramResto = meses.slice(t).reduce((s, m) => s + m.entram, 0);
       return {
         funcao: f, mesAtual: t, prazoMeses: pm,
-        filaHoje, entramHoje: hoje ? hoje.entram : 0, entramPrazo, conseguePrazo, faltaPrazo, pessoasPrazo, pessoasSobram,
+        filaHoje, entramHoje: hoje ? hoje.informado : 0, entramPrazo, conseguePrazo, faltaPrazo, pessoasPrazo, pessoasSobram,
         entramResto, filaDezembro: meses[11].filaFim,
         zeraEm: zeraIdx >= 0 ? zeraIdx : null, zeraEmNome: zeraIdx >= 0 ? nomeMes(zeraIdx) : null,
         pessoas: hoje ? hoje.pessoas : 0, producaoDia: hoje ? hoje.producaoDia : 0,
@@ -481,6 +497,8 @@ const Calculo = (() => {
         const gargaloId = ENTREGAS_DA_FUNCAO[f].reduce((a, b) => (producaoDiaPor[b.id] < producaoDiaPor[a.id] ? b : a)).id;
         return {
           mes: m.mes, nome: m.nome, nomeLongo: m.nomeLongo, diasUteis: m.diasUteis,
+          passado: i < t, hoje: i === t,
+          informado: soma('informado'), pendentes: soma('pendentes'),
           entram, filaInicio: soma('filaInicio'), consegue: soma('consegue'), atendidas: soma('atendidas'), filaFim,
           pessoas: soma('pessoas'), producaoPessoa: soma('producaoPessoa') / Math.max(1, partes.length), producaoDia: soma('producaoDia'),
           producaoDiaPor, gargaloId,

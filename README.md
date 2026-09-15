@@ -120,11 +120,12 @@ pessoas que faltam/sobram    = sobra ÷ produção de uma pessoa inteira no per�
   por entrega, equipe do mês, coluna **Faltam / sobram** — sempre em relação à equipe de
   hoje, não acumulado —, leitura "Mês a mês: … Contratando N a partir de X, nenhum mês
   fica descoberto" e a grade unidade × mês só com sinais) e
-- **Fila de atendimento** (tela para a diretoria, `js/views/fila.js` + `Calculo.fila`): o que
-  não é atendido num mês **acumula** no seguinte. Por unidade e grupo, mês a mês: entram
-  (docs. vencidos), fila no início, o que a equipe consegue (gargalo do grupo: técnicos =
-  a menor entre inspeções e relatórios), atendidas, fila no fim; situação = fila zerada /
-  menos de um mês de entradas / mais de um mês. A partir do **mês atual** (seletor, por
+- **Fila de atendimento** (tela para a diretoria, `js/views/fila.js` + `Calculo.fila`): o
+  número lançado em Empresas por Unidade é **o que está pendente** no mês. Meses passados =
+  histórico (pendentes lançados); mês atual = fila de hoje, a equipe atende o que consegue
+  (gargalo do grupo: técnicos = a menor entre inspeções e relatórios) e o resto passa
+  adiante; meses seguintes = sobra do anterior + o que vence (lançado). Situação = zerado /
+  fica menos de um mês de trabalho / fica mais de um mês. A partir do **mês atual** (seletor, por
   navegador; padrão = mês do calendário) e do **prazo para atender** (`parametros.prazo_dias`,
   padrão 60 = 2 meses): produção por dia da equipe, fila hoje (acumulado de janeiro ao mês
   anterior), entradas no prazo, **pessoas a contratar para cumprir o prazo** (por unidade,
