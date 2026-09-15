@@ -635,7 +635,8 @@ form.busy { opacity: .7; pointer-events: none; }
 
 .grade-cartoes { display: grid; grid-template-columns: 1fr; gap: 32px; margin-bottom: 32px; } /* um cartão por unidade, um embaixo do outro, com respiro */
 .grade-cartoes .cartao-unidade { padding: 22px 24px; }
-.cartao-unidade { margin-bottom: 0; border-left: 5px solid var(--border); }
+.cartao-unidade { margin-bottom: 32px; border-left: 5px solid var(--border); } /* o cartão "Todas as unidades" fica fora da grade */
+.grade-cartoes .cartao-unidade { margin-bottom: 0; }
 .cartao-unidade.row-ok      { border-left-color: #2e9e6e; background: #fff; }
 .cartao-unidade.row-atencao { border-left-color: #e0a800; background: #fff; }
 .cartao-unidade.row-deficit { border-left-color: #d0413a; background: #fff; }
