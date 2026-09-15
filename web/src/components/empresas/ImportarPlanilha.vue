@@ -158,7 +158,7 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
       <template v-if="resumo && nomesArquivo.length">
         <h3 class="mt-4 mb-2 text-[14px] font-semibold">Prévia — clientes que vencem por mês em {{ opcoes.ano }} <span class="muted font-normal">({{ num(resumo.linhasUsadas) }} de {{ num(resumo.totalLinhas) }} linhas usadas · Mensal {{ num(porCondicao.mensal) }} · Exclusiva TST {{ num(porCondicao.exclusiva_tst) }})</span></h3>
         <div class="table-wrap">
-          <table class="table text-center [&_td]:px-1.5 [&_th]:px-1.5">
+          <table class="table table-grade text-center [&_td]:px-1.5 [&_th]:px-1.5">
             <thead><tr><th class="text-left">{{ unidadeFixa ? 'Unidade' : 'No arquivo' }}</th><th v-if="!unidadeFixa" class="text-left">Unidade do cadastro</th><th v-for="m in MESES" :key="m">{{ m }}</th><th class="bg-page">Total</th></tr></thead>
             <tbody>
               <tr v-for="nome in nomesArquivo" :key="nome" :class="mapaUnidades[nome] ? '' : 'bg-danger-bg'">

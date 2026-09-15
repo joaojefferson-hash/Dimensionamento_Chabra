@@ -98,7 +98,7 @@ async function limpar(u) {
       A linha <strong>Clientes ativos</strong> é só informativa.
     </p>
     <div class="table-wrap">
-      <table class="table text-center [&_td]:px-1 [&_th]:px-1">
+      <table class="table table-grade text-center [&_td]:px-1 [&_th]:px-1 [&_th]:text-center">
         <thead>
           <tr>
             <th class="text-left">Unidade</th><th class="text-left">Condição</th>
@@ -109,7 +109,7 @@ async function limpar(u) {
         </thead>
         <tbody>
           <template v-for="u in cad.unidades" :key="u.id">
-            <tr v-for="(c, ci) in (mostrarTotal ? [ATIVOS, ...CONDICOES] : conds)" :key="c.campo" :class="[ci === 0 ? 'border-t-[10px] border-t-page' : '', c === ATIVOS ? 'text-muted' : '']">
+            <tr v-for="(c, ci) in (mostrarTotal ? [ATIVOS, ...CONDICOES] : conds)" :key="c.campo" :class="[ci === 0 ? 'border-t-[6px]! border-t-page!' : '', c === ATIVOS ? 'text-muted' : '']">
               <td v-if="ci === 0" class="bg-white text-left align-top font-semibold" :rowspan="(mostrarTotal ? 3 : conds.length) + (mostrarTotal ? 1 : 0)">{{ u.nome }}<div v-if="auth.podeEditar && temNumeros(u)"><button class="btn-link text-[12px] font-normal" type="button" @click="limpar(u)">limpar {{ pref.ano }}</button></div></td>
               <td class="whitespace-nowrap text-left"><span class="chip" :class="c === ATIVOS ? 'bg-page text-muted' : c.campo === 'empresasVencidas' ? 'bg-ok-bg text-ok' : 'chip-blue'" :title="c.ajuda">{{ c.rotulo }}</span></td>
               <td v-for="mes in 12" :key="mes" :class="valor(u, mes, c.campo) ? 'bg-[#eef4fb]' : ''">
