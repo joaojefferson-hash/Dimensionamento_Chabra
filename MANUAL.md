@@ -41,7 +41,7 @@ Qualquer usuário troca a própria senha em **Senha** (rodapé do menu). Não h�
 
 | Seção | Tela | Para quê |
 |---|---|---|
-| Dimensionamento | **Dimensionamento** | A tela de resultado: pendentes hoje, equipe → quadro ideal, mês a mês (deveria ter contratado? contratar?), por unidade, "E se…?". |
+| Dimensionamento | **Dimensionamento** | A tela de resultado, uma unidade por vez: pendentes hoje, equipe → quadro ideal, mês a mês (deveria ter contratado? contratar?), "E se…?". |
 | Dimensionamento | **Dashboard** | Os mesmos números em gráficos: pendentes mês a mês, vencem × equipe consegue, equipe hoje × ideal, por unidade, R$. |
 | Cadastros | **Unidades** | As unidades/filiais. |
 | Cadastros | **Empresas por Unidade** | Por unidade e mês: clientes ativos (informativo), Mensal e Exclusiva TST com documentos vencidos. |
@@ -163,14 +163,14 @@ Bloco fechado no fim do Dimensionamento. Cada linha: unidade, grupo, pessoas (+ 
 
 ## 6. Dimensionamento (a tela de resultado)
 
-Uma tela só. Barra: **ano**, **mês atual** (separa o que já passou do plano; fica no seu navegador; padrão = mês do calendário) e **unidade** (ou todas). Folga, prazo e dias úteis ficam no Calendário.
+Uma tela só, sempre de **uma unidade por vez** (sem o total de todas as unidades, para não confundir). Barra: **ano**, **mês atual** (separa o que já passou do plano; fica no seu navegador; padrão = mês do calendário) e **unidade**. Folga, prazo e dias úteis ficam no Calendário.
 
 ### 6.1 Hoje
 
 Três números para o mês atual:
 
 - **Pendentes hoje** — empresas em aberto: o que vence no mês + tudo o que ficou de meses anteriores ("645 ficaram de meses anteriores + 131 que vencem em setembro").
-- **Técnicos** e **Administrativos** — "11 hoje → 11 ideal em setembro": a equipe de hoje e o quadro ideal do mês; "Para zerar o pendente em 60 dias: +18 técnicos"; e quanto a equipe produz por dia. Em "Todas as unidades" pode aparecer "faltam 2 onde precisa · sobram 3 em outras unidades": cada unidade tem a sua equipe, quem sobra numa não atende a fila de outra.
+- **Técnicos** e **Administrativos** — "4 hoje → 5 ideal em setembro": a equipe de hoje e o quadro ideal do mês; "Para zerar o pendente em 60 dias: +14 técnicos"; e quanto a equipe produz por dia.
 
 ### 6.2 Mês a mês
 
@@ -181,23 +181,19 @@ Uma tabela com os 12 meses do ano selecionado:
 | Vencem | Clientes Mensal + Exclusiva TST que vencem no mês (Empresas por Unidade). |
 | Pendente no fim do mês | O que fica em aberto: o que veio de antes + o que vence − o que a equipe atende. Nos meses passados o número lançado já é o que ficou em aberto, então só soma. |
 | Técnicos / Administrativos (hoje → ideal) | Equipe de hoje → quadro ideal do mês (pessoas inteiras para dar conta do que vence). Vermelho quando falta gente. Passe o mouse para ver inspeções, relatórios e dias úteis. |
-| Conclusão | Meses passados: "Deveria ter contratado 1 técnico e 2 administrativos" ou "Não precisava contratar". Mês atual e seguintes: "Contratar…" ou "Dá conta" (· no limite). Em "Todas as unidades", diz em qual unidade. |
+| Conclusão | Meses passados: "Deveria ter contratado 1 técnico e 2 administrativos" ou "Não precisava contratar". Mês atual e seguintes: "Contratar…" ou "Dá conta" (· no limite). |
 
 Linha do rodapé: total que vence no ano, pendente em dezembro sem contratar, o maior quadro ideal do ano e "Para não faltar em nenhum mês: N técnicos e N administrativos". A linha do mês atual fica em negrito; os meses passados, esmaecidos.
 
 Como o pendente é montado, do primeiro mês em diante: pendentes = sobra do mês anterior + o que vence — e janeiro começa com o que ficou em aberto no ano anterior (o pendente de dezembro do ano anterior; se aquele ano já terminou, tudo o que foi lançado nele). Nos **meses passados**, o número lançado é o que venceu e **ainda está em aberto** — a equipe já trabalhou de verdade e o que sobrou é esse número; por isso nada é descontado e tudo passa adiante. Do **mês atual em diante**, a equipe atende o que consegue (o que limita: nos técnicos, a menor entre inspeções e relatórios) e o resto passa para o mês seguinte. Mudar o número de um mês recalcula os seguintes.
 
-### 6.3 Por unidade
-
-Com "Todas as unidades": uma linha por unidade com os pendentes de hoje, técnicos e administrativos (hoje → ideal, e "+N para zerar em 60 dias") e a conclusão do mês atual. Clique numa unidade para ver o mês a mês dela.
-
-### 6.4 "E se…?"
+### 6.3 "E se…?"
 
 Fica fechado no fim da tela; abre num clique. Cada linha: unidade, grupo, pessoas (+ contratar / − desligar), a partir de um mês até outro (padrão dezembro) e ritmo por dia. Tudo recalcula na hora — inclusive os meses passados, para testar "se eu tivesse contratado em fevereiro". Fica só no navegador; quando há simulação ativa, o bloco abre sozinho e mostra o que está sendo simulado.
 
 No fim da tela aparecem avisos de cadastro (pessoas sem unidade, tempo parcial, unidades sem gente).
 
-### 6.5 Dashboard
+### 6.4 Dashboard
 
 A mesma barra (ano · mês atual · unidade) e os mesmos números do Dimensionamento, em gráficos, **sempre de uma unidade por vez** (sem o total de todas, para não confundir) — passe o mouse para ver os valores:
 

@@ -1,10 +1,10 @@
 <script setup>
-/* Dimensionamento — a tela de resultado: barra (ano · mês atual · unidade), chefia, bloco "Hoje",
-   tabela dos 12 meses, uma linha por unidade (quando "Todas"), "E se…?" e avisos de cadastro. */
-import { computed } from 'vue';
+/* Dimensionamento — a tela de resultado, sempre de UMA unidade (sem o total "Todas as unidades",
+   para não confundir): barra (ano · mês atual · unidade), chefia, bloco "Hoje", tabela dos 12 meses,
+   "E se…?" e avisos de cadastro. */
+import { computed, watch } from 'vue';
 import BarraOpcoes from '../components/BarraOpcoes.vue';
 import TabelaMeses from '../components/dimensionamento/TabelaMeses.vue';
-import PorUnidade from '../components/dimensionamento/PorUnidade.vue';
 import Simulacao from '../components/dimensionamento/Simulacao.vue';
 import ChefiaLinha from '../components/ChefiaLinha.vue';
 import { useCadastrosStore } from '../stores/cadastros.js';
@@ -16,6 +16,11 @@ const cad = useCadastrosStore();
 const pref = usePreferenciasStore();
 const dim = useDimensionamentoStore();
 const { num, numFte, moeda, qtdFuncao, mesMin } = useFormat();
+
+// sempre uma unidade: sem escolha (ou "Todas"), usa a primeira do cadastro
+watch(() => [cad.unidades.length, pref.unidadeSel], () => {
+  if (cad.unidades.length && !cad.unidades.some(u => u.id === pref.unidadeSel)) pref.unidadeSel = cad.unidades[0].id;
+}, { immediate: true });
 
 const p = computed(() => cad.parametros);
 const fimPrazo = computed(() => Math.min(11, pref.mesAtual + dim.prazoMeses - 1));
@@ -47,7 +52,7 @@ const notaDistribuicao = a => {
     <p>Com as empresas que vencem em cada mês e a equipe de hoje: dá conta? Qual o quadro ideal? Quanto fica pendente? Quantos contratar, e em qual área?</p>
   </header>
 
-  <BarraOpcoes />
+  <BarraOpcoes sem-todas />
   <ChefiaLinha v-if="cad.unidades.length" :chefia="dim.alvo.chefia" />
 
   <section v-if="cad.unidades.length === 0" class="card"><p class="muted">Cadastre unidades, empresas por unidade e colaboradores para ver o dimensionamento.</p></section>
@@ -76,7 +81,6 @@ const notaDistribuicao = a => {
     </div>
 
     <TabelaMeses />
-    <PorUnidade />
     <Simulacao />
     <div v-if="avisos.length" class="card border-[#f0d9a8] bg-warn-bg text-[13px] text-warn">
       <ul class="list-disc pl-5"><li v-for="(a, i) in avisos" :key="i" v-html="a"></li></ul>
