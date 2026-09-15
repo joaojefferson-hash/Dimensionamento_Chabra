@@ -215,6 +215,12 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
   recomendação; depois simplificada para o modelo de produção diária com linguagem simples.
 - **Fase 3 (feita):** só documentos vencidos por mês, pendente acumulado, quadro ideal,
   papéis de acesso; as três telas de resultado viraram uma só (Dimensionamento).
+- **Fase 5 (em andamento):** front novo em `web/` (Vue 3 + Vite + Pinia + Tailwind v4) contra o
+  mesmo banco e o mesmo motor (sincronizado de `js/calculo.js` por `web/scripts/sync-engine.mjs`).
+  Etapa 3 feita: serviços (`src/services/api.js`), stores (`auth`, `cadastros`, `preferencias`,
+  `dimensionamento`), router com guard por papel, layout, login e o bloco "Hoje" do
+  Dimensionamento. Etapa 4: componentes e telas de cadastro; depois troca o deploy.
+  Ver `web/README.md`.
 - **Fase 4 (feita, migração 0022):** porte do cliente (tabela `portes` com peso; demanda
   normalizada em `demanda_mensal` por unidade × ano × mês × condição × porte; `unidade_mes`
   para clientes ativos), ramp-up de contratações (`colaboradores.data_admissao` /
