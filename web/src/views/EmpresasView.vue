@@ -74,6 +74,14 @@ async function limpar(u) {
     <p>Quantos clientes de cada unidade têm <strong>documentos vencendo em cada mês</strong>, por condição (Mensal e Exclusiva TST) e por porte ({{ cad.portes.map(p => `${p.nome} = peso ${num(p.peso, 1)}`).join(', ') }} — o porte multiplica o esforço). <strong>Preencha em cada mês só o que vence naquele mês</strong> — nos meses que já passaram, o que venceu e ainda está em aberto; o acumulado o Dimensionamento calcula. Célula vazia conta como zero; tudo salva automaticamente.</p>
   </header>
 
+  <form class="card flex flex-wrap items-end gap-5 !py-4" @submit.prevent>
+    <label class="text-[12px]">
+      <span class="mb-1 block font-semibold uppercase tracking-wider text-muted">Ano</span>
+      <select class="input input-sm" :value="pref.ano" @change="pref.definirAno($event.target.value)"><option v-for="a in anos" :key="a" :value="a">{{ a }}</option></select>
+    </label>
+    <span class="muted pb-1 text-[12.5px]">Vale para a tabela e para a importação. O mesmo ano do Dimensionamento.</span>
+  </form>
+
   <section v-if="!cad.unidades.length" class="card"><p class="muted">Cadastre as unidades primeiro.</p></section>
   <ImportarPlanilha v-if="cad.unidades.length && auth.podeEditar" />
   <section v-if="cad.unidades.length" class="card">
@@ -89,7 +97,6 @@ async function limpar(u) {
           <button v-for="p in cad.portes" :key="p.codigo" type="button" class="px-3 py-1" :class="porteSel === p.codigo ? 'bg-primary text-white' : 'bg-white hover:bg-primary-light'" :title="`${p.nome} — peso ${num(p.peso, 1)}`" @click="escolherPorte(p.codigo)">{{ p.nome }}</button>
           <button type="button" class="px-3 py-1" :class="somaPortes ? 'bg-primary text-white' : 'bg-white hover:bg-primary-light'" @click="escolherPorte('todos')">Todos</button>
         </div>
-        <label class="ml-2"><span class="muted mr-1">Ano</span><select class="input input-sm" :value="pref.ano" @change="pref.definirAno($event.target.value)"><option v-for="a in anos" :key="a" :value="a">{{ a }}</option></select></label>
       </div>
     </div>
     <p class="muted mb-3 text-[13px]">

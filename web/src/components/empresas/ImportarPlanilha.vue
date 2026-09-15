@@ -20,7 +20,8 @@ const abas = ref([]);
 const abaSel = ref(0);
 const mapa = reactive({ unidade: null, vencimento: null, cliente: null, clienteId: null, condicao: null, porte: null, situacao: null });
 const situacoesSel = ref(null); // valores da coluna Situação que entram (null = sem filtro)
-const opcoes = reactive({ unidadeId: '', condicao: 'mensal', contarPor: 'cliente', ano: pref.ano, portePadrao: 'P', usarFaixas: false, faixaP: 19, faixaM: 99 });
+const opcoes = reactive({ unidadeId: '', condicao: 'mensal', contarPor: 'cliente', portePadrao: 'P', usarFaixas: false, faixaP: 19, faixaM: 99 });
+const ano = computed(() => pref.ano); // o ano da página (seletor no topo da tela) vale para a importação
 // condição: '' = pela coluna do arquivo (quando há), 'mensal' ou 'exclusiva_tst' para o arquivo inteiro
 const condicaoFixa = computed(() => (opcoes.condicao === '' && mapa.condicao != null ? null : (opcoes.condicao || 'mensal')));
 const unidadeFixa = computed(() => (cad.unidadePorId[opcoes.unidadeId] || null));
@@ -70,21 +71,22 @@ function alternarSituacao(valor, on) { const s = new Set(situacoesSel.value || [
 const resumo = computed(() => {
   if (!aba.value) return null;
   const faixas = opcoes.usarFaixas ? { pequeno: Number(opcoes.faixaP), medio: Number(opcoes.faixaM) } : null;
-  return resumir(aba.value.linhas, mapa, { contarPor: opcoes.contarPor, ano: Number(opcoes.ano), portePadrao: opcoes.portePadrao, porteFaixas: faixas, codigosPorte: cad.portes.map(p => p.codigo), situacoes: mapa.situacao != null ? situacoesSel.value : null, unidadeFixa: unidadeFixa.value ? unidadeFixa.value.nome : null, condicaoFixa: condicaoFixa.value, porteCliente });
+  return resumir(aba.value.linhas, mapa, { contarPor: opcoes.contarPor, ano: ano.value, portePadrao: opcoes.portePadrao, porteFaixas: faixas, codigosPorte: cad.portes.map(p => p.codigo), situacoes: mapa.situacao != null ? situacoesSel.value : null, unidadeFixa: unidadeFixa.value ? unidadeFixa.value.nome : null, condicaoFixa: condicaoFixa.value, porteCliente });
 });
 const nomesArquivo = computed(() => (resumo.value ? Object.keys(resumo.value.porUnidade) : []));
 watch([nomesArquivo, unidadeFixa], ([nomes, fixa]) => {
   const auto = casarUnidades(nomes, cad.unidades);
   nomes.forEach(n => { if (fixa) mapaUnidades[n] = fixa.id; else if (mapaUnidades[n] === undefined) mapaUnidades[n] = auto[n]; });
 }, { immediate: true });
-// ano: quando o arquivo tem um só ano, usa ele
-watch(() => resumo.value && resumo.value.anosEncontrados, anos => { if (anos && anos.length === 1 && Number(opcoes.ano) !== anos[0].ano) opcoes.ano = anos[0].ano; });
+/** Anos do arquivo diferentes do ano da página (para avisar e oferecer a troca). */
+const outrosAnos = computed(() => (resumo.value ? resumo.value.anosEncontrados.filter(a => a.ano !== ano.value) : []));
+const linhasNoAno = computed(() => { const a = resumo.value && resumo.value.anosEncontrados.find(x => x.ano === ano.value); return a ? a.linhas : 0; });
 
 const totalMesUnidade = (nome, mes) => { const m = ((resumo.value || {}).porUnidade[nome] || {})[mes]; if (!m) return 0; return Object.values(m).reduce((s, portes) => s + Object.values(portes).reduce((a, b) => a + b, 0), 0); };
 const totalUnidade = nome => { let s = 0; for (let m = 1; m <= 12; m++) s += totalMesUnidade(nome, m); return s; };
 /** Esforço equivalente do mês (cada cliente × peso do porte); mostrado quando difere da contagem. */
 const ponderadoMesUnidade = (nome, mes) => { const m = ((resumo.value || {}).porUnidade[nome] || {})[mes]; if (!m) return 0; return Object.values(m).reduce((s, portes) => s + Object.entries(portes).reduce((a, [p, q]) => a + q * (cad.pesosPorte[p] || 1), 0), 0); };
-const atualMes = (nome, mes) => { const id = mapaUnidades[nome]; const u = id ? cad.unidadePorId[id] : null; const x = u ? ((u.mesesPorAno || {})[Number(opcoes.ano)] || {})[mes] : null; return x ? x.empresasVencidas + x.empresasExclusivaTst : 0; };
+const atualMes = (nome, mes) => { const id = mapaUnidades[nome]; const u = id ? cad.unidadePorId[id] : null; const x = u ? ((u.mesesPorAno || {})[ano.value] || {})[mes] : null; return x ? x.empresasVencidas + x.empresasExclusivaTst : 0; };
 const semUnidade = computed(() => nomesArquivo.value.filter(n => !mapaUnidades[n]));
 const linhasRpc = computed(() => (resumo.value ? montarLinhasRpc(resumo.value.porUnidade, mapaUnidades) : []));
 const totalImportar = computed(() => linhasRpc.value.reduce((s, l) => s + l.quantidade, 0));
@@ -118,14 +120,13 @@ const rotuloCond = c => (c === 'exclusiva_tst' ? 'Exclusiva TST' : c === 'mensal
 
 async function gravar() {
   const unidadesAlvo = [...new Set(linhasRpc.value.map(l => l.unidade_id))].map(id => cad.unidadePorId[id].nome);
-  const ok = await ui.confirmar({ titulo: `Importar demanda de ${opcoes.ano}`, mensagem: `Substituir os números de ${opcoes.ano} (Mensal e Exclusiva TST, todos os meses) de: ${unidadesAlvo.join(', ')} pelos ${num(totalImportar.value)} clientes da planilha? Clientes ativos não mudam. Isso vale para toda a equipe.`, textoConfirmar: 'Substituir', perigo: true });
+  const ok = await ui.confirmar({ titulo: `Importar demanda de ${ano.value}`, mensagem: `Substituir os números de ${ano.value} (Mensal e Exclusiva TST, todos os meses) de: ${unidadesAlvo.join(', ')} pelos ${num(totalImportar.value)} clientes da planilha? Clientes ativos não mudam. Isso vale para toda a equipe.`, textoConfirmar: 'Substituir', perigo: true });
   if (!ok) return;
   gravando.value = true;
   try {
-    const r = await cad.substituirDemandaAno(Number(opcoes.ano), linhasRpc.value);
+    const r = await cad.substituirDemandaAno(ano.value, linhasRpc.value);
     ultimo.value = r;
-    ui.toast(`Importado: ${num(totalImportar.value)} clientes em ${unidadesAlvo.length} unidade(s) de ${opcoes.ano}.`);
-    if (Number(opcoes.ano) !== pref.ano) pref.definirAno(Number(opcoes.ano));
+    ui.toast(`Importado: ${num(totalImportar.value)} clientes em ${unidadesAlvo.length} unidade(s) de ${ano.value}.`);
     emit('importado');
   } catch (e) { ui.erro(e); } finally { gravando.value = false; }
 }
@@ -171,8 +172,6 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
             <option value="exclusiva_tst">Exclusiva TST</option>
           </select>
           <small class="muted block">{{ opcoes.condicao === '' && mapa.condicao != null ? 'Texto com "Exclusiva"/"TST" vira Exclusiva TST; o resto, Mensal.' : 'Todas as linhas contam nesta condição.' }}</small></label>
-        <label><span class="mb-1 block font-medium">Ano a importar</span><select v-model="opcoes.ano" class="input input-sm w-full"><option v-for="a in cad.anosDisponiveis(Number(opcoes.ano))" :key="a" :value="a">{{ a }}</option></select>
-          <small v-if="resumo && resumo.anosEncontrados.length" class="muted block">No arquivo: {{ resumo.anosEncontrados.map(a => `${a.ano} (${a.linhas})`).join(', ') }}</small></label>
         <label><span class="mb-1 block font-medium">Como contar</span><select v-model="opcoes.contarPor" class="input input-sm w-full"><option value="cliente">cada cliente uma vez por mês</option><option value="linha">cada linha (documento)</option></select>
           <small v-if="opcoes.contarPor === 'cliente' && mapa.cliente == null && mapa.clienteId == null" class="block text-warn">Sem coluna de cliente, cada linha conta uma vez.</small>
           <small v-else-if="opcoes.contarPor === 'cliente'" class="muted block">Identifica pelo {{ mapa.clienteId != null ? 'código' : 'nome' }}.</small></label>
@@ -185,10 +184,14 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
         </div>
       </div>
 
+      <div v-if="resumo && outrosAnos.length" class="mt-3 rounded-lg px-3 py-2 text-[12.5px]" :class="linhasNoAno ? 'bg-warn-bg text-warn' : 'bg-danger-bg text-danger-dark'">
+        O ano selecionado no topo da tela é <strong>{{ ano }}</strong>{{ linhasNoAno ? ` (${linhasNoAno} linhas do arquivo)` : ' e o arquivo não tem nenhum vencimento nele' }}. O arquivo também tem:
+        <button v-for="a in outrosAnos" :key="a.ano" class="btn-link ml-2 font-semibold" type="button" @click="pref.definirAno(a.ano)">{{ a.ano }} ({{ a.linhas }} linhas) — usar {{ a.ano }}</button>
+      </div>
       <div v-if="resumo && resumo.avisos.length" class="mt-3 rounded-lg bg-warn-bg px-3 py-2 text-[12.5px] text-warn"><div v-for="(a, i) in resumo.avisos" :key="i">{{ a }}</div></div>
 
       <template v-if="resumo && nomesArquivo.length">
-        <h3 class="mt-4 mb-2 text-[14px] font-semibold">Prévia — clientes que vencem por mês em {{ opcoes.ano }} <span class="muted font-normal">({{ num(resumo.linhasUsadas) }} de {{ num(resumo.totalLinhas) }} linhas usadas · Mensal {{ num(porCondicao.mensal) }} · Exclusiva TST {{ num(porCondicao.exclusiva_tst) }})</span></h3>
+        <h3 class="mt-4 mb-2 text-[14px] font-semibold">Prévia — clientes que vencem por mês em {{ ano }} <span class="muted font-normal">({{ num(resumo.linhasUsadas) }} de {{ num(resumo.totalLinhas) }} linhas usadas · Mensal {{ num(porCondicao.mensal) }} · Exclusiva TST {{ num(porCondicao.exclusiva_tst) }})</span></h3>
         <div class="table-wrap">
           <table class="table table-grade text-center [&_td]:px-1.5 [&_th]:px-1.5">
             <thead><tr><th class="text-left">{{ unidadeFixa ? 'Unidade' : 'No arquivo' }}</th><th v-if="!unidadeFixa" class="text-left">Unidade do cadastro</th><th v-for="m in MESES" :key="m">{{ m }}</th><th class="bg-page">Total</th></tr></thead>
@@ -207,8 +210,8 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
         </div>
         <p v-if="semUnidade.length" class="mt-2 text-[12.5px] text-danger-dark">Sem unidade do cadastro (não serão importadas): {{ semUnidade.join(', ') }}. Escolha a unidade na coluna ao lado, ou escolha uma unidade única lá em cima, ou cadastre-a em Unidades.</p>
         <div class="mt-3 flex items-center gap-3">
-          <button class="btn btn-primary" type="button" :disabled="gravando || !linhasRpc.length" @click="gravar">{{ gravando ? 'Importando…' : `Importar ${num(totalImportar)} clientes para ${opcoes.ano}` }}</button>
-          <span class="muted text-[12.5px]">Substitui Mensal e Exclusiva TST de {{ opcoes.ano }} nas unidades acima (todos os meses). Clientes ativos não mudam.</span>
+          <button class="btn btn-primary" type="button" :disabled="gravando || !linhasRpc.length" @click="gravar">{{ gravando ? 'Importando…' : `Importar ${num(totalImportar)} clientes para ${ano}` }}</button>
+          <span class="muted text-[12.5px]">Substitui Mensal e Exclusiva TST de {{ ano }} nas unidades acima (todos os meses). Clientes ativos não mudam.</span>
         </div>
         <p v-if="ultimo" class="mt-2 text-[12.5px] text-ok">Feito: {{ ultimo.inseridas }} lançamentos gravados ({{ ultimo.apagadas }} anteriores substituídos).</p>
       </template>
@@ -228,7 +231,7 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
                     <td class="muted">{{ d.codigo || '—' }}</td>
                     <td v-if="!unidadeFixa">{{ d.unidade || '—' }}</td>
                     <td class="whitespace-nowrap">{{ fmtData(d.data) }}</td>
-                    <td>{{ d.mes ? MESES[d.mes - 1] + (d.ano && Number(opcoes.ano) !== d.ano ? '/' + d.ano : '') : '—' }}</td>
+                    <td>{{ d.mes ? MESES[d.mes - 1] + (d.ano && ano !== d.ano ? '/' + d.ano : '') : '—' }}</td>
                     <td>{{ rotuloCond(d.condicao) }}</td>
                     <td><select v-if="d.chave" class="input input-sm" :value="d.porte" :title="d.codigo ? 'Fica guardado para este cliente' : 'Sem código: vale só nesta importação'" @change="escolherPorte(d, $event.target.value)"><option v-for="p in cad.portes" :key="p.codigo" :value="p.codigo">{{ p.nome }}</option></select><span v-else>{{ nomePorte(d.porte) }}</span></td>
                     <td>{{ d.situacao || '—' }}</td>
