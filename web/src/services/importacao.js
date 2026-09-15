@@ -5,7 +5,8 @@
      lerPlanilha(arrayBuffer)            → { abas: [{ nome, cabecalhos, linhas }] }
      detectarColunas(cabecalhos)         → { unidade, vencimento, cliente, clienteId, condicao, porte, situacao } (índices ou null)
      resumir(linhas, mapa, opcoes)       → { ano, porUnidade: { [nomeUnidade]: { [mes]: { [condicao]: { [porte]: n } } } },
-                                             avisos, totalLinhas, linhasUsadas, anosEncontrados }
+                                             avisos, totalLinhas, linhasUsadas, anosEncontrados,
+                                             detalhes: [{ cliente, codigo, unidade, data, mes, ano, condicao, porte, situacao, usada, motivo }] }
      casarUnidades(nomesNoArquivo, unidadesCadastro) → { [nomeNoArquivo]: unidadeId | null }
      montarLinhasRpc(porUnidade, mapaUnidades)       → [{ unidade_id, mes, condicao, porte, quantidade }]
 
@@ -117,33 +118,43 @@ export function resumir(linhas, mapa, opcoes = {}) {
   const anos = {};
   const vistos = new Set();
   const porUnidade = {};
+  const detalhes = [];
   let usadas = 0, semData = 0, semUnidade = 0, outroAno = 0;
-  if (mapa.vencimento == null) return { ano, porUnidade, avisos: ['Escolha a coluna de data de vencimento.'], totalLinhas: linhas.length, linhasUsadas: 0, anosEncontrados: [] };
-  if (mapa.unidade == null && !unidadeFixa) return { ano, porUnidade, avisos: ['Escolha a unidade do cadastro (o arquivo não tem coluna de unidade).'], totalLinhas: linhas.length, linhasUsadas: 0, anosEncontrados: [] };
+  const texto = (i) => (i == null ? '' : String(linhas_atual[i] ?? '').trim());
+  let linhas_atual = null;
+  if (mapa.vencimento == null) return { ano, porUnidade, avisos: ['Escolha a coluna de data de vencimento.'], totalLinhas: linhas.length, linhasUsadas: 0, anosEncontrados: [], detalhes };
+  if (mapa.unidade == null && !unidadeFixa) return { ano, porUnidade, avisos: ['Escolha a unidade do cadastro (o arquivo não tem coluna de unidade).'], totalLinhas: linhas.length, linhasUsadas: 0, anosEncontrados: [], detalhes };
 
   linhas.forEach(l => {
-    if (mapa.situacao != null && situacoes) { const sv = String(l[mapa.situacao] ?? '').trim() || '(vazio)'; if (!situacoes.includes(sv)) { foraSituacao++; return; } }
+    linhas_atual = l;
+    const det = { cliente: texto(mapa.cliente), codigo: texto(mapa.clienteId), situacao: texto(mapa.situacao), data: null, mes: null, ano: null, condicao: null, porte: null, unidade: unidadeFixa || texto(mapa.unidade), usada: false, motivo: '' };
+    detalhes.push(det);
+    const fora = motivo => { det.motivo = motivo; };
+    if (mapa.situacao != null && situacoes) { const sv = det.situacao || '(vazio)'; if (!situacoes.includes(sv)) { foraSituacao++; fora('situação desmarcada'); return; } }
     const data = lerData(l[mapa.vencimento]);
-    if (!data) { semData++; return; }
-    const unidade = unidadeFixa || String(l[mapa.unidade] ?? '').trim();
-    if (!unidade) { semUnidade++; return; }
+    if (!data) { semData++; fora('sem data de vencimento'); return; }
+    det.data = data; det.ano = data.getFullYear(); det.mes = data.getMonth() + 1;
+    const unidade = det.unidade;
+    if (!unidade) { semUnidade++; fora('sem unidade'); return; }
     const y = data.getFullYear();
     anos[y] = (anos[y] || 0) + 1;
-    if (ano != null && y !== ano) { outroAno++; return; }
+    if (ano != null && y !== ano) { outroAno++; fora(`vence em ${y}, não em ${ano}`); return; }
     const mes = data.getMonth() + 1;
     const cond = condicaoFixa || (mapa.condicao != null ? lerCondicao(l[mapa.condicao]) : condicaoPadrao);
     const porte = mapa.porte != null ? lerPorte(l[mapa.porte], porteFaixas, codigosPorte) : portePadrao;
+    det.condicao = cond; det.porte = porte;
     // identidade do cliente: o código (cada estabelecimento tem o seu) ou, sem código, o nome
     const idCliente = mapa.clienteId != null ? l[mapa.clienteId] : mapa.cliente != null ? l[mapa.cliente] : null;
     if (contarPor === 'cliente' && idCliente != null && String(idCliente).trim() !== '') {
       const k = `${chave(unidade)}|${y}|${mes}|${chave(idCliente)}`;
-      if (vistos.has(k)) return;
+      if (vistos.has(k)) { fora('mesmo cliente já contado neste mês'); return; }
       vistos.add(k);
     }
     const u = (porUnidade[unidade] = porUnidade[unidade] || {});
     const m = (u[mes] = u[mes] || {});
     const c = (m[cond] = m[cond] || {});
     c[porte] = (c[porte] || 0) + 1;
+    det.usada = true;
     usadas++;
   });
   if (foraSituacao) avisos.push(`${foraSituacao} linha(s) com situação desmarcada foram ignoradas.`);
@@ -151,7 +162,7 @@ export function resumir(linhas, mapa, opcoes = {}) {
   if (semUnidade) avisos.push(`${semUnidade} linha(s) sem unidade foram ignoradas.`);
   if (outroAno) avisos.push(`${outroAno} linha(s) de outros anos foram ignoradas (só o ano ${ano} entra).`);
   const anosEncontrados = Object.entries(anos).map(([a, n]) => ({ ano: Number(a), linhas: n })).sort((x, y) => x.ano - y.ano);
-  return { ano, porUnidade, avisos, totalLinhas: linhas.length, linhasUsadas: usadas, anosEncontrados };
+  return { ano, porUnidade, avisos, totalLinhas: linhas.length, linhasUsadas: usadas, anosEncontrados, detalhes };
 }
 
 /* ---------- unidades: nome no arquivo → cadastro ---------- */

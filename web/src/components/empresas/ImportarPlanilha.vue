@@ -83,6 +83,20 @@ const semUnidade = computed(() => nomesArquivo.value.filter(n => !mapaUnidades[n
 const linhasRpc = computed(() => (resumo.value ? montarLinhasRpc(resumo.value.porUnidade, mapaUnidades) : []));
 const totalImportar = computed(() => linhasRpc.value.reduce((s, l) => s + l.quantidade, 0));
 const porCondicao = computed(() => { const o = { mensal: 0, exclusiva_tst: 0 }; linhasRpc.value.forEach(l => { o[l.condicao] += l.quantidade; }); return o; });
+/* lista de empresas: o que entra, em que mês, e o que ficou de fora (e por quê) */
+const mostrarEmpresas = ref(false);
+const filtroEmpresas = ref('');
+const empresas = computed(() => {
+  if (!resumo.value) return [];
+  const t = filtroEmpresas.value.trim().toLocaleLowerCase('pt-BR');
+  return resumo.value.detalhes
+    .map((d, i) => ({ ...d, i }))
+    .filter(d => !t || `${d.cliente} ${d.codigo} ${d.unidade} ${d.situacao}`.toLocaleLowerCase('pt-BR').includes(t))
+    .sort((a, b) => (b.usada - a.usada) || ((a.mes || 99) - (b.mes || 99)) || a.cliente.localeCompare(b.cliente, 'pt-BR'));
+});
+const foraCount = computed(() => (resumo.value ? resumo.value.detalhes.filter(d => !d.usada).length : 0));
+const fmtData = d => (d ? d.toLocaleDateString('pt-BR') : '—');
+const rotuloCond = c => (c === 'exclusiva_tst' ? 'Exclusiva TST' : c === 'mensal' ? 'Mensal' : '—');
 
 async function gravar() {
   const unidadesAlvo = [...new Set(linhasRpc.value.map(l => l.unidade_id))].map(id => cad.unidadePorId[id].nome);
@@ -180,6 +194,30 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
         </div>
         <p v-if="ultimo" class="mt-2 text-[12.5px] text-ok">Feito: {{ ultimo.inseridas }} lançamentos gravados ({{ ultimo.apagadas }} anteriores substituídos).</p>
       </template>
+      <div v-if="resumo && resumo.detalhes.length" class="mt-3">
+          <button class="btn-link text-[13px]" type="button" @click="mostrarEmpresas = !mostrarEmpresas">{{ mostrarEmpresas ? 'Ocultar' : 'Ver' }} as {{ resumo.detalhes.length }} empresas do arquivo{{ foraCount ? ` (${foraCount} ficam de fora)` : '' }}</button>
+          <div v-if="mostrarEmpresas" class="mt-2">
+            <input v-model="filtroEmpresas" class="input input-sm mb-2 w-72" placeholder="Filtrar por empresa, código ou situação…">
+            <div class="table-wrap max-h-[420px] overflow-y-auto">
+              <table class="table table-grade">
+                <thead><tr><th>Empresa</th><th>Código</th><th v-if="!unidadeFixa">Unidade</th><th>Vencimento</th><th>Mês</th><th>Condição</th><th>Porte</th><th>Situação</th><th>Entra?</th></tr></thead>
+                <tbody>
+                  <tr v-for="d in empresas" :key="d.i" :class="d.usada ? '' : 'text-muted'">
+                    <td class="font-medium">{{ d.cliente || '—' }}</td>
+                    <td class="muted">{{ d.codigo || '—' }}</td>
+                    <td v-if="!unidadeFixa">{{ d.unidade || '—' }}</td>
+                    <td class="whitespace-nowrap">{{ fmtData(d.data) }}</td>
+                    <td>{{ d.mes ? MESES[d.mes - 1] + (d.ano && Number(opcoes.ano) !== d.ano ? '/' + d.ano : '') : '—' }}</td>
+                    <td>{{ rotuloCond(d.condicao) }}</td>
+                    <td>{{ d.porte || '—' }}</td>
+                    <td>{{ d.situacao || '—' }}</td>
+                    <td><span v-if="d.usada" class="chip bg-ok-bg text-ok">sim</span><span v-else class="chip bg-page text-muted" :title="d.motivo">não · {{ d.motivo }}</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
     </template>
     <p v-else class="muted text-[13px]">Como funciona: cada linha da planilha deve ter a <strong>unidade</strong>, a <strong>data de vencimento</strong> e, se possível, o <strong>cliente</strong> (para contar cada cliente uma vez por mês), a <strong>condição</strong> (Mensal / Exclusiva TST) e o <strong>porte</strong>. O sistema reconhece as colunas pelos títulos e você confirma antes de gravar. Nada é alterado até clicar em Importar.</p>
   </section>
