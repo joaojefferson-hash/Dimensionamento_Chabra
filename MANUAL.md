@@ -199,12 +199,11 @@ No fim da tela aparecem avisos de cadastro (pessoas sem unidade, tempo parcial, 
 
 ### 6.5 Dashboard
 
-A mesma barra (ano · mês atual · unidade) e os mesmos números do Dimensionamento, em gráficos — passe o mouse para ver os valores:
+A mesma barra (ano · mês atual · unidade) e os mesmos números do Dimensionamento, em gráficos, **sempre de uma unidade por vez** (sem o total de todas, para não confundir) — passe o mouse para ver os valores:
 
 - **Pendentes no fim de cada mês** — barras claras nos meses passados (o lançado vai somando), escura no mês atual, laranja no plano.
 - **Vencem no mês × o que a equipe consegue** — barras com o que vence (cada cliente valendo o peso do porte) e linhas com quanto técnicos e administrativos dão conta.
 - **Equipe hoje × quadro ideal** — um gráfico por área; o ideal fica vermelho no mês em que falta gente.
-- **Por unidade** (com "Todas"): pendentes hoje, na cor da situação da unidade, e quantas pessoas contratar para zerar no prazo (técnicos e administrativos empilhados).
 - **Impacto em R$** (quando há custo nas Funções): contratar quem falta × sobra paga sem produção, mês a mês.
 
 ---
