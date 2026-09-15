@@ -3,7 +3,7 @@
 
    Funções puras (sem Vue/Supabase; testáveis em Node):
      lerPlanilha(arrayBuffer)            → { abas: [{ nome, cabecalhos, linhas }] }
-     detectarColunas(cabecalhos)         → { unidade, vencimento, cliente, condicao, porte } (índices ou null)
+     detectarColunas(cabecalhos)         → { unidade, vencimento, cliente, clienteId, condicao, porte, situacao } (índices ou null)
      resumir(linhas, mapa, opcoes)       → { ano, porUnidade: { [nomeUnidade]: { [mes]: { [condicao]: { [porte]: n } } } },
                                              avisos, totalLinhas, linhasUsadas, anosEncontrados }
      casarUnidades(nomesNoArquivo, unidadesCadastro) → { [nomeNoArquivo]: unidadeId | null }
@@ -40,22 +40,42 @@ export function lerPlanilha(arrayBuffer) {
 
 /* ---------- detecção de colunas ---------- */
 
+// Palavras por campo, em ordem de preferência. Export do SGG ("VENCIMENTO(s) DE PGR(s)"):
+// Código Empresa · Empresa · Região · Tipo Período · Data Emissão Anterior · Data Validade · Situação ·
+// Detalhes Adicionais · Informações adicionais da Empresa
 const PALAVRAS = {
-  unidade:    ['unidade', 'filial', 'regional', 'base', 'escritorio', 'polo'],
-  vencimento: ['vencimento', 'validade', 'vence', 'data de venc', 'dt venc', 'expira', 'prazo'],
-  cliente:    ['cliente', 'empresa', 'razao social', 'nome fantasia', 'contratante', 'cnpj'],
-  condicao:   ['condicao', 'tipo de contrato', 'contrato', 'modalidade', 'plano', 'servico'],
-  porte:      ['porte', 'grau', 'tamanho', 'funcionarios', 'colaboradores', 'vidas', 'empregados'],
-  documento:  ['documento', 'tipo de documento', 'programa', 'laudo'],
+  unidade:    ['regiao', 'unidade', 'filial', 'regional', 'base', 'escritorio', 'polo'],
+  vencimento: ['data validade', 'data de validade', 'validade', 'vencimento', 'data de venc', 'dt venc', 'vence', 'expira'],
+  cliente:    ['empresa', 'cliente', 'razao social', 'nome fantasia', 'contratante', 'nome'],
+  clienteId:  ['codigo empresa', 'codigo cliente', 'cod empresa', 'cod cliente', 'cnpj', 'codigo'],
+  condicao:   ['condicao', 'informacoes adicionais', 'tipo de contrato', 'modalidade', 'plano', 'observac'],
+  porte:      ['porte', 'grau de risco', 'tamanho', 'funcionarios', 'colaboradores', 'vidas', 'empregados'],
+  situacao:   ['situacao', 'status'],
 };
+const NAO_E_CLIENTE = ['codigo', 'cnpj', 'informacoes', 'detalhes']; // colunas que contêm "empresa" mas não são o nome
 export function detectarColunas(cabecalhos) {
   const c = cabecalhos.map(chave);
-  const acha = lista => { for (const p of lista) { const i = c.findIndex(h => h.includes(chave(p))); if (i >= 0) return i; } return null; };
+  const acha = (lista, evitar = []) => {
+    const ok = i => !evitar.some(e => c[i].includes(e));
+    for (const p of lista) { const k = chave(p); const i = c.findIndex((h, idx) => h === k && ok(idx)); if (i >= 0) return i; }       // nome exato
+    for (const p of lista) { const k = chave(p); const i = c.findIndex((h, idx) => h.startsWith(k) && ok(idx)); if (i >= 0) return i; } // começa com
+    for (const p of lista) { const k = chave(p); const i = c.findIndex((h, idx) => h.includes(k) && ok(idx)); if (i >= 0) return i; }   // contém
+    return null;
+  };
   const mapa = {};
-  Object.entries(PALAVRAS).forEach(([campo, lista]) => { mapa[campo] = acha(lista); });
-  // "empresa" pode ser a unidade quando não há coluna de unidade e há outra coluna de cliente… deixa como está: o usuário confirma
+  Object.entries(PALAVRAS).forEach(([campo, lista]) => { mapa[campo] = acha(lista, campo === 'cliente' ? NAO_E_CLIENTE : []); });
+  if (mapa.unidade != null && mapa.unidade === mapa.cliente) mapa.cliente = null;
   return mapa;
 }
+
+/** Valores distintos de uma coluna (para o filtro de situação), com contagem. */
+export function valoresDistintos(linhas, coluna) {
+  const c = {};
+  linhas.forEach(l => { const v = String(l[coluna] ?? '').trim() || '(vazio)'; c[v] = (c[v] || 0) + 1; });
+  return Object.entries(c).map(([valor, n]) => ({ valor, n })).sort((a, b) => b.n - a.n);
+}
+/** Situações que NÃO representam demanda em aberto (renovado, em dia, cancelado…). */
+export const situacaoExcluida = v => /renovad|em dia|cancel|inativ|encerrad|baixad|conclu/.test(semAcento(v));
 
 /* ---------- valores ---------- */
 
@@ -70,7 +90,11 @@ export function lerData(v) {
   if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
   return null;
 }
-export function lerCondicao(v) { const s = semAcento(v); return s.includes('exclus') || /\btst\b/.test(s) ? 'exclusiva_tst' : 'mensal'; }
+/** Condição a partir de um texto (só a primeira linha: "Mensal desde 04/04/2022" + "Reativado…" -> Mensal). */
+export function lerCondicao(v) {
+  const s = semAcento(String(v).split(/\r?\n/)[0]);
+  return s.includes('exclus') || /\btst\b/.test(s) ? 'exclusiva_tst' : 'mensal';
+}
 export function lerPorte(v, faixas = null, codigos = ['P', 'M', 'G']) {
   if (v == null || v === '') return codigos[0];
   const s = semAcento(v);
@@ -85,7 +109,8 @@ export function lerPorte(v, faixas = null, codigos = ['P', 'M', 'G']) {
 /* ---------- resumo por unidade × mês ---------- */
 
 export function resumir(linhas, mapa, opcoes = {}) {
-  const { contarPor = 'cliente', ano = null, condicaoPadrao = 'mensal', portePadrao = 'P', porteFaixas = null, codigosPorte = ['P', 'M', 'G'] } = opcoes;
+  const { contarPor = 'cliente', ano = null, condicaoPadrao = 'mensal', portePadrao = 'P', porteFaixas = null, codigosPorte = ['P', 'M', 'G'], situacoes = null } = opcoes;
+  let foraSituacao = 0;
   const avisos = [];
   const anos = {};
   const vistos = new Set();
@@ -94,6 +119,7 @@ export function resumir(linhas, mapa, opcoes = {}) {
   if (mapa.unidade == null || mapa.vencimento == null) return { ano, porUnidade, avisos: ['Escolha as colunas de unidade e de data de vencimento.'], totalLinhas: linhas.length, linhasUsadas: 0, anosEncontrados: [] };
 
   linhas.forEach(l => {
+    if (mapa.situacao != null && situacoes) { const sv = String(l[mapa.situacao] ?? '').trim() || '(vazio)'; if (!situacoes.includes(sv)) { foraSituacao++; return; } }
     const data = lerData(l[mapa.vencimento]);
     if (!data) { semData++; return; }
     const unidade = String(l[mapa.unidade] ?? '').trim();
@@ -104,8 +130,10 @@ export function resumir(linhas, mapa, opcoes = {}) {
     const mes = data.getMonth() + 1;
     const cond = mapa.condicao != null ? lerCondicao(l[mapa.condicao]) : condicaoPadrao;
     const porte = mapa.porte != null ? lerPorte(l[mapa.porte], porteFaixas, codigosPorte) : portePadrao;
-    if (contarPor === 'cliente' && mapa.cliente != null) {
-      const k = `${chave(unidade)}|${y}|${mes}|${chave(l[mapa.cliente])}`;
+    // identidade do cliente: o código (cada estabelecimento tem o seu) ou, sem código, o nome
+    const idCliente = mapa.clienteId != null ? l[mapa.clienteId] : mapa.cliente != null ? l[mapa.cliente] : null;
+    if (contarPor === 'cliente' && idCliente != null && String(idCliente).trim() !== '') {
+      const k = `${chave(unidade)}|${y}|${mes}|${chave(idCliente)}`;
       if (vistos.has(k)) return;
       vistos.add(k);
     }
@@ -115,6 +143,7 @@ export function resumir(linhas, mapa, opcoes = {}) {
     c[porte] = (c[porte] || 0) + 1;
     usadas++;
   });
+  if (foraSituacao) avisos.push(`${foraSituacao} linha(s) com situação desmarcada foram ignoradas.`);
   if (semData) avisos.push(`${semData} linha(s) sem data de vencimento reconhecível foram ignoradas.`);
   if (semUnidade) avisos.push(`${semUnidade} linha(s) sem unidade foram ignoradas.`);
   if (outroAno) avisos.push(`${outroAno} linha(s) de outros anos foram ignoradas (só o ano ${ano} entra).`);

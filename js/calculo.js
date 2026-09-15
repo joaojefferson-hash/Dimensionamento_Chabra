@@ -504,6 +504,9 @@ const Calculo = (() => {
        mês atual e seguintes: atendidas = mínimo(pendentes, o que a equipe consegue no mês)
        sobra(mês)     = pendentes − atendidas   (nunca negativa; passa para o mês seguinte)
      Editar o lançado de um mês recalcula todos os seguintes.
+     O que ficou em aberto no ANO ANTERIOR entra em janeiro (`filaInicial[unidadeId][grupo]`, calculado
+     pelo chamador com a fila do ano anterior). `mesAtual = 12` = todos os meses já passaram (ano anterior
+     inteiro em aberto).
      Roda em cima do resultado de calcular() para o ano inteiro (janela 0..11), por unidade e grupo.
      Situação do mês: ok = zerado no fim; atenção = ficou menos de um mês de trabalho;
      precisa contratar = ficou mais de um mês de trabalho (prazo em risco).
@@ -513,8 +516,9 @@ const Calculo = (() => {
        pessoasPrazo = pessoas a contratar para zerar isso dentro do prazo
      ---------------------------------------------------- */
 
-  function fila(resultado, { mesAtual = 0, prazoMeses = 2, periodo = null } = {}) {
-    const t = clampMes(mesAtual, 0);
+  function fila(resultado, { mesAtual = 0, prazoMeses = 2, periodo = null, filaInicial = null } = {}) {
+    const t = Number(mesAtual) === 12 ? 12 : clampMes(mesAtual, 0); // 12 = ano inteiro já passou
+    const inicialDe = (item, f) => Math.max(0, n(filaInicial && filaInicial[item.id] && filaInicial[item.id][f]));
     const pm = Math.max(1, Math.round(n(prazoMeses)) || 1);
     const nomeMes = i => MESES_LONGO[i];
     const pDe = clampMes(periodo && periodo.de, 0), pAte = clampMes(periodo && periodo.ate, 11);
@@ -548,7 +552,7 @@ const Calculo = (() => {
 
     const filaGrupo = (item, f) => {
       const entregas = ENTREGAS_DA_FUNCAO[f];
-      let pend = 0;
+      let pend = inicialDe(item, f); // o que ficou em aberto do ano anterior entra em janeiro
       const meses = item.meses.map((m, i) => {
         // entrega gargalo do grupo no mês (técnicos: inspeções ou relatórios, a menor)
         const gargaloEntrega = entregas.reduce((a, b) => (m.entregas[b.id].consegue < m.entregas[a.id].consegue ? b : a));
@@ -642,7 +646,9 @@ const Calculo = (() => {
       grupos[f] = { meses, resumo, periodo: periodoTotal };
     });
 
-    return { mesAtual: t, prazoMeses: pm, periodo: per, unidades, total: { grupos } };
+    const filaInicialTotal = {};
+    FUNCOES.forEach(f => { filaInicialTotal[f] = resultado.unidades.reduce((s, u) => s + inicialDe(u, f), 0); });
+    return { mesAtual: t, prazoMeses: pm, periodo: per, unidades, total: { grupos }, filaInicial: filaInicialTotal };
   }
 
   return {

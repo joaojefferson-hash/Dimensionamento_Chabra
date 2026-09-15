@@ -118,4 +118,17 @@ teste('porte muda o pendente: 10 empresas G pesam como 20 na fila', () => {
   perto(g.meses[0].pendentes, 20);
 });
 
+teste('ano anterior: mesAtual = 12 deixa tudo em aberto; filaInicial entra em janeiro do ano seguinte', () => {
+  const meses = {}; [25, 30, 20, 22, 10, 5, 0, 0, 0, 0, 0, 0].forEach((v, i) => { meses[i + 1] = { empresasVencidas: v, empresasExclusivaTst: 0 }; });
+  const r = Calculo.calcular({ unidades: [unidade(meses)], colaboradores: [tecnico()], parametros: { diasUteis: Array(12).fill(20), ocupacaoAlvo: 85 }, janela: { de: 0, ate: 11 }, ano: 2025 });
+  const passado = Calculo.fila(r, { mesAtual: 12 }).total.grupos.tecnico;
+  assert.strictEqual(passado.meses[11].filaFim, 112);             // nada é atendido: soma de tudo
+  assert.strictEqual(passado.meses.every(m => m.atendidas === 0), true);
+  const seguinte = Calculo.fila(r, { mesAtual: 4, filaInicial: { u: { tecnico: 112, administrativo: 0 } } });
+  assert.strictEqual(seguinte.total.grupos.tecnico.meses[0].filaInicio, 112);
+  assert.strictEqual(seguinte.total.grupos.tecnico.meses[0].pendentes, 112 + 25);
+  assert.deepStrictEqual(seguinte.filaInicial, { tecnico: 112, administrativo: 0 });
+  assert.strictEqual(seguinte.total.grupos.tecnico.resumo.deMesesAnteriores, 112 + 25 + 30 + 20 + 22);
+});
+
 console.log(`\n${passaram} testes passaram.`);

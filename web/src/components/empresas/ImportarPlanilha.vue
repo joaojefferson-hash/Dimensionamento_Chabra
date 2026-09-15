@@ -6,7 +6,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { useCadastrosStore } from '../../stores/cadastros.js';
 import { usePreferenciasStore } from '../../stores/preferencias.js';
 import { useUiStore } from '../../stores/ui.js';
-import { lerPlanilha, detectarColunas, resumir, casarUnidades, montarLinhasRpc } from '../../services/importacao.js';
+import { lerPlanilha, detectarColunas, resumir, casarUnidades, montarLinhasRpc, valoresDistintos, situacaoExcluida } from '../../services/importacao.js';
 import { MESES, num } from '../../composables/useFormat.js';
 
 const emit = defineEmits(['importado']);
@@ -18,7 +18,8 @@ const aberto = ref(false);
 const arquivoNome = ref('');
 const abas = ref([]);
 const abaSel = ref(0);
-const mapa = reactive({ unidade: null, vencimento: null, cliente: null, condicao: null, porte: null });
+const mapa = reactive({ unidade: null, vencimento: null, cliente: null, clienteId: null, condicao: null, porte: null, situacao: null });
+const situacoesSel = ref(null); // valores da coluna Situação que entram (null = sem filtro)
 const opcoes = reactive({ contarPor: 'cliente', ano: pref.ano, condicaoPadrao: 'mensal', portePadrao: 'P', usarFaixas: false, faixaP: 19, faixaM: 99 });
 const mapaUnidades = reactive({});
 const gravando = ref(false);
@@ -29,9 +30,11 @@ const cabecalhos = computed(() => (aba.value ? aba.value.cabecalhos : []));
 const CAMPOS = [
   { id: 'unidade', rotulo: 'Unidade', obrig: true, ajuda: 'em qual unidade o cliente é atendido' },
   { id: 'vencimento', rotulo: 'Data de vencimento', obrig: true, ajuda: 'a data que define o mês' },
-  { id: 'cliente', rotulo: 'Cliente', obrig: false, ajuda: 'para contar cada cliente uma vez por mês' },
+  { id: 'cliente', rotulo: 'Cliente (nome)', obrig: false, ajuda: 'para contar cada cliente uma vez por mês' },
+  { id: 'clienteId', rotulo: 'Código do cliente', obrig: false, ajuda: 'identifica cada estabelecimento (dois códigos = dois atendimentos); sem código, usa o nome' },
   { id: 'condicao', rotulo: 'Condição', obrig: false, ajuda: 'Mensal / Exclusiva TST (sem coluna: usa o padrão abaixo)' },
   { id: 'porte', rotulo: 'Porte', obrig: false, ajuda: 'P/M/G, pequeno/médio/grande ou nº de funcionários' },
+  { id: 'situacao', rotulo: 'Situação', obrig: false, ajuda: 'para deixar de fora renovados / em dia' },
 ];
 
 async function escolher(ev) {
@@ -47,14 +50,18 @@ async function escolher(ev) {
 }
 function aplicarDeteccao() {
   const d = detectarColunas(cabecalhos.value);
-  Object.assign(mapa, { unidade: d.unidade, vencimento: d.vencimento, cliente: d.cliente, condicao: d.condicao, porte: d.porte });
+  Object.assign(mapa, { unidade: d.unidade, vencimento: d.vencimento, cliente: d.cliente, clienteId: d.clienteId, condicao: d.condicao, porte: d.porte, situacao: d.situacao });
 }
 watch(abaSel, aplicarDeteccao);
+const situacoes = computed(() => (aba.value && mapa.situacao != null ? valoresDistintos(aba.value.linhas, mapa.situacao) : []));
+// ao (re)detectar a coluna de situação, marca tudo menos renovado/em dia/cancelado
+watch(situacoes, lista => { situacoesSel.value = lista.length ? lista.filter(x => !situacaoExcluida(x.valor)).map(x => x.valor) : null; }, { immediate: true });
+function alternarSituacao(valor, on) { const s = new Set(situacoesSel.value || []); if (on) s.add(valor); else s.delete(valor); situacoesSel.value = [...s]; }
 
 const resumo = computed(() => {
   if (!aba.value) return null;
   const faixas = opcoes.usarFaixas ? { pequeno: Number(opcoes.faixaP), medio: Number(opcoes.faixaM) } : null;
-  return resumir(aba.value.linhas, mapa, { contarPor: opcoes.contarPor, ano: Number(opcoes.ano), condicaoPadrao: opcoes.condicaoPadrao, portePadrao: opcoes.portePadrao, porteFaixas: faixas, codigosPorte: cad.portes.map(p => p.codigo) });
+  return resumir(aba.value.linhas, mapa, { contarPor: opcoes.contarPor, ano: Number(opcoes.ano), condicaoPadrao: opcoes.condicaoPadrao, portePadrao: opcoes.portePadrao, porteFaixas: faixas, codigosPorte: cad.portes.map(p => p.codigo), situacoes: mapa.situacao != null ? situacoesSel.value : null });
 });
 const nomesArquivo = computed(() => (resumo.value ? Object.keys(resumo.value.porUnidade) : []));
 watch(nomesArquivo, nomes => {
@@ -120,7 +127,11 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
         <label><span class="mb-1 block font-medium">Ano a importar</span><select v-model="opcoes.ano" class="input input-sm w-full"><option v-for="a in cad.anosDisponiveis(Number(opcoes.ano))" :key="a" :value="a">{{ a }}</option></select>
           <small v-if="resumo && resumo.anosEncontrados.length" class="muted block">No arquivo: {{ resumo.anosEncontrados.map(a => `${a.ano} (${a.linhas})`).join(', ') }}</small></label>
         <label><span class="mb-1 block font-medium">Como contar</span><select v-model="opcoes.contarPor" class="input input-sm w-full"><option value="cliente">cada cliente uma vez por mês</option><option value="linha">cada linha (documento)</option></select>
-          <small v-if="opcoes.contarPor === 'cliente' && mapa.cliente == null" class="block text-warn">Sem a coluna Cliente, cada linha conta uma vez.</small></label>
+          <small v-if="opcoes.contarPor === 'cliente' && mapa.cliente == null && mapa.clienteId == null" class="block text-warn">Sem coluna de cliente, cada linha conta uma vez.</small>
+          <small v-else-if="opcoes.contarPor === 'cliente'" class="muted block">Identifica pelo {{ mapa.clienteId != null ? 'código' : 'nome' }}.</small></label>
+        <div v-if="situacoes.length" class="md:col-span-4"><span class="mb-1 block font-medium">Situações que entram</span>
+          <div class="flex flex-wrap gap-3"><label v-for="s in situacoes" :key="s.valor" class="flex items-center gap-1"><input type="checkbox" :checked="(situacoesSel || []).includes(s.valor)" @change="alternarSituacao(s.valor, $event.target.checked)"> {{ s.valor }} <span class="muted">({{ s.n }})</span></label></div>
+        </div>
         <label v-if="mapa.condicao == null"><span class="mb-1 block font-medium">Condição (sem coluna)</span><select v-model="opcoes.condicaoPadrao" class="input input-sm w-full"><option value="mensal">Mensal</option><option value="exclusiva_tst">Exclusiva TST</option></select></label>
         <div v-if="mapa.porte == null"><span class="mb-1 block font-medium">Porte (sem coluna)</span><select v-model="opcoes.portePadrao" class="input input-sm w-full"><option v-for="p in cad.portes" :key="p.codigo" :value="p.codigo">{{ p.nome }}</option></select></div>
         <div v-else><label class="flex items-center gap-2"><input v-model="opcoes.usarFaixas" type="checkbox"> <span>A coluna de porte é nº de funcionários</span></label>

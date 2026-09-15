@@ -44,7 +44,7 @@ const pendente = mes => {
   const a = dim.filaAlvo[Calculo.TEC].meses[mes], b = dim.filaAlvo[Calculo.ADM].meses[mes];
   const v = Math.max(a.filaFim, b.filaFim);
   const tip = Math.abs(a.filaFim - b.filaFim) > 0.5 ? `Técnicos: ${num(a.filaFim)} · Administrativos: ${num(b.filaFim)} (mostra o maior)`
-    : mes < pref.mesAtual ? `${num(a.filaInicio)} que já estavam em aberto + ${num(a.informado)} que venceram (o passado não desconta a equipe: o número lançado já é o que ficou em aberto)`
+    : mes < pref.mesAtual ? `${num(a.filaInicio)} que já estavam em aberto${mes === 0 && a.filaInicio > 0.5 ? ` (vindos de ${pref.ano - 1})` : ''} + ${num(a.informado)} que venceram (o passado não desconta a equipe: o número lançado já é o que ficou em aberto)`
     : `${num(a.filaInicio)} de antes + ${num(a.informado)} que vencem − ${num(a.atendidas)} atendidas`;
   return { v, tip };
 };

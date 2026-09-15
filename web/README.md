@@ -27,7 +27,8 @@ web/
     services/
       supabase.js           cliente único + erroAmigavel()
       api.js                única camada que fala com o banco; devolve objetos do domínio
-      importacao.js         importador de planilha (SGG): ler, detectar colunas, contar por unidade × mês (puro; testes em tests/)
+      importacao.js         importador de planilha (SGG "Vencimento(s) de PGR(s)"): ler, detectar colunas, contar por
+                            unidade × mês, filtro de situação (puro; testes em tests/importacao.test.mjs)
     stores/  (Pinia)
       auth.js               sessão, papel (admin | supervisor | leitura), podeEditar, entrar/sair
       cadastros.js          FONTE ÚNICA DE DADOS: funcoes, unidades (mesesPorAno), colaboradores,
@@ -35,8 +36,8 @@ web/
                             getters para o motor (unidadesDoAno, colaboradoresCompletos, pesosPorte);
                             exportarBackup / importarBackup
       preferencias.js       só do navegador: ano, mês atual, unidade, simulação "E se…?" (localStorage)
-      dimensionamento.js    SÓ DERIVAÇÕES: resultado = Calculo.calcular(...), fila = Calculo.fila(...),
-                            alvo (unidade ou total), hoje (3 números) — muda um cadastro, recalcula
+      dimensionamento.js    SÓ DERIVAÇÕES: resultado = Calculo.calcular(...), filaInicial (pendente do ano
+                            anterior → janeiro), fila = Calculo.fila(...), alvo, hoje — muda um cadastro, recalcula
     router/index.js         rotas + TELAS (menu) + guard por papel
     composables/useFormat.js num, numFte, moeda, meses
     components/

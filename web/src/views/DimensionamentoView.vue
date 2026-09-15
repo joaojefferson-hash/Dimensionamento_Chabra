@@ -57,7 +57,7 @@ const notaDistribuicao = a => {
         <div class="label">Pendentes hoje · {{ mesMin(dim.hoje.mes) }}</div>
         <div class="value" :class="dim.hoje.pendentes > 0.5 ? 'text-danger' : ''">{{ num(dim.hoje.pendentes) }}<small> empresas</small></div>
         <div class="stat-detalhe">
-          <template v-if="dim.hoje.deAntes > 0.5"><strong>{{ num(dim.hoje.deAntes) }}</strong> ficaram de meses anteriores + {{ num(dim.hoje.vencem) }} que vencem em {{ mesMin(dim.hoje.mes) }}.</template>
+          <template v-if="dim.hoje.deAntes > 0.5"><strong>{{ num(dim.hoje.deAntes) }}</strong> ficaram de meses anteriores<template v-if="dim.hoje.deAnoAnterior > 0.5"> (inclui {{ num(dim.hoje.deAnoAnterior) }} de {{ dim.hoje.anoAnterior }})</template> + {{ num(dim.hoje.vencem) }} que vencem em {{ mesMin(dim.hoje.mes) }}.</template>
           <template v-else>Tudo o que vence em {{ mesMin(dim.hoje.mes) }}; nada ficou de meses anteriores.</template>
         </div>
       </div>

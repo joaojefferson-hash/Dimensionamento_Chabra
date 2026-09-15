@@ -3,7 +3,7 @@
 import assert from 'node:assert';
 import { writeFileSync } from 'node:fs';
 import * as XLSX from 'xlsx';
-import { lerPlanilha, detectarColunas, resumir, casarUnidades, montarLinhasRpc, lerData, lerPorte } from '../src/services/importacao.js';
+import { lerPlanilha, detectarColunas, resumir, casarUnidades, montarLinhasRpc, lerData, lerPorte, situacaoExcluida } from '../src/services/importacao.js';
 
 let passaram = 0;
 const teste = (nome, fn) => { fn(); passaram++; console.log('  ✓ ' + nome); };
@@ -87,6 +87,26 @@ teste('casa nomes do arquivo com o cadastro (acento, maiúscula) e junta na mesm
   const set = rpc.filter(l => l.unidade_id === 'u-ter' && l.mes === 9);
   assert.deepStrictEqual(set.map(l => `${l.condicao}/${l.porte}=${l.quantidade}`).sort(), ['exclusiva_tst/G=1', 'mensal/M=1', 'mensal/P=1']);
   assert.ok(!rpc.some(l => l.unidade_id === null));
+});
+
+teste('formato real do SGG (VENCIMENTO(s) DE PGR(s)): Região, Data Validade, Empresa, Código Empresa, Situação, Informações adicionais', () => {
+  const cab = ['Código Empresa', 'Empresa', 'Região', 'Tipo Período', 'Data Emissão Anterior', 'Data Validade', 'Situação', 'Detalhes Adicionais', 'Informações adicionais da Empresa', ''];
+  const rows = [
+    ['1483', 'FONTE DA CONSTRUCAO', 'Teresópolis', 'PERIÓDICA', '23/05/2024', '07/02/2025', 'Vencido', '', 'Mensal desde 04/04/2022\n', ''],
+    ['1499', 'FRADES IDIOMAS LTDA', 'Teresópolis', 'PERIÓDICA', '', '03/09/2025', 'Vencido', '', 'Mensal', ''],
+    ['1501', 'FRADES IDIOMAS LTDA', 'Teresópolis', 'PERIÓDICA', '', '12/09/2025', 'Vencido', '', 'Mensal', ''],   // outro código = outro estabelecimento
+    ['2000', 'HOTEL X', 'Teresópolis', 'PERIÓDICA', '', '20/09/2025', 'Renovado', '', 'Mensal', ''],              // renovado: fora por padrão
+    ['2001', 'CLINICA Y', 'Teresópolis', 'PERIÓDICA', '', '25/09/2025', 'Vencido', '', 'Exclusiva TST', ''],
+  ];
+  const m = detectarColunas(cab);
+  assert.deepStrictEqual({ u: cab[m.unidade], v: cab[m.vencimento], c: cab[m.cliente], id: cab[m.clienteId], cond: cab[m.condicao], sit: cab[m.situacao], porte: m.porte },
+    { u: 'Região', v: 'Data Validade', c: 'Empresa', id: 'Código Empresa', cond: 'Informações adicionais da Empresa', sit: 'Situação', porte: null });
+  assert.strictEqual(situacaoExcluida('Renovado'), true);
+  assert.strictEqual(situacaoExcluida('Vencido'), false);
+  const r = resumir(rows, m, { ano: 2025, situacoes: ['Vencido'] });
+  assert.deepStrictEqual(r.porUnidade['Teresópolis'][9], { mensal: { P: 2 }, exclusiva_tst: { P: 1 } }); // Frades conta 2 (dois códigos)
+  assert.deepStrictEqual(r.porUnidade['Teresópolis'][2], { mensal: { P: 1 } });
+  assert.ok(r.avisos.some(a => /desmarcada/.test(a)));
 });
 
 console.log(`\n${passaram} testes passaram.`);

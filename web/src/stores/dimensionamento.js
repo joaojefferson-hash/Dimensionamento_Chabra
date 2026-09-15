@@ -25,8 +25,24 @@ export const useDimensionamentoStore = defineStore('dimensionamento', () => {
     janela: { de: 0, ate: 11 },
     ano: pref.ano,
   }));
+  /**
+   * O que ficou em aberto no ano anterior entra em janeiro: calcula a fila do ano anterior
+   * (todo passado se já terminou; até o mês atual se for o ano corrente) e pega dezembro.
+   */
+  const filaInicial = computed(() => {
+    const anoAnterior = pref.ano - 1;
+    const unidadesAnt = cad.unidadesDoAno(anoAnterior);
+    if (!unidadesAnt.some(u => Object.keys(u.meses).length)) return null;
+    const hojeAno = new Date().getFullYear();
+    const mesAtualAnt = anoAnterior < hojeAno ? 12 : anoAnterior === hojeAno ? pref.mesAtual : 0;
+    const rAnt = Calculo.calcular({ unidades: unidadesAnt, colaboradores: cad.colaboradoresCompletos, parametros: parametrosMotor.value, simulacoes: [], janela: { de: 0, ate: 11 }, ano: anoAnterior });
+    const fAnt = Calculo.fila(rAnt, { mesAtual: mesAtualAnt, prazoMeses: prazoMeses.value });
+    const out = {};
+    fAnt.unidades.forEach(u => { out[u.id] = {}; Calculo.FUNCOES.forEach(f => { out[u.id][f] = u.grupos[f].meses[11].filaFim; }); });
+    return out;
+  });
   /** Pendentes mês a mês (o passado acumula sem descontar; do mês atual em diante a equipe atende). */
-  const fila = computed(() => Calculo.fila(resultado.value, { mesAtual: pref.mesAtual, prazoMeses: prazoMeses.value }));
+  const fila = computed(() => Calculo.fila(resultado.value, { mesAtual: pref.mesAtual, prazoMeses: prazoMeses.value, filaInicial: filaInicial.value }));
 
   const unidadeSelValida = computed(() => (cad.unidades.some(u => u.id === pref.unidadeSel) ? pref.unidadeSel : ''));
   /** Alvo da tela: a unidade escolhida ou o total. */
@@ -52,8 +68,11 @@ export const useDimensionamentoStore = defineStore('dimensionamento', () => {
         producaoDia: Calculo.ENTREGAS_DA_FUNCAO[f].map(e => ({ id: e.id, unidade: e.unidade, valor: res.producaoDiaPor[e.id] || 0 })),
       };
     });
-    return { mes: t, pendentes: pend.pendentes, deAntes: pend.filaInicio, vencem: pend.informado, areas };
+    const deAnoAnterior = unidadeSelValida.value
+      ? (filaInicial.value && filaInicial.value[unidadeSelValida.value] ? filaInicial.value[unidadeSelValida.value][Calculo.TEC] : 0)
+      : fila.value.filaInicial[Calculo.TEC];
+    return { mes: t, pendentes: pend.pendentes, deAntes: pend.filaInicio, vencem: pend.informado, deAnoAnterior, anoAnterior: pref.ano - 1, areas };
   });
 
-  return { resultado, fila, alvo, filaAlvo, titulo, varias, temCusto, hoje, prazoMeses, unidadeSelValida };
+  return { resultado, fila, filaInicial, alvo, filaAlvo, titulo, varias, temCusto, hoje, prazoMeses, unidadeSelValida };
 });
