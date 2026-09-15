@@ -67,11 +67,27 @@ const Auth = (() => {
     return nome || u.email || '';
   }
 
-  /** Administrador = app_metadata.admin === true (definido só pelo servidor; o usuário não edita). */
-  function isAdmin() {
+  /**
+   * Papel do usuário (definido só pelo servidor, em app_metadata; o usuário não edita):
+   *   admin      → vê e edita tudo, gerencia usuários, importa backup
+   *   supervisor → vê e edita os cadastros; não vê o dimensionamento
+   *   leitura    → vê tudo, não altera nada (diretoria, gerência, RH)
+   * Sem papel gravado: admin === true → admin; senão → leitura.
+   */
+  const PAPEIS = {
+    admin:      { rotulo: 'Administrador', descricao: 'vê e edita tudo, gerencia usuários e importa backups' },
+    supervisor: { rotulo: 'Supervisão',    descricao: 'vê e edita os cadastros (unidades, empresas, colaboradores, funções, calendário)' },
+    leitura:    { rotulo: 'Leitura',       descricao: 'vê tudo (programações, fila, cadastros), mas não altera nada — diretoria, gerência, RH' },
+  };
+  function papel() {
     const u = user();
-    return !!(u && u.app_metadata && u.app_metadata.admin === true);
+    const m = (u && u.app_metadata) || {};
+    if (typeof m.papel === 'string' && PAPEIS[m.papel]) return m.papel;
+    return m.admin === true ? 'admin' : 'leitura';
   }
+  function isAdmin() { return papel() === 'admin'; }
+  /** Pode alterar cadastros (admin e supervisão). */
+  function podeEditar() { return papel() === 'admin' || papel() === 'supervisor'; }
 
   /** Troca a senha do usuário logado. */
   async function alterarSenha(novaSenha) {
@@ -92,7 +108,7 @@ const Auth = (() => {
   }
 
   return {
-    configOk, init, onChange, signIn, signOut, user, displayName, isAdmin, alterarSenha,
+    configOk, init, onChange, signIn, signOut, user, displayName, isAdmin, papel, podeEditar, PAPEIS, alterarSenha,
     get session() { return session; },
   };
 })();

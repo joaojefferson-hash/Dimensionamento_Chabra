@@ -24,13 +24,13 @@ const ViewHistorico = {
         <div class="card-head">
           <h2>Alterações recentes</h2>
           <div class="right">
-            <input class="input input-sm" id="hist-filtro" type="search" placeholder="Filtrar por pessoa, unidade, colaborador…" value="${UI.esc(this.filtro)}" style="min-width:260px">
-            <button type="button" class="btn btn-ghost btn-sm" data-action="recarregar">Atualizar</button>
+            <input class="input input-sm" id="hist-filtro" data-local type="search" placeholder="Filtrar por pessoa, unidade, colaborador…" value="${UI.esc(this.filtro)}" style="min-width:260px">
+            <button type="button" class="btn btn-ghost btn-sm" data-action="recarregar" data-local>Atualizar</button>
           </div>
         </div>
         <div id="hist-lista"><div class="empty">Carregando…</div></div>
         <div class="hist-rodape">
-          <button type="button" class="btn btn-ghost btn-sm" id="hist-mais" hidden>Carregar mais</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="hist-mais" data-local hidden>Carregar mais</button>
         </div>
       </section>
     `;

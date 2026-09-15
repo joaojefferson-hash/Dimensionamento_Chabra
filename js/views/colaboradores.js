@@ -40,7 +40,7 @@ const ViewColaboradores = {
             ? 'Quem está em cada unidade e quem lidera. O organograma é montado pelas unidades marcadas em cada pessoa — clique num nome para editar.'
             : 'Cadastre cada pessoa da equipe e informe quanto ela produz em um dia normal de trabalho. Cada pessoa tem o seu ritmo — os números são seus, não há fórmula automática.'}</p>
         </div>
-        <div class="segmented" role="tablist" aria-label="Modo de visualização">
+        <div class="segmented" role="tablist" aria-label="Modo de visualização" data-local>
           <button type="button" role="tab" class="${modo === 'cadastro' ? 'ativo' : ''}" aria-selected="${modo === 'cadastro'}" data-action="modo" data-modo="cadastro">Cadastro</button>
           <button type="button" role="tab" class="${modo === 'organograma' ? 'ativo' : ''}" aria-selected="${modo === 'organograma'}" data-action="modo" data-modo="organograma">Organograma</button>
         </div>
@@ -114,7 +114,7 @@ const ViewColaboradores = {
       <section class="card card-organograma">
         <div class="card-head">
           <h2>Organograma</h2>
-          <div class="right">
+          <div class="right" data-local>
             <span class="muted">chefias pela hierarquia das funções → equipes por unidade</span>
             <label class="print-orientacao" title="Orientação da folha na impressão">
               <span class="muted">Folha</span>
@@ -370,7 +370,7 @@ const ViewColaboradores = {
           <span class="muted" id="colab-contador"></span>
         </div>
         ${colaboradores.length > 0 ? `
-        <form class="filtros" id="filtros-colab" autocomplete="off">
+        <form class="filtros" id="filtros-colab" autocomplete="off" data-local>
           <input class="input input-sm filtro-texto" type="search" name="texto" placeholder="Buscar por nome…" value="${UI.esc(this.filtros.texto)}" aria-label="Buscar por nome">
           <select class="input input-sm" name="funcao" aria-label="Função">
             <option value="">Todas as funções</option>

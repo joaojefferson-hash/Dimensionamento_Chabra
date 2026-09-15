@@ -108,7 +108,7 @@ const Organograma = (() => {
   // ---------------------------------------------------------------- HTML ----
 
   const pessoaHTML = (c, pct, estrela = false) => `
-    <button type="button" class="org-pessoa" data-action="edit" data-id="${c.id}" title="Editar ${UI.esc(c.nome)}">
+    <button type="button" class="org-pessoa" data-action="edit" data-local data-id="${c.id}" title="Editar ${UI.esc(c.nome)}">
       <span class="org-nome">${estrela ? '<span class="org-estrela">★</span> ' : ''}${UI.esc(c.nome)}</span>
       <span class="org-funcao">${UI.esc(c.funcao || 'sem função')}${pct != null && pct < 99.999 && c.tipoProducao !== 'nenhuma' ? ` · ${fmt(Math.round(pct * 10) / 10)}% do tempo` : ''}</span>
     </button>`;

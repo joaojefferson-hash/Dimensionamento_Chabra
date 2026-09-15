@@ -3,18 +3,22 @@
 //
 // Chamada pelo app com o JWT do usuário logado (supabase.functions.invoke).
 // - O gateway já exige um JWT válido (verify_jwt = true).
-// - Aqui conferimos QUEM é o chamador e exigimos app_metadata.admin === true
-//   (app_metadata não é editável pelo próprio usuário, ao contrário de
-//   user_metadata).
+// - Aqui conferimos QUEM é o chamador e exigimos papel 'admin' (app_metadata
+//   não é editável pelo próprio usuário, ao contrário de user_metadata).
 // - Só então usamos a chave secreta (lida do ambiente da função, nunca vai ao
 //   navegador) para as operações auth.admin.*.
 //
+// Papéis (app_metadata.papel): 'admin' (tudo), 'supervisor' (edita cadastros),
+// 'leitura' (vê tudo, não altera). app_metadata.admin continua sendo gravado
+// (= papel === 'admin') para compatibilidade.
+//
 // Ações (body JSON { action, ...params }):
 //   listar                       → { usuarios: [...] }
-//   criar          { nome, sobrenome, email, senha, admin }
+//   criar          { nome, sobrenome, email, senha, papel }
 //   editar         { id, nome, sobrenome }        (dados de exibição, em user_metadata)
 //   redefinirSenha { id, senha }
-//   definirAdmin   { id, admin }
+//   definirPapel   { id, papel }
+//   definirAdmin   { id, admin }                  (legado: admin → 'admin', senão 'leitura')
 //   remover        { id }
 // ============================================================================
 
@@ -58,12 +62,21 @@ function traduz(msg: string): string {
   return msg;
 }
 
+type Papel = 'admin' | 'supervisor' | 'leitura';
+const PAPEIS: Papel[] = ['admin', 'supervisor', 'leitura'];
+const papelDe = (meta: Record<string, unknown> | undefined): Papel => {
+  const p = meta?.papel;
+  if (typeof p === 'string' && (PAPEIS as string[]).includes(p)) return p as Papel;
+  return meta?.admin === true ? 'admin' : 'leitura';
+};
+
 type Usuario = {
   id: string;
   email: string | null;
   nome: string;
   sobrenome: string;
   nomeCompleto: string;
+  papel: Papel;
   admin: boolean;
   confirmado: boolean;
   criadoEm: string;
@@ -82,7 +95,8 @@ function mapUser(u: { id: string; email?: string; app_metadata?: Record<string, 
     nome,
     sobrenome,
     nomeCompleto: [nome, sobrenome].filter(Boolean).join(' ') || (u.email ?? ''),
-    admin: u.app_metadata?.admin === true,
+    papel: papelDe(u.app_metadata),
+    admin: papelDe(u.app_metadata) === 'admin',
     confirmado: !!u.email_confirmed_at,
     criadoEm: u.created_at,
     ultimoLogin: u.last_sign_in_at ?? null,
@@ -104,7 +118,7 @@ Deno.serve(async (req: Request) => {
     if (!token) return json({ error: 'Não autenticado' }, 401);
     const { data: { user: chamador }, error: authErr } = await admin.auth.getUser(token);
     if (authErr || !chamador) return json({ error: 'Sessão inválida ou expirada' }, 401);
-    if (chamador.app_metadata?.admin !== true) return json({ error: 'Apenas administradores podem gerenciar usuários.' }, 403);
+    if (papelDe(chamador.app_metadata) !== 'admin') return json({ error: 'Apenas administradores podem gerenciar usuários.' }, 403);
 
     const body = await req.json().catch(() => ({}));
     const action = String(body.action ?? '');
@@ -128,7 +142,7 @@ Deno.serve(async (req: Request) => {
         const sobrenome = limpaNome(body.sobrenome);
         const email = String(body.email ?? '').trim().toLowerCase();
         const senha = String(body.senha ?? '');
-        const ehAdmin = body.admin === true;
+        const papel: Papel = (PAPEIS as string[]).includes(String(body.papel)) ? body.papel : (body.admin === true ? 'admin' : 'leitura');
         if (!nome) return json({ error: 'Informe o nome.' }, 400);
         if (!EMAIL_RE.test(email)) return json({ error: 'E-mail inválido.' }, 400);
         if (senha.length < SENHA_MIN) return json({ error: `A senha precisa ter pelo menos ${SENHA_MIN} caracteres.` }, 400);
@@ -137,7 +151,7 @@ Deno.serve(async (req: Request) => {
           password: senha,
           email_confirm: true,
           user_metadata: { nome, sobrenome },
-          app_metadata: { admin: ehAdmin },
+          app_metadata: { admin: papel === 'admin', papel },
         });
         if (error) return json({ error: traduz(error.message) }, error.status === 422 ? 409 : 400);
         return json({ usuario: mapUser(data.user) }, 201);
@@ -168,24 +182,28 @@ Deno.serve(async (req: Request) => {
         return json({ ok: true });
       }
 
+      case 'definirPapel':
       case 'definirAdmin': {
         const id = String(body.id ?? '');
-        const ehAdmin = body.admin === true;
+        const papel: Papel = action === 'definirAdmin'
+          ? (body.admin === true ? 'admin' : 'leitura')
+          : ((PAPEIS as string[]).includes(String(body.papel)) ? body.papel : null as unknown as Papel);
         if (!id) return json({ error: 'Usuário não informado.' }, 400);
+        if (!papel) return json({ error: 'Papel inválido. Use admin, supervisor ou leitura.' }, 400);
         if (id === chamador.id) return json({ error: 'Você não pode alterar o seu próprio papel.' }, 400);
         const { data: alvo, error: getErr } = await admin.auth.admin.getUserById(id);
         if (getErr || !alvo.user) return json({ error: 'Usuário não encontrado.' }, 404);
-        if (!ehAdmin) {
+        if (papel !== 'admin') {
           const admins = (await listar()).filter(u => u.admin);
           if (admins.length <= 1 && admins.some(u => u.id === id)) {
             return json({ error: 'Não é possível remover o último administrador.' }, 400);
           }
         }
         const { error } = await admin.auth.admin.updateUserById(id, {
-          app_metadata: { ...(alvo.user.app_metadata ?? {}), admin: ehAdmin },
+          app_metadata: { ...(alvo.user.app_metadata ?? {}), admin: papel === 'admin', papel },
         });
         if (error) return json({ error: traduz(error.message) }, 400);
-        return json({ ok: true });
+        return json({ ok: true, papel });
       }
 
       case 'remover': {

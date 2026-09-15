@@ -50,7 +50,7 @@ const Programacao = (() => {
         ${janela ? `
         <div class="param">
           <span class="param-label">Período</span>
-          <div class="param-inline">
+          <div class="param-inline" data-local>
             <select class="input input-sm" name="de" aria-label="Mês inicial">${opcoesMes(janela.de)}</select>
             <span class="muted">a</span>
             <select class="input input-sm" name="ate" aria-label="Mês final">${opcoesMes(janela.ate)}</select>
@@ -60,7 +60,7 @@ const Programacao = (() => {
         ${mesAtual !== null ? `
         <div class="param">
           <span class="param-label">Mês atual</span>
-          <div class="param-inline">
+          <div class="param-inline" data-local>
             <select class="input input-sm" name="mesAtual" aria-label="Mês atual">${opcoesMes(mesAtual)}</select>
             <span class="param-ajuda" title="A fila de hoje é o que se acumulou de janeiro até o mês anterior a este. O que entra e o que a equipe consegue são contados deste mês em diante.">?</span>
           </div>
@@ -68,7 +68,7 @@ const Programacao = (() => {
         ${unidades ? `
         <div class="param">
           <span class="param-label">Unidade</span>
-          <select class="input input-sm" name="unidade">
+          <select class="input input-sm" name="unidade" data-local>
             <option value="" ${!unidadeSel ? 'selected' : ''}>Todas as unidades</option>
             ${unidades.map(u => `<option value="${u.id}" ${u.id === unidadeSel ? 'selected' : ''}>${UI.esc(u.nome)}</option>`).join('')}
           </select>
@@ -195,7 +195,7 @@ const Programacao = (() => {
         <td class="actions"><button type="button" class="btn-link danger" data-action="sim-remover" data-sim="${i}">Remover</button></td>
       </tr>`;
     return `
-      <section class="card card-simulacao ${sims.length ? 'ativa' : ''}">
+      <section class="card card-simulacao ${sims.length ? 'ativa' : ''}" data-local>
         <div class="card-head">
           <h2>E se…? Simular pessoas a mais ou a menos</h2>
           <div class="right">

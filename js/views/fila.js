@@ -166,7 +166,7 @@ const ViewFila = {
             <tbody>
               ${fila.unidades.map(u => { const gu = u.grupos[f], su = gu.resumo; return `
                 <tr>
-                  <td><button type="button" class="btn-link" data-action="ver-unidade" data-id="${u.id}">${UI.esc(u.nome)}</button></td>
+                  <td><button type="button" class="btn-link" data-action="ver-unidade" data-local data-id="${u.id}">${UI.esc(u.nome)}</button></td>
                   <td class="num">${fte(su.pessoas)}</td>
                   <td class="num ${su.filaHoje > 0.5 ? 'txt-deficit' : ''}">${num(su.filaHoje)}</td>
                   <td class="num">${su.pessoasPrazo > 0 ? `<span class="delta delta-falta">contratar ${su.pessoasPrazo}</span>` : '<span class="delta delta-ok">ok</span>'}</td>

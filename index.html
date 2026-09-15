@@ -70,50 +70,50 @@
       </div>
 
       <nav class="nav" id="nav" aria-label="Telas">
-        <div class="nav-section">Dimensionamento</div>
-        <button class="nav-item" data-view="programacao-anual" type="button">
+        <div class="nav-section" data-secao="dimensionamento">Dimensionamento</div>
+        <button class="nav-item" data-secao="dimensionamento" data-view="programacao-anual" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 4 3 5-6"/></svg>
           <span>Programação Anual</span>
         </button>
-        <button class="nav-item" data-view="programacao-mensal" type="button">
+        <button class="nav-item" data-secao="dimensionamento" data-view="programacao-mensal" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
           <span>Programação Mensal</span>
         </button>
-        <button class="nav-item" data-view="fila" type="button">
+        <button class="nav-item" data-secao="dimensionamento" data-view="fila" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>
           <span>Fila de atendimento</span>
         </button>
-        <div class="nav-section">Cadastros</div>
-        <button class="nav-item" data-view="unidades" type="button">
+        <div class="nav-section" data-secao="cadastros">Cadastros</div>
+        <button class="nav-item" data-secao="cadastros" data-view="unidades" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/></svg>
           <span>Unidades</span>
           <span class="badge" data-badge="unidades">0</span>
         </button>
-        <button class="nav-item" data-view="empresas" type="button">
+        <button class="nav-item" data-secao="cadastros" data-view="empresas" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
           <span>Empresas por Unidade</span>
           <span class="badge" data-badge="empresas">0</span>
         </button>
-        <button class="nav-item" data-view="colaboradores" type="button">
+        <button class="nav-item" data-secao="cadastros" data-view="colaboradores" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <span>Colaboradores</span>
           <span class="badge" data-badge="colaboradores">0</span>
         </button>
-        <button class="nav-item" data-view="funcoes" type="button">
+        <button class="nav-item" data-secao="cadastros" data-view="funcoes" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></svg>
           <span>Funções</span>
         </button>
-        <button class="nav-item" data-view="calendario" type="button">
+        <button class="nav-item" data-secao="cadastros" data-view="calendario" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
           <span>Calendário</span>
         </button>
-        <div class="nav-section">Acompanhamento</div>
-        <button class="nav-item" data-view="historico" type="button">
+        <div class="nav-section" data-secao="acompanhamento">Acompanhamento</div>
+        <button class="nav-item" data-secao="acompanhamento" data-view="historico" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></svg>
           <span>Histórico</span>
         </button>
-        <div class="nav-section" data-admin-only hidden>Administração</div>
-        <button class="nav-item" data-view="usuarios" type="button" data-admin-only hidden>
+        <div class="nav-section" data-secao="administracao" data-admin-only hidden>Administração</div>
+        <button class="nav-item" data-secao="administracao" data-view="usuarios" type="button" data-admin-only hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9.5 12l1.8 1.8L14.5 10"/></svg>
           <span>Usuários</span>
         </button>
@@ -125,13 +125,13 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
           Exportar JSON
         </button>
-        <button class="btn btn-outline-light" id="btn-import" type="button">
+        <button class="btn btn-outline-light" id="btn-import" type="button" data-admin-only hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
           Importar JSON
         </button>
         <input type="file" id="file-import" accept="application/json,.json" hidden>
         <div class="user-row">
-          <span class="user-email" id="user-email"></span>
+          <span class="user-papel" id="user-papel"></span> <span class="user-email" id="user-email"></span>
           <span class="user-actions">
             <button type="button" class="btn-link light" id="btn-senha" title="Alterar minha senha">Senha</button>
             <button type="button" class="btn-link light" id="btn-logout">Sair</button>

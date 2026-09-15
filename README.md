@@ -46,15 +46,30 @@ Nginx…). Nenhuma configuração extra.
 
 ## Usuários e papéis
 
-- Papel de administrador = `app_metadata.admin = true` (só o servidor altera;
-  o usuário não consegue editar `app_metadata`). A mudança de papel vale no
-  próximo login do usuário afetado.
+- Três papéis, em `app_metadata.papel` (só o servidor altera; o usuário não
+  consegue editar `app_metadata`). A mudança vale no próximo login do afetado.
+
+  | papel        | vê                                              | edita                              |
+  |--------------|-------------------------------------------------|------------------------------------|
+  | `admin`      | tudo                                            | tudo; gerencia usuários; importa backup |
+  | `supervisor` | cadastros (unidades, empresas, colaboradores, funções, calendário) e histórico | os cadastros |
+  | `leitura`    | tudo (programações, fila, cadastros, histórico) | nada (diretoria, gerência, RH)     |
+
+  Sem papel gravado: `admin = true` → admin; senão → leitura. `app_metadata.admin`
+  continua sendo gravado (= papel admin) por compatibilidade.
+- **RLS**: leitura de todas as tabelas para qualquer autenticado; escrita só quando
+  `public.pode_editar()` (papel admin ou supervisor, lido do JWT por
+  `public.papel_atual()`); `importar_backup` exige admin. O front esconde as telas
+  fora do papel (`ACESSO` em `js/app.js`), desliga os controles que gravam no modo
+  leitura (`aplicarSomenteLeitura`; controles só do navegador levam `data-local`:
+  período, filtros, simulação, alternância de modo, impressão) e mostra o papel no
+  rodapé do menu. Importar JSON só aparece para admin.
 - Nome e sobrenome ficam em `user_metadata` (`nome`, `sobrenome`) e aparecem no
   programa no lugar do e-mail (menu lateral, lista de usuários).
 - Administradores veem a tela **Usuários**: listar, criar (nome, sobrenome,
-  e-mail, senha inicial, opcionalmente admin), editar nome, redefinir senha,
-  promover/rebaixar, remover. A função recusa remover a si mesmo, alterar o
-  próprio papel e remover o último admin.
+  e-mail, senha inicial, papel), editar nome, redefinir senha, trocar o papel
+  (seletor na lista; Edge Function `definirPapel`), remover. A função recusa
+  remover a si mesmo, alterar o próprio papel e remover o último admin.
 - Qualquer usuário logado troca a própria senha em **Senha** (menu lateral).
 - Não há fluxo "esqueci a senha": um admin redefine pela tela Usuários.
 
@@ -149,7 +164,7 @@ js/views/historico.js       tela Histórico de alterações
 js/calculo.js           motor de dimensionamento (puro)
 js/programacao.js       utilitários das telas de programação (janela, barra, formatação)
 js/app.js               inicialização, navegação por hash (#/unidades …), badges, backup
-supabase/migrations/    SQL do banco (0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico, 0012 = funções cadastráveis, 0013 = chefia, 0014 = coordena/responde_para, 0015 = situação da documentação no lugar do grau, 0016 = só documentos vencidos, 0017 = prazo para atender)
+supabase/migrations/    SQL do banco (0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico, 0012 = funções cadastráveis, 0013 = chefia, 0014 = coordena/responde_para, 0015 = situação da documentação no lugar do grau, 0016 = só documentos vencidos, 0017 = prazo para atender, 0018 = papéis na RLS)
 supabase/functions/usuarios/index.ts   Edge Function de gestão de usuários (chave secreta só no servidor)
 ```
 

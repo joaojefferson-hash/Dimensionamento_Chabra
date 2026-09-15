@@ -143,7 +143,7 @@ const ViewProgramacaoMensal = {
             <tbody>
               ${r.unidades.map(u => `
                 <tr>
-                  <td><button type="button" class="btn-link" data-action="ver-unidade" data-id="${u.id}">${UI.esc(u.nome)}</button></td>
+                  <td><button type="button" class="btn-link" data-action="ver-unidade" data-local data-id="${u.id}">${UI.esc(u.nome)}</button></td>
                   <td class="num">${Programacao.pessoasTexto(u.pessoas[f], u.pessoasSimuladas[f], '')}</td>
                   ${u.meses.map(m => `<td class="num">${Programacao.statusDot(m.funcoes[f].status, `${m.nomeLongo}: ${PLURAL[f]} dão conta de ${Programacao.num(m.funcoes[f].atendeEmpresas)} de ${Programacao.num(m.precisa)} empresas · ${ViewProgramacaoMensal.textoPessoas(m.funcoes[f], singular)}`)}</td>`).join('')}
                   <td class="num">${Programacao.pessoasHTML(u.janela.funcoes[f], singular)}</td>

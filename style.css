@@ -896,3 +896,8 @@ form.busy { opacity: .7; pointer-events: none; }
 .fila-leg.passado { background: var(--primary-soft); }
 .fila-leg.atual { background: var(--primary-dark); }
 .stat .value.value-lista { display: flex; flex-wrap: wrap; gap: 2px 14px; }
+
+/* papéis / modo leitura */
+.alert-info { background: #e7eef8; border: 1px solid #c5d5ee; color: #2b4c7e; }
+.user-papel { display: inline-block; padding: 0 6px; border-radius: 999px; background: rgba(255, 255, 255, .18); font-size: 11px; margin-right: 4px; }
+.sel-papel { width: auto; }

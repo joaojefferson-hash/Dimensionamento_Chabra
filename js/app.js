@@ -29,11 +29,30 @@ const App = (() => {
 
   /* ---------- navegação ---------- */
 
+  /** Quais papéis veem cada tela (o que não está aqui é para todos). */
+  const ACESSO = {
+    'programacao-anual':  ['admin', 'leitura'],
+    'programacao-mensal': ['admin', 'leitura'],
+    fila:                 ['admin', 'leitura'],
+    unidades:             ['admin', 'supervisor', 'leitura'],
+    empresas:             ['admin', 'supervisor', 'leitura'],
+    colaboradores:        ['admin', 'supervisor', 'leitura'],
+    funcoes:              ['admin', 'supervisor', 'leitura'],
+    calendario:           ['admin', 'supervisor', 'leitura'],
+    historico:            ['admin', 'supervisor', 'leitura'],
+    usuarios:             ['admin'],
+  };
+  function podeVer(view) {
+    if (view.oculta) return false;
+    const lista = ACESSO[view.id];
+    return !lista || lista.includes(Auth.papel());
+  }
+  function telaInicial() { return views.find(podeVer) || views[0]; }
+
   function findView(id) {
-    const view = views.find(v => v.id === id) || views[0];
-    // telas ocultas ou só de admin (para quem não é) caem na tela inicial
-    if (view.oculta) return views[0];
-    return view.adminOnly && !Auth.isAdmin() ? views[0] : view;
+    const view = views.find(v => v.id === id) || telaInicial();
+    // telas ocultas ou fora do papel do usuário caem na primeira tela permitida
+    return podeVer(view) ? view : telaInicial();
   }
 
   function viewFromHash() {
@@ -70,7 +89,26 @@ const App = (() => {
     root.className = 'view';
     content.replaceChildren(root);
     current.render(root);
+    aplicarSomenteLeitura(root);
     updateBadges();
+  }
+
+  /**
+   * Modo leitura: quem não pode editar vê tudo, mas os controles que gravam ficam
+   * desligados. Controles marcados com data-local (período, filtros, simulação,
+   * alternância de modo, impressão) continuam funcionando, pois só mexem no navegador.
+   */
+  function aplicarSomenteLeitura(root) {
+    if (Auth.podeEditar()) return;
+    root.querySelectorAll('input, select, textarea, button').forEach(el => {
+      if (el.closest('[data-local]')) return;
+      el.disabled = true;
+      if (!el.title) el.title = 'Seu acesso é só de leitura';
+    });
+    const aviso = document.createElement('p');
+    aviso.className = 'alert alert-info aviso-leitura';
+    aviso.textContent = 'Acesso de leitura: você pode consultar tudo, mas não alterar. Período, filtros e a simulação "E se…?" continuam disponíveis (ficam só no seu navegador).';
+    root.prepend(aviso);
   }
 
   function updateBadges() {
@@ -100,6 +138,16 @@ const App = (() => {
     document.getElementById('user-email').textContent = Auth.displayName();
     document.getElementById('user-email').title = user ? user.email : '';
     document.querySelectorAll('[data-admin-only]').forEach(el => { el.hidden = !Auth.isAdmin(); });
+    // menu conforme o papel: só as telas que o usuário pode ver
+    document.querySelectorAll('.nav-item[data-view]').forEach(btn => {
+      const v = views.find(x => x.id === btn.dataset.view);
+      btn.hidden = !v || !podeVer(v);
+    });
+    document.querySelectorAll('.nav-section[data-secao]').forEach(sec => {
+      sec.hidden = ![...document.querySelectorAll(`.nav-item[data-secao="${sec.dataset.secao}"]`)].some(b => !b.hidden);
+    });
+    const papelEl = document.getElementById('user-papel');
+    if (papelEl) papelEl.textContent = Auth.PAPEIS[Auth.papel()].rotulo;
     showScreen('app');
     navigate(viewFromHash().id);
     await oferecerMigracaoLocal();

@@ -29,7 +29,7 @@ const UsuariosAPI = (() => {
     criar: dados => chamar('criar', dados).then(r => r.usuario),
     editar: (id, nome, sobrenome) => chamar('editar', { id, nome, sobrenome }).then(r => r.usuario),
     redefinirSenha: (id, senha) => chamar('redefinirSenha', { id, senha }),
-    definirAdmin: (id, admin) => chamar('definirAdmin', { id, admin }),
+    definirPapel: (id, papel) => chamar('definirPapel', { id, papel }),
     remover: id => chamar('remover', { id }),
   };
 })();
@@ -88,10 +88,16 @@ const ViewUsuarios = {
             </div>
             <small>Fica visível para você copiar e enviar ao colaborador.</small>
           </label>
-          <label class="field span-4 field-check">
-            <input type="checkbox" name="admin">
-            <span>Administrador (pode gerenciar usuários)</span>
-          </label>`}
+          <div class="field span-4">
+            <span>Papel (o que essa pessoa pode fazer)</span>
+            <div class="tipo-opcoes">
+              ${Object.entries(Auth.PAPEIS).map(([id, p]) => `
+                <label class="tipo-opcao">
+                  <input type="radio" name="papel" value="${id}" ${id === 'leitura' ? 'checked' : ''}>
+                  <span><strong>${UI.esc(p.rotulo)}</strong><small>${UI.esc(p.descricao)}</small></span>
+                </label>`).join('')}
+            </div>
+          </div>`}
           <div class="form-actions">
             <button type="submit" class="btn btn-primary">${editing ? 'Salvar alterações' : 'Criar usuário'}</button>
             ${editing ? '<button type="button" class="btn btn-ghost" data-action="cancel">Cancelar</button>' : ''}
@@ -130,14 +136,14 @@ const ViewUsuarios = {
         }
         const email = form.email.value.trim().toLowerCase();
         const senha = form.senha.value;
-        const admin = form.admin.checked;
+        const papel = form.papel.value;
         if (!email) { form.email.focus(); return; }
         if (senha.length < 8) {
           UI.toast('A senha precisa ter pelo menos 8 caracteres.', 'error');
           form.senha.focus();
           return;
         }
-        await UsuariosAPI.criar({ nome, sobrenome, email, senha, admin });
+        await UsuariosAPI.criar({ nome, sobrenome, email, senha, papel });
         UI.toast(`Usuário ${nome} ${sobrenome} criado.`);
         form.reset();
         form.nome.focus();
@@ -192,20 +198,6 @@ const ViewUsuarios = {
           btn.disabled = true;
           await UsuariosAPI.redefinirSenha(id, senha);
           UI.toast('Senha redefinida.');
-        } else if (action === 'admin') {
-          const tornar = !alvo.admin;
-          const ok = await UI.confirm({
-            title: tornar ? 'Tornar administrador' : 'Remover administrador',
-            message: tornar
-              ? `${alvo.nomeCompleto} passará a gerenciar usuários (criar, remover, redefinir senhas).`
-              : `${alvo.nomeCompleto} deixará de gerenciar usuários.`,
-            confirmText: tornar ? 'Tornar admin' : 'Remover admin',
-          });
-          if (!ok) return;
-          btn.disabled = true;
-          await UsuariosAPI.definirAdmin(id, tornar);
-          UI.toast(tornar ? 'Agora é administrador. A mudança vale no próximo login dele.' : 'Deixou de ser administrador. A mudança vale no próximo login dele.');
-          await this.carregar(el);
         } else if (action === 'remover') {
           const ok = await UI.confirm({
             title: 'Remover usuário',
@@ -277,12 +269,15 @@ const ViewUsuarios = {
                 <tr class="${u.id === this.editingId ? 'editing' : ''}">
                   <td>${semNome ? '<span class="muted">(sem nome)</span>' : UI.esc(u.nomeCompleto)}${souEu ? ' <span class="muted">(você)</span>' : ''}</td>
                   <td>${UI.esc(u.email || '—')}${u.confirmado ? '' : ' <span class="chip chip-gray">não confirmado</span>'}</td>
-                  <td><span class="chip ${u.admin ? 'chip-green' : 'chip-gray'}">${u.admin ? 'Administrador' : 'Usuário'}</span></td>
+                  <td>${souEu
+                    ? `<span class="chip ${u.papel === 'admin' ? 'chip-green' : u.papel === 'supervisor' ? 'chip-blue' : 'chip-gray'}">${UI.esc(Auth.PAPEIS[u.papel].rotulo)}</span>`
+                    : `<select class="input input-sm sel-papel" data-id="${u.id}" aria-label="Papel de ${UI.esc(u.nomeCompleto)}" title="${UI.esc(Auth.PAPEIS[u.papel].descricao)}">
+                        ${Object.entries(Auth.PAPEIS).map(([id, p]) => `<option value="${id}" ${id === u.papel ? 'selected' : ''}>${UI.esc(p.rotulo)}</option>`).join('')}
+                      </select>`}</td>
                   <td>${this.fmtData(u.ultimoLogin)}</td>
                   <td class="actions">
                     <button type="button" class="btn-link" data-action="edit" data-id="${u.id}">Editar</button>
                     <button type="button" class="btn-link" data-action="senha" data-id="${u.id}">Senha</button>
-                    <button type="button" class="btn-link" data-action="admin" data-id="${u.id}" ${souEu ? 'disabled title="Você não pode alterar o seu próprio papel"' : ''}>${u.admin ? 'Remover admin' : 'Tornar admin'}</button>
                     <button type="button" class="btn-link danger" data-action="remover" data-id="${u.id}" ${souEu ? 'disabled title="Você não pode remover a si mesmo"' : ''}>Remover</button>
                   </td>
                 </tr>`;
@@ -290,5 +285,30 @@ const ViewUsuarios = {
           </tbody>
         </table>
       </div>`;
+
+    // troca de papel direto na lista (vale no próximo login da pessoa)
+    box.querySelectorAll('select.sel-papel').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        const alvo = lista.find(u => u.id === sel.dataset.id);
+        const novo = sel.value;
+        if (!alvo || novo === alvo.papel) return;
+        const ok = await UI.confirm({
+          title: 'Mudar papel',
+          message: `${alvo.nomeCompleto} passa a ser "${Auth.PAPEIS[novo].rotulo}": ${Auth.PAPEIS[novo].descricao}.\n\nA mudança vale no próximo login dessa pessoa.`,
+          confirmText: 'Mudar',
+        });
+        if (!ok) { sel.value = alvo.papel; return; }
+        sel.disabled = true;
+        try {
+          await UsuariosAPI.definirPapel(alvo.id, novo);
+          UI.toast(`Papel alterado para ${Auth.PAPEIS[novo].rotulo}. Vale no próximo login de ${alvo.nome || alvo.email}.`);
+          await this.carregar(el);
+        } catch (err) {
+          UI.toast(err.message, 'error');
+          sel.value = alvo.papel;
+          sel.disabled = false;
+        }
+      });
+    });
   },
 };
