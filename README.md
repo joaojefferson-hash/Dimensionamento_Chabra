@@ -5,6 +5,8 @@ Trabalho (SST). App web independente — HTML/CSS/JS vanilla, sem framework e se
 build step. Dados na nuvem (Supabase), compartilhados por toda a equipe, com
 login por e-mail/senha.
 
+Manual completo do programa (telas, papéis, contas, rotina): [MANUAL.md](MANUAL.md).
+
 ## Como rodar
 
 **Live Server (VS Code):** abra a pasta no VS Code, clique com o botão direito em
