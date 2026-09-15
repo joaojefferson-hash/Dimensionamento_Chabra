@@ -7,6 +7,7 @@ import { useAuthStore } from '../stores/auth.js';
 
 export const TELAS = [
   { path: '/dimensionamento', name: 'dimensionamento', titulo: 'Dimensionamento', secao: 'Dimensionamento', papeis: ['admin', 'leitura'], component: () => import('../views/DimensionamentoView.vue') },
+  { path: '/dashboard',       name: 'dashboard',       titulo: 'Dashboard',       secao: 'Dimensionamento', papeis: ['admin', 'leitura'], component: () => import('../views/DashboardView.vue') },
   { path: '/unidades',        name: 'unidades',        titulo: 'Unidades',            secao: 'Cadastros', component: () => import('../views/UnidadesView.vue') },
   { path: '/empresas',        name: 'empresas',        titulo: 'Empresas por Unidade', secao: 'Cadastros', component: () => import('../views/EmpresasView.vue') },
   { path: '/colaboradores',   name: 'colaboradores',   titulo: 'Colaboradores',       secao: 'Cadastros', component: () => import('../views/ColaboradoresView.vue') },

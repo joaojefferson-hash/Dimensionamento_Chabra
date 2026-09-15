@@ -42,6 +42,7 @@ Qualquer usuário troca a própria senha em **Senha** (rodapé do menu). Não h�
 | Seção | Tela | Para quê |
 |---|---|---|
 | Dimensionamento | **Dimensionamento** | A tela de resultado: pendentes hoje, equipe → quadro ideal, mês a mês (deveria ter contratado? contratar?), por unidade, "E se…?". |
+| Dimensionamento | **Dashboard** | Os mesmos números em gráficos: pendentes mês a mês, vencem × equipe consegue, equipe hoje × ideal, por unidade, R$. |
 | Cadastros | **Unidades** | As unidades/filiais. |
 | Cadastros | **Empresas por Unidade** | Por unidade e mês: clientes ativos (informativo), Mensal e Exclusiva TST com documentos vencidos. |
 | Cadastros | **Colaboradores** | A equipe, com função, ritmo por dia e unidades onde atua. Modo **Organograma**. |
@@ -195,6 +196,16 @@ Com "Todas as unidades": uma linha por unidade com os pendentes de hoje, técnic
 Fica fechado no fim da tela; abre num clique. Cada linha: unidade, grupo, pessoas (+ contratar / − desligar), a partir de um mês até outro (padrão dezembro) e ritmo por dia. Tudo recalcula na hora — inclusive os meses passados, para testar "se eu tivesse contratado em fevereiro". Fica só no navegador; quando há simulação ativa, o bloco abre sozinho e mostra o que está sendo simulado.
 
 No fim da tela aparecem avisos de cadastro (pessoas sem unidade, tempo parcial, unidades sem gente).
+
+### 6.5 Dashboard
+
+A mesma barra (ano · mês atual · unidade) e os mesmos números do Dimensionamento, em gráficos — passe o mouse para ver os valores:
+
+- **Pendentes no fim de cada mês** — barras claras nos meses passados (o lançado vai somando), escura no mês atual, laranja no plano.
+- **Vencem no mês × o que a equipe consegue** — barras com o que vence (cada cliente valendo o peso do porte) e linhas com quanto técnicos e administrativos dão conta.
+- **Equipe hoje × quadro ideal** — um gráfico por área; o ideal fica vermelho no mês em que falta gente.
+- **Por unidade** (com "Todas"): pendentes hoje, na cor da situação da unidade, e quantas pessoas contratar para zerar no prazo (técnicos e administrativos empilhados).
+- **Impacto em R$** (quando há custo nas Funções): contratar quem falta × sobra paga sem produção, mês a mês.
 
 ---
 

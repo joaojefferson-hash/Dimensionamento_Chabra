@@ -46,6 +46,7 @@ web/
     views/
       LoginView.vue
       DimensionamentoView.vue   barra + Hoje + TabelaMeses + PorUnidade + Simulacao + avisos
+      DashboardView.vue         gráficos (Chart.js via components/ui/Grafico.vue) sobre a store de dimensionamento
       Unidades/Empresas/Colaboradores/Funcoes/Calendario/Historico/UsuariosView.vue
   src/style.css             Tailwind v4 + tokens da marca (@theme) + peças (.card, .stat, .table, .status…)
 ```
