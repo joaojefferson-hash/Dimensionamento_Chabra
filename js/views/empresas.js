@@ -35,7 +35,7 @@ const ViewEmpresas = {
       <tr data-unidade="${u.id}">
         <td class="col-nome">
           <div class="nome-unidade">${UI.esc(u.nome)}</div>
-          <div class="acoes-unidade" data-acoes="${u.id}">${nExc(u) ? `<button type="button" class="btn-link" data-action="limpar-mes" data-id="${u.id}" title="Apagar os valores próprios de mês e usar o padrão o ano todo">usar padrão o ano todo</button>` : ''}</div>
+          <div class="acoes-unidade" data-acoes="${u.id}">${nExc(u) ? `<button type="button" class="btn-link" data-action="limpar-mes" data-id="${u.id}" title="Apagar os valores próprios de ${Store.ano} e usar o padrão o ano todo">usar padrão em ${Store.ano}</button>` : ''}</div>
         </td>
         <td class="col-padrao"><input type="number" class="input input-sm input-num input-padrao" min="0" step="1" inputmode="numeric" data-id="${u.id}" value="${u[this.CAMPO]}" aria-label="Padrão de ${UI.esc(u.nome)}"></td>
         ${MESES.map((m, i) => { const mes = i + 1; const exc = (u.meses || {})[mes]; return `
@@ -46,14 +46,14 @@ const ViewEmpresas = {
     el.innerHTML = `
       <header class="page-header">
         <h1>Empresas por Unidade</h1>
-        <p>Quantas empresas de cada unidade estão com <strong>documentos vencidos</strong> em cada mês. Cada uma precisa do atendimento completo no mês: uma inspeção e um relatório (técnicos) e uma finalização (administrativos). Preencha o <em>padrão</em> (vale para o ano todo) e, se algum mês for diferente, digite o número naquele mês. Tudo é salvo automaticamente.</p>
+        <p>Quantas empresas de cada unidade estão com <strong>documentos vencidos</strong> em cada mês do ano selecionado. Cada uma precisa do atendimento completo no mês: uma inspeção e um relatório (técnicos) e uma finalização (administrativos). Preencha o <em>padrão</em> (vale para todos os meses e anos) e, se algum mês for diferente, digite o número naquele mês. Tudo é salvo automaticamente.</p>
       </header>
 
       <div class="stats">
         <div class="stat"><div class="label">Unidades</div><div class="value">${unidades.length}</div></div>
         <div class="stat" title="Soma do padrão das unidades"><div class="label">Docs. vencidos (padrão)</div><div class="value" id="stat-padrao">${totalPadrao}</div></div>
-        <div class="stat" title="Média dos 12 meses, somando as unidades"><div class="label">Média por mês</div><div class="value" id="stat-media">${UI.fmt(mediaMes, 1)}</div></div>
-        <div class="stat" title="Mês com mais empresas com documentos vencidos, somando as unidades"><div class="label">Mês mais apertado</div><div class="value" id="stat-pico">${picoMes}</div></div>
+        <div class="stat" title="Média dos 12 meses de ${Store.ano}, somando as unidades"><div class="label">Média por mês (${Store.ano})</div><div class="value" id="stat-media">${UI.fmt(mediaMes, 1)}</div></div>
+        <div class="stat" title="Mês de ${Store.ano} com mais empresas com documentos vencidos, somando as unidades"><div class="label">Mês mais apertado (${Store.ano})</div><div class="value" id="stat-pico">${picoMes}</div></div>
       </div>
 
       ${unidades.length === 0 ? `
@@ -67,10 +67,13 @@ const ViewEmpresas = {
       </section>` : `
       <section class="card">
         <div class="card-head">
-          <h2>Empresas com documentos vencidos, por mês</h2>
-          <span class="muted">${UI.plural(unidades.length, 'unidade', 'unidades')}</span>
+          <h2>Empresas com documentos vencidos, por mês · ${Store.ano}</h2>
+          <div class="right">
+            <label class="param-inline" data-local><span class="muted">Ano</span> ${Programacao.seletorAnoHTML('empresas-ano')}</label>
+            <span class="muted">${UI.plural(unidades.length, 'unidade', 'unidades')}</span>
+          </div>
         </div>
-        <p class="muted">A coluna <strong>Padrão</strong> vale para todos os meses; digite um número em um mês só quando ele for diferente. Célula em azul = mês com valor próprio; apague o número para voltar ao padrão.</p>
+        <p class="muted">Os números dos meses são de <strong>${Store.ano}</strong> (troque o ano ao lado para planejar outro ano). A coluna <strong>Padrão</strong> vale para todos os meses e anos sem valor próprio; digite um número em um mês só quando ele for diferente. Célula em azul = mês com valor próprio; apague o número para voltar ao padrão.</p>
         <div class="table-wrap">
           <table class="table table-matriz">
             <thead>
@@ -99,13 +102,14 @@ const ViewEmpresas = {
     `;
 
     el.querySelector('[data-action="go-unidades"]')?.addEventListener('click', () => App.navigate('unidades'));
+    Programacao.bindSeletorAno(el.querySelector('#empresas-ano'));
 
     // ---- usar padrão o ano todo ----
     el.addEventListener('click', async e => {
       const btn = e.target.closest('[data-action="limpar-mes"]');
       if (!btn) return;
       const u = Store.unidades.get(btn.dataset.id);
-      const ok = await UI.confirm({ title: 'Usar o padrão o ano todo', message: `Apagar os valores próprios de mês de "${u ? u.nome : ''}"? Todos os meses passam a usar o padrão.`, confirmText: 'Apagar' });
+      const ok = await UI.confirm({ title: `Usar o padrão em ${Store.ano}`, message: `Apagar os valores próprios de ${Store.ano} de "${u ? u.nome : ''}"? Todos os meses de ${Store.ano} passam a usar o padrão.`, confirmText: 'Apagar' });
       if (!ok) return;
       try { await Store.empresasMes.limpar(btn.dataset.id); UI.toast('Meses voltaram ao padrão.'); }
       catch (err) { UI.toast(err.message, 'error'); }
@@ -180,7 +184,7 @@ const ViewEmpresas = {
         tr.querySelector('[data-media]').textContent = this.fmt(this.media(u));
       }
       const acoes = el.querySelector(`[data-acoes="${unidadeId}"]`);
-      if (acoes) acoes.innerHTML = Object.keys(u.meses || {}).length ? `<button type="button" class="btn-link" data-action="limpar-mes" data-id="${u.id}" title="Apagar os valores próprios de mês e usar o padrão o ano todo">usar padrão o ano todo</button>` : '';
+      if (acoes) acoes.innerHTML = Object.keys(u.meses || {}).length ? `<button type="button" class="btn-link" data-action="limpar-mes" data-id="${u.id}" title="Apagar os valores próprios de ${Store.ano} e usar o padrão o ano todo">usar padrão em ${Store.ano}</button>` : '';
     }
     const set = (sel, v) => { const n = el.querySelector(sel); if (n) n.textContent = v; };
     const somaMes = m => unidades.reduce((s, x) => s + this.efetivo(x, m), 0);

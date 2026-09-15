@@ -107,7 +107,7 @@ const ViewHistorico = {
     unidades: { nome: 'nome', empresas_vencidas: 'documentos vencidos (padrão)',
                 empresas_em_dia: 'em dia (padrão)', empresas_vencendo: 'vencendo (padrão)', empresas_a_vencer: 'a vencer no mês (padrão)',
                 empresas_baixo: 'grau baixo (padrão)', empresas_medio: 'grau médio (padrão)', empresas_alto: 'grau alto (padrão)' },
-    unidade_empresas_mes: { empresas_vencidas: 'documentos vencidos',
+    unidade_empresas_mes: { empresas_vencidas: 'documentos vencidos', ano: 'ano',
                             empresas_em_dia: 'em dia', empresas_vencendo: 'vencendo', empresas_a_vencer: 'a vencer no mês',
                             empresas_baixo: 'grau baixo', empresas_medio: 'grau médio', empresas_alto: 'grau alto' },
     colaboradores: { nome: 'nome', funcao: 'função', funcao_id: 'função', empresas_dia: 'empresas por dia', inspecoes_dia: 'inspeções por dia', relatorios_dia: 'relatórios por dia' },
@@ -162,7 +162,7 @@ const ViewHistorico = {
         if (h.operacao === 'delete') return `Excluiu a unidade <strong>${nome}</strong>`;
         return `Alterou a unidade <strong>${nome}</strong>${mudancas()}`;
       case 'unidade_empresas_mes': {
-        const mes = this.MES[Number(r.mes)] || `mês ${r.mes}`;
+        const mes = (this.MES[Number(r.mes)] || `mês ${r.mes}`) + (r.ano ? `/${r.ano}` : '');
         const valores = x => {
           if (!x) return '';
           if (x.empresas_vencidas != null) return `${x.empresas_vencidas} com documentos vencidos`;

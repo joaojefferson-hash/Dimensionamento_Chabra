@@ -10,7 +10,8 @@
 
    Formato em JS (igual ao backup exportado, versão 2):
      unidades:      [{ id, nome, empresasVencidas, empresas (= empresasVencidas),
-                       meses: { [1..12]: { empresasVencidas } } }]  // exceções mensais (padrão = campo acima)
+                       mesesPorAno: { [ano]: { [1..12]: { empresasVencidas } } },  // valores próprios por ano/mês
+                       meses: { [1..12]: {...} } }]                                 // = mesesPorAno[Store.ano] (ano selecionado)
                     // empresas com documentos vencidos: cada uma exige o atendimento completo no mês
      documentos:    [{ id, nome, horas, periodicidadeMeses, responsavel }]   // periodicidade 0 = sob demanda
      funcoes:       [{ id, nome, tipoProducao: 'tecnico' | 'administrativo' | 'nenhuma', chefia,
@@ -23,7 +24,7 @@
 
 const Store = (() => {
   const APP_ID = 'chabra-dimensiona';
-  const SCHEMA_VERSION = 8;
+  const SCHEMA_VERSION = 9; // v9: empresasPorMes com ano
   const LOCAL_KEY = 'chabra-dimensiona:data';            // versão antiga (só localStorage)
   const LOCAL_BACKUP_KEY = 'chabra-dimensiona:backup-local'; // onde os dados locais ficam após a migração
 
@@ -69,18 +70,34 @@ const Store = (() => {
 
   /* ---------- normalização de registros + mapeamento JS <-> tabela ---------- */
 
-  /** Normaliza exceções mensais: aceita objeto { "3": {...} } ou lista [{ mes, ... }]; devolve objeto por mês. */
-  const buildMeses = fonte => {
+  const ANO_KEY = 'chabra-dimensiona:ano';
+  const anoCorrente = () => new Date().getFullYear();
+  const anoValido = a => Number.isInteger(a) && a >= 2000 && a <= 2100;
+  /** Ano selecionado (por navegador); os valores por mês mostrados e calculados são os desse ano. */
+  let ano = (() => { try { const v = Number(localStorage.getItem(ANO_KEY)); return anoValido(v) ? v : anoCorrente(); } catch (_) { return anoCorrente(); } })();
+
+  /**
+   * Normaliza valores próprios por mês: lista [{ ano?, mes, ... }] (backup) ou objeto { "3": {...} } (formato
+   * antigo, sem ano → ano corrente). Devolve { [ano]: { [mes]: { empresasVencidas } } }.
+   */
+  const buildMesesPorAno = fonte => {
     const out = {};
-    const entradas = Array.isArray(fonte) ? fonte.map(m => [m && m.mes, m])
-      : (fonte && typeof fonte === 'object') ? Object.entries(fonte) : [];
-    entradas.forEach(([k, v]) => {
+    const entradas = Array.isArray(fonte) ? fonte.map(m => [m && m.mes, m, m && m.ano])
+      : (fonte && typeof fonte === 'object' && !Array.isArray(fonte))
+        ? (Object.values(fonte).some(v => v && typeof v === 'object' && !('empresasVencidas' in v) && !('empresasBaixo' in v) && !('empresasAVencer' in v) && !('empresas' in v))
+            ? Object.entries(fonte).flatMap(([a, meses]) => Object.entries(meses || {}).map(([k, v]) => [k, v, a])) // já por ano
+            : Object.entries(fonte).map(([k, v]) => [k, v, undefined]))
+        : [];
+    entradas.forEach(([k, v, a]) => {
       const mes = Math.round(toNum(k, 0));
-      if (!v || mes < 1 || mes > 12) return;
-      out[mes] = { empresasVencidas: vencidasDe(v) };
+      const y = Math.round(toNum(a, anoCorrente()));
+      if (!v || mes < 1 || mes > 12 || !anoValido(y)) return;
+      (out[y] = out[y] || {})[mes] = { empresasVencidas: vencidasDe(v) };
     });
     return out;
   };
+  /** Aplica o ano selecionado: u.meses passa a ser o mapa daquele ano. */
+  const aplicarAno = u => { u.meses = (u.mesesPorAno && u.mesesPorAno[ano]) || {}; return u; };
   /**
    * Empresas com documentos vencidos de um objeto (unidade ou mês), aceitando formatos antigos:
    * situação (vencendo + a vencer; "em dia" não gerava trabalho), grau (baixo + médio + alto) ou só "empresas".
@@ -95,7 +112,7 @@ const Store = (() => {
     const vencidas = vencidasDe(u);
     return {
       nome: toStr(u.nome), empresasVencidas: vencidas, empresas: vencidas,
-      meses: buildMeses(u.empresasPorMes !== undefined ? u.empresasPorMes : u.meses),
+      mesesPorAno: buildMesesPorAno(u.empresasPorMes !== undefined ? u.empresasPorMes : (u.mesesPorAno !== undefined ? u.mesesPorAno : u.meses)),
     };
   };
   const buildDocumento = d => ({
@@ -174,7 +191,7 @@ const Store = (() => {
       fromRow: r => ({
         id: r.id, nome: r.nome,
         empresasVencidas: Number(r.empresas_vencidas), empresas: Number(r.empresas_vencidas),
-        meses: {},
+        mesesPorAno: {}, meses: {},
       }),
     },
     documentos: {
@@ -277,7 +294,7 @@ const Store = (() => {
           return ['_alocacoes', data];
         }));
     consultas.push(
-      db.from('unidade_empresas_mes').select('unidade_id, mes, empresas_vencidas')
+      db.from('unidade_empresas_mes').select('unidade_id, ano, mes, empresas_vencidas')
         .then(({ data, error }) => {
           if (error) throw falha(error, 'Falha ao carregar a variação mensal de empresas.');
           return ['_meses', data];
@@ -293,12 +310,11 @@ const Store = (() => {
     state.colaboradores.forEach(c => { c.alocacoes = comNomes(porColab[c.id] || []); });
     const porUnidade = {};
     state._meses.forEach(m => {
-      (porUnidade[m.unidade_id] = porUnidade[m.unidade_id] || {})[m.mes] = {
-        empresasVencidas: Number(m.empresas_vencidas),
-      };
+      const porAno = (porUnidade[m.unidade_id] = porUnidade[m.unidade_id] || {});
+      (porAno[m.ano] = porAno[m.ano] || {})[m.mes] = { empresasVencidas: Number(m.empresas_vencidas) };
     });
     delete state._meses;
-    state.unidades.forEach(u => { u.meses = porUnidade[u.id] || {}; });
+    state.unidades.forEach(u => { u.mesesPorAno = porUnidade[u.id] || {}; aplicarAno(u); });
     state.funcoes.sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR'));
     state.colaboradores.forEach(c => Object.assign(c, infoFuncao(c.funcaoId)));
     loaded = true;
@@ -374,7 +390,7 @@ const Store = (() => {
             ? await salvarAlocacoes(id, montado.alocacoes)
             : comNomes(atual.alocacoes || []);
         }
-        if (key === 'unidades') item.meses = atual.meses || {};
+        if (key === 'unidades') { item.mesesPorAno = atual.mesesPorAno || {}; aplicarAno(item); }
         state[key] = state[key].map(x => (x.id === id ? item : x));
         if (key === 'funcoes') { state.funcoes.sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR')); state.colaboradores.forEach(c => Object.assign(c, infoFuncao(c.funcaoId))); }
         if (!silent) emit();
@@ -393,37 +409,58 @@ const Store = (() => {
   /* ---------- variação mensal de empresas por unidade ---------- */
 
   const empresasMes = {
-    /** Define a exceção de um mês (valores) ou remove (null → volta ao padrão). */
+    /** Define o valor próprio de um mês do ano selecionado (valores) ou remove (null → volta ao padrão). */
     async definir(unidadeId, mes, valores, { silent = false } = {}) {
       const u = state.unidades.find(x => x.id === unidadeId);
       if (!u) throw new Error('Unidade não encontrada.');
+      const doAno = { ...((u.mesesPorAno || {})[ano] || {}) };
       if (valores) {
         const row = {
-          unidade_id: unidadeId, mes,
+          unidade_id: unidadeId, ano, mes,
           empresas_vencidas: Math.max(0, toInt(valores.empresasVencidas, 0)),
         };
-        const { error } = await db.from('unidade_empresas_mes').upsert(row, { onConflict: 'unidade_id,mes' });
-        if (error) throw falha(error, 'Não foi possível salvar a variação mensal.');
-        u.meses = { ...u.meses, [mes]: { empresasVencidas: row.empresas_vencidas } };
+        const { error } = await db.from('unidade_empresas_mes').upsert(row, { onConflict: 'unidade_id,ano,mes' });
+        if (error) throw falha(error, 'Não foi possível salvar o valor do mês.');
+        doAno[mes] = { empresasVencidas: row.empresas_vencidas };
       } else {
-        const { error } = await db.from('unidade_empresas_mes').delete().eq('unidade_id', unidadeId).eq('mes', mes);
-        if (error) throw falha(error, 'Não foi possível remover a variação mensal.');
-        const meses = { ...u.meses };
-        delete meses[mes];
-        u.meses = meses;
+        const { error } = await db.from('unidade_empresas_mes').delete().eq('unidade_id', unidadeId).eq('ano', ano).eq('mes', mes);
+        if (error) throw falha(error, 'Não foi possível remover o valor do mês.');
+        delete doAno[mes];
       }
+      u.mesesPorAno = { ...(u.mesesPorAno || {}), [ano]: doAno };
+      aplicarAno(u);
       if (!silent) emit();
     },
-    /** Remove todas as exceções da unidade (todos os meses voltam ao padrão). */
+    /** Remove todos os valores próprios da unidade no ano selecionado (todos os meses voltam ao padrão). */
     async limpar(unidadeId) {
       const u = state.unidades.find(x => x.id === unidadeId);
       if (!u) throw new Error('Unidade não encontrada.');
-      const { error } = await db.from('unidade_empresas_mes').delete().eq('unidade_id', unidadeId);
-      if (error) throw falha(error, 'Não foi possível limpar a variação mensal.');
-      u.meses = {};
+      const { error } = await db.from('unidade_empresas_mes').delete().eq('unidade_id', unidadeId).eq('ano', ano);
+      if (error) throw falha(error, 'Não foi possível limpar os valores do ano.');
+      u.mesesPorAno = { ...(u.mesesPorAno || {}) };
+      delete u.mesesPorAno[ano];
+      aplicarAno(u);
       emit();
     },
   };
+
+  /** Anos disponíveis no seletor: 2025 até o ano corrente + 2, mais os que têm valores. */
+  function anosDisponiveis() {
+    const set = new Set();
+    for (let y = Math.min(2025, anoCorrente()); y <= anoCorrente() + 2; y++) set.add(y);
+    state.unidades.forEach(u => Object.keys(u.mesesPorAno || {}).forEach(y => set.add(Number(y))));
+    set.add(ano);
+    return [...set].filter(anoValido).sort((a, b) => a - b);
+  }
+  /** Troca o ano selecionado (por navegador) e avisa as telas. */
+  function definirAno(novo) {
+    const y = Math.round(toNum(novo, ano));
+    if (!anoValido(y) || y === ano) return;
+    ano = y;
+    try { localStorage.setItem(ANO_KEY, String(y)); } catch (_) { /* ignora */ }
+    state.unidades.forEach(aplicarAno);
+    emit();
+  }
 
   /* ---------- parâmetros do motor (linha única) ---------- */
 
@@ -486,7 +523,9 @@ const Store = (() => {
       unidades: state.unidades.map(u => ({
         ...u,
         meses: undefined,
-        empresasPorMes: Object.entries(u.meses || {}).map(([mes, v]) => ({ mes: Number(mes), ...v })).sort((a, b) => a.mes - b.mes),
+        empresasPorMes: Object.entries(u.mesesPorAno || {})
+          .flatMap(([a, meses]) => Object.entries(meses || {}).map(([mes, v]) => ({ ano: Number(a), mes: Number(mes), ...v })))
+          .sort((a, b) => a.ano - b.ano || a.mes - b.mes),
       })),
       documentos: state.documentos,
       colaboradores: state.colaboradores.map(c => ({ ...c, ...infoFuncao(c.funcaoId), alocacoes: comNomes(c.alocacoes || []) })),
@@ -556,6 +595,9 @@ const Store = (() => {
     colaboradores: makeCollection('colaboradores'),
     parametros,
     empresasMes,
+    get ano() { return ano; },
+    definirAno,
+    anosDisponiveis,
     nomeUnidade,
     descricaoAlocacoes,
     totalAlocado,

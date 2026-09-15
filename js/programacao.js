@@ -31,22 +31,39 @@ const Programacao = (() => {
   function salvarFiltros(f) { try { localStorage.setItem(KEY_FILTROS, JSON.stringify(f)); } catch (_) { /* ignora */ } }
 
   function descricaoJanela(j) {
-    if (j.de === 0 && j.ate === 11) return 'ano completo';
-    if (j.de === j.ate) return Calculo.MESES_LONGO[j.de];
-    return `${Calculo.MESES_LONGO[j.de]} a ${Calculo.MESES_LONGO[j.ate]}`;
+    const ano = ` de ${Store.ano}`;
+    if (j.de === 0 && j.ate === 11) return `ano completo${ano}`;
+    if (j.de === j.ate) return Calculo.MESES_LONGO[j.de] + ano;
+    return `${Calculo.MESES_LONGO[j.de]} a ${Calculo.MESES_LONGO[j.ate]}${ano}`;
   }
 
   /* ---------- barra de opções ---------- */
 
+  /** Seletor de ano (o ano selecionado vale para todas as telas; fica só neste navegador). */
+  function seletorAnoHTML(id = 'sel-ano') {
+    return `<select class="input input-sm" name="ano" id="${id}" aria-label="Ano" data-local>${Store.anosDisponiveis().map(a => `<option value="${a}" ${a === Store.ano ? 'selected' : ''}>${a}</option>`).join('')}</select>`;
+  }
+  function bindSeletorAno(sel) {
+    if (!sel) return;
+    sel.addEventListener('change', () => Store.definirAno(Number(sel.value))); // Store emite store:change → re-render
+  }
+
   /**
    * HTML da barra. opções: { janela?, ocupacaoAlvo, unidades?, unidadeSel?, mesAtual?, prazoDias? }
-   * Com `janela` mostra o período (de/até); com `mesAtual` mostra o mês atual; com `prazoDias` o prazo para atender.
+   * Sempre mostra o ano; com `janela` mostra o período (de/até); com `mesAtual` o mês atual; com `prazoDias` o prazo.
    */
   function barraHTML({ janela = null, ocupacaoAlvo, unidades = null, unidadeSel = '', mesAtual = null, prazoDias = null }) {
     const opcoesMes = sel => Calculo.MESES_LONGO.map((m, i) => `<option value="${i}" ${i === sel ? 'selected' : ''}>${m}</option>`).join('');
     const folga = Math.round((100 - ocupacaoAlvo) * 10) / 10;
     return `
       <form class="barra-params" id="barra-params" autocomplete="off">
+        <div class="param">
+          <span class="param-label">Ano</span>
+          <div class="param-inline" data-local>
+            ${seletorAnoHTML('barra-ano')}
+            <span class="param-ajuda" title="Os números de empresas com documentos vencidos são por ano e mês (tela Empresas por Unidade). O padrão da unidade vale para qualquer ano.">?</span>
+          </div>
+        </div>
         ${janela ? `
         <div class="param">
           <span class="param-label">Período</span>
@@ -111,6 +128,7 @@ const Programacao = (() => {
       form.querySelector('[data-action="ano-completo"]').addEventListener('click', () => { salvarJanela({ de: 0, ate: 11 }); onJanela({ de: 0, ate: 11 }); });
     }
     if (form.mesAtual && onMesAtual) form.mesAtual.addEventListener('change', () => { salvarMesAtual(Number(form.mesAtual.value)); onMesAtual(Number(form.mesAtual.value)); });
+    bindSeletorAno(form.ano);
     if (form.unidade && onUnidade) form.unidade.addEventListener('change', () => onUnidade(form.unidade.value));
     if (form.prazoDias) {
       const prazo = form.prazoDias;
@@ -359,6 +377,6 @@ const Programacao = (() => {
     lerJanela, salvarJanela, lerFiltros, salvarFiltros, descricaoJanela,
     barraHTML, bindBarra,
     num, numFte, statusChip, statusDot, classeLinha, fraseEntrega, recomendacaoHTML, legendaHTML, avisosHTML, chefiaHTML, pessoasHTML,
-    lerSimulacao, salvarSimulacao, simulacaoHTML, bindSimulacao, descricaoSimulacao, pessoasTexto, lerMesAtual, salvarMesAtual,
+    lerSimulacao, salvarSimulacao, simulacaoHTML, bindSimulacao, descricaoSimulacao, pessoasTexto, lerMesAtual, salvarMesAtual, seletorAnoHTML, bindSeletorAno,
   };
 })();
