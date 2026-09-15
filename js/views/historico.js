@@ -70,7 +70,7 @@ const ViewHistorico = {
     // exclusões em cascata (mês/alocação apagados junto com a unidade ou o colaborador) são ruído:
     // a linha "Excluiu a unidade X" / "Excluiu o colaborador Y" já conta a história
     const cascata = h => h.operacao === 'delete' && h.antes && (
-      (h.tabela === 'unidade_empresas_mes' && h.antes.unidade_nome == null) ||
+      (['unidade_empresas_mes', 'demanda_mensal', 'unidade_mes'].includes(h.tabela) && h.antes.unidade_nome == null) ||
       (h.tabela === 'colaborador_unidades' && (h.antes.unidade_nome == null || h.antes.colaborador_nome == null)));
     const linhas = this.itens
       .filter(h => !cascata(h))
@@ -110,10 +110,14 @@ const ViewHistorico = {
     unidade_empresas_mes: { empresas_vencidas: 'clientes Mensal', empresas_exclusiva_tst: 'clientes Exclusiva TST', clientes_ativos: 'clientes ativos', ano: 'ano',
                             empresas_em_dia: 'em dia', empresas_vencendo: 'vencendo', empresas_a_vencer: 'a vencer no mês',
                             empresas_baixo: 'grau baixo', empresas_medio: 'grau médio', empresas_alto: 'grau alto' },
-    colaboradores: { nome: 'nome', funcao: 'função', funcao_id: 'função', empresas_dia: 'empresas por dia', inspecoes_dia: 'inspeções por dia', relatorios_dia: 'relatórios por dia' },
-    funcoes: { nome: 'nome', tipo_producao: 'tipo de produção', chefia: 'chefia de equipe', coordena: 'coordena', responde_para: 'responde para', ordem: 'ordem' },
+    colaboradores: { nome: 'nome', funcao: 'função', funcao_id: 'função', empresas_dia: 'empresas por dia', inspecoes_dia: 'inspeções por dia', relatorios_dia: 'relatórios por dia',
+                     data_admissao: 'admissão', data_desligamento: 'desligamento', custo_mensal: 'custo mensal' },
+    funcoes: { nome: 'nome', tipo_producao: 'tipo de produção', chefia: 'chefia de equipe', coordena: 'coordena', responde_para: 'responde para', ordem: 'ordem', custo_mensal: 'custo mensal' },
+    demanda_mensal: { quantidade: 'quantidade' },
+    unidade_mes: { clientes_ativos: 'clientes ativos' },
+    portes: { nome: 'nome', peso: 'peso', ordem: 'ordem' },
     colaborador_unidades: { percentual: '% do tempo' },
-    parametros: { peso_em_dia: 'peso de "em dia"', peso_vencendo: 'peso de "vencendo"', peso_a_vencer: 'peso de "a vencer no mês"', ocupacao_alvo: 'folga para imprevistos', dias_uteis: 'dias úteis', prazo_dias: 'prazo para atender (dias)',
+    parametros: { peso_em_dia: 'peso de "em dia"', peso_vencendo: 'peso de "vencendo"', peso_a_vencer: 'peso de "a vencer no mês"', ocupacao_alvo: 'folga para imprevistos', dias_uteis: 'dias úteis', prazo_dias: 'prazo para atender (dias)', rampup: 'ramp-up (%)',
                   fator_baixo: 'peso do grau baixo', fator_medio: 'peso do grau médio', fator_alto: 'peso do grau alto', meses_por_inspecao: 'frequência de inspeção', meses_por_relatorio: 'frequência de relatório', meses_por_finalizacao: 'frequência de finalização' },
     documentos: { nome: 'nome', horas: 'horas', periodicidade_meses: 'periodicidade', responsavel: 'produzido por' },
   },
@@ -121,6 +125,8 @@ const ViewHistorico = {
   fmtVal(campo, v) {
     if (v == null) return '—';
     if (campo === 'ocupacao_alvo') return `${UI.fmt(100 - Number(v), 0)}%`;
+    if (campo === 'custo_mensal') return UI.moeda(Number(v));
+    if (campo === 'data_admissao' || campo === 'data_desligamento') { const [a, m, d] = String(v).split('-'); return `${d}/${m}/${a}`; }
     if (campo === 'percentual') return `${UI.fmt(Number(v), 1)}%`;
     if (campo.startsWith('meses_por')) { const m = Number(v); return m >= 12 && m % 12 === 0 ? `a cada ${m / 12} ${m === 12 ? 'ano' : 'anos'}` : `a cada ${UI.fmt(m, 1)} ${m === 1 ? 'mês' : 'meses'}`; }
     if (campo === 'funcao') return String(v);
@@ -173,6 +179,22 @@ const ViewHistorico = {
         if (h.operacao === 'delete') return `Voltou <strong>${mes}</strong> de <strong>${uni}</strong> ao padrão (era ${valores(a)})`;
         return `Alterou <strong>${mes}</strong> de <strong>${uni}</strong>${mudancas()}`;
       }
+      case 'demanda_mensal': {
+        const mes = (this.MES[Number(r.mes)] || `mês ${r.mes}`) + (r.ano ? `/${r.ano}` : '');
+        const cond = r.condicao === 'exclusiva_tst' ? 'Exclusiva TST' : 'Mensal';
+        const porte = Store.portes.get(r.porte); const porteNome = porte ? porte.nome.toLowerCase() : r.porte;
+        if (h.operacao === 'insert') return `Lançou <strong>${d.quantidade}</strong> clientes ${cond} (${porteNome}) em <strong>${mes}</strong> de <strong>${uni}</strong>`;
+        if (h.operacao === 'delete') return `Apagou os ${a.quantidade} clientes ${cond} (${porteNome}) de <strong>${mes}</strong> de <strong>${uni}</strong>`;
+        return `Alterou ${cond} (${porteNome}) de <strong>${mes}</strong> de <strong>${uni}</strong>${mudancas()}`;
+      }
+      case 'unidade_mes': {
+        const mes = (this.MES[Number(r.mes)] || `mês ${r.mes}`) + (r.ano ? `/${r.ano}` : '');
+        if (h.operacao === 'insert') return `Registrou <strong>${d.clientes_ativos}</strong> clientes ativos em <strong>${mes}</strong> de <strong>${uni}</strong>`;
+        if (h.operacao === 'delete') return `Apagou os clientes ativos de <strong>${mes}</strong> de <strong>${uni}</strong> (eram ${a.clientes_ativos})`;
+        return `Alterou os clientes ativos de <strong>${mes}</strong> de <strong>${uni}</strong>${mudancas()}`;
+      }
+      case 'portes':
+        return `Alterou o porte <strong>${UI.esc(r.nome || r.codigo || '')}</strong>${mudancas()}`;
       case 'funcoes':
         if (h.operacao === 'insert') return `Cadastrou a função <strong>${nome}</strong> (${this.fmtVal('tipo_producao', r.tipo_producao)}${r.chefia ? ', chefia de equipe' : ''})`;
         if (h.operacao === 'delete') return `Excluiu a função <strong>${nome}</strong>`;

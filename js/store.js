@@ -25,12 +25,13 @@
 
 const Store = (() => {
   const APP_ID = 'chabra-dimensiona';
-  const SCHEMA_VERSION = 11; // v11: clientesAtivos (v10: Exclusiva TST; v9: empresasPorMes com ano)
+  const SCHEMA_VERSION = 12; // v12: demanda por porte (demandaPorMes), clientesAtivosPorMes, portes, custo, admissão/desligamento, rampup
   /** Condições de cliente por unidade/mês (mesmo atendimento completo; separadas para enxergar cada uma). */
   const CONDICOES = [
-    { campo: 'empresasVencidas',     coluna: 'empresas_vencidas',      rotulo: 'Mensal',        classe: 'cond-mensal',    ajuda: 'clientes com contrato mensal, com documentos vencidos no mês' },
-    { campo: 'empresasExclusivaTst', coluna: 'empresas_exclusiva_tst', rotulo: 'Exclusiva TST', classe: 'cond-exclusiva', ajuda: 'clientes na condição Exclusiva TST (mesmo atendimento completo)' },
+    { campo: 'empresasVencidas',     condicao: 'mensal',        rotulo: 'Mensal',        classe: 'cond-mensal',    ajuda: 'clientes com contrato mensal cujos documentos vencem no mês' },
+    { campo: 'empresasExclusivaTst', condicao: 'exclusiva_tst', rotulo: 'Exclusiva TST', classe: 'cond-exclusiva', ajuda: 'clientes na condição Exclusiva TST (mesmo atendimento completo)' },
   ];
+  const PORTES_PADRAO = [{ codigo: 'P', nome: 'Pequeno', peso: 1, ordem: 1 }, { codigo: 'M', nome: 'Médio', peso: 1.5, ordem: 2 }, { codigo: 'G', nome: 'Grande', peso: 2, ordem: 3 }];
   /** Números só informativos por unidade/mês (não entram em nenhuma conta). */
   const INFORMATIVOS = [
     { campo: 'clientesAtivos', coluna: 'clientes_ativos', rotulo: 'Clientes ativos', classe: 'cond-ativos', ajuda: 'total de clientes da unidade no mês — só informativo, não entra em nenhuma conta' },
@@ -52,7 +53,7 @@ const Store = (() => {
   const DEFAULT_COLABORADOR = { empresasDia: 2, inspecoesDia: 2, relatoriosDia: 2 };
   const DEFAULT_PARAMETROS = {
     diasUteis: [21, 18, 22, 20, 20, 21, 23, 21, 21, 21, 19, 22],
-    ocupacaoAlvo: 85, prazoDias: 60,
+    ocupacaoAlvo: 85, prazoDias: 60, rampup: [50, 80],
   };
 
   // Mesmos valores do seed da migration 0001 (sugestões, editáveis).
@@ -102,8 +103,45 @@ const Store = (() => {
       const mes = Math.round(toNum(k, 0));
       const y = Math.round(toNum(a, anoCorrente()));
       if (!v || mes < 1 || mes > 12 || !anoValido(y)) return;
-      (out[y] = out[y] || {})[mes] = { empresasVencidas: vencidasDe(v), empresasExclusivaTst: Math.max(0, toInt(v.empresasExclusivaTst, 0)), clientesAtivos: Math.max(0, toInt(v.clientesAtivos, 0)) };
+      // formato antigo: só contagens → tudo porte P
+      const demanda = v.demanda && typeof v.demanda === 'object' ? v.demanda
+        : { mensal: { P: vencidasDe(v) }, exclusiva_tst: { P: Math.max(0, toInt(v.empresasExclusivaTst, 0)) } };
+      (out[y] = out[y] || {})[mes] = montarMes(demanda, Math.max(0, toInt(v.clientesAtivos, 0)));
     });
+    return out;
+  };
+  /** Um mês no cache: demanda por condição × porte + contagens derivadas (Σ dos portes) + clientes ativos. */
+  const montarMes = (demanda, clientesAtivos) => {
+    const d = {};
+    CONDICOES.forEach(c => {
+      const porPorte = (demanda && demanda[c.condicao]) || {};
+      d[c.condicao] = {};
+      Object.entries(porPorte).forEach(([porte, q]) => { const n = Math.max(0, toInt(q, 0)); if (n > 0) d[c.condicao][porte] = n; });
+    });
+    const soma = cond => Object.values(d[cond]).reduce((s, q) => s + q, 0);
+    return { demanda: d, empresasVencidas: soma('mensal'), empresasExclusivaTst: soma('exclusiva_tst'), clientesAtivos: Math.max(0, toInt(clientesAtivos, 0)) };
+  };
+  /** Demanda por mês no formato do backup v12: [{ ano, mes, condicao, porte, quantidade }]. */
+  const demandaLista = u => Object.entries(u.mesesPorAno || {}).flatMap(([a, meses]) => Object.entries(meses || {}).flatMap(([mes, v]) =>
+    CONDICOES.flatMap(c => Object.entries((v.demanda || {})[c.condicao] || {}).filter(([, q]) => q > 0)
+      .map(([porte, quantidade]) => ({ ano: Number(a), mes: Number(mes), condicao: c.condicao, porte, quantidade })))))
+    .sort((x, y) => x.ano - y.ano || x.mes - y.mes || x.condicao.localeCompare(y.condicao) || x.porte.localeCompare(y.porte));
+  const clientesAtivosLista = u => Object.entries(u.mesesPorAno || {}).flatMap(([a, meses]) => Object.entries(meses || {})
+    .filter(([, v]) => v.clientesAtivos > 0).map(([mes, v]) => ({ ano: Number(a), mes: Number(mes), clientesAtivos: v.clientesAtivos })))
+    .sort((x, y) => x.ano - y.ano || x.mes - y.mes);
+  /** Backup v12: demandaPorMes + clientesAtivosPorMes → mesesPorAno. */
+  const mesesDeBackupV12 = (demandaPorMes, ativosPorMes) => {
+    const out = {};
+    const pegar = (a, mes) => { const y = Math.round(toNum(a, anoCorrente())); const m = Math.round(toNum(mes, 0)); if (m < 1 || m > 12 || !anoValido(y)) return null; return ((out[y] = out[y] || {})[m] = out[y][m] || { demanda: {}, clientesAtivos: 0 }); };
+    (Array.isArray(demandaPorMes) ? demandaPorMes : []).forEach(x => {
+      if (!x) return;
+      const slot = pegar(x.ano, x.mes); if (!slot) return;
+      const cond = CONDICOES.some(c => c.condicao === x.condicao) ? x.condicao : 'mensal';
+      const porte = toStr(x.porte) || 'P';
+      (slot.demanda[cond] = slot.demanda[cond] || {})[porte] = (slot.demanda[cond][porte] || 0) + Math.max(0, toInt(x.quantidade, 0));
+    });
+    (Array.isArray(ativosPorMes) ? ativosPorMes : []).forEach(x => { if (!x) return; const slot = pegar(x.ano, x.mes); if (slot) slot.clientesAtivos = Math.max(0, toInt(x.clientesAtivos, 0)); });
+    Object.keys(out).forEach(y => Object.keys(out[y]).forEach(m => { out[y][m] = montarMes(out[y][m].demanda, out[y][m].clientesAtivos); }));
     return out;
   };
   /** Aplica o ano selecionado: u.meses passa a ser o mapa daquele ano. */
@@ -118,15 +156,14 @@ const Store = (() => {
     if (o.empresasBaixo != null || o.empresasMedio != null || o.empresasAlto != null) return Math.max(0, toInt(o.empresasBaixo, 0) + toInt(o.empresasMedio, 0) + toInt(o.empresasAlto, 0));
     return Math.max(0, toInt(o.empresas, 0));
   };
-  const buildUnidade = u => {
-    const vencidas = vencidasDe(u);
-    const exclusiva = Math.max(0, toInt(u.empresasExclusivaTst, 0));
-    return {
-      nome: toStr(u.nome), empresasVencidas: vencidas, empresasExclusivaTst: exclusiva, empresas: vencidas + exclusiva,
-      clientesAtivos: Math.max(0, toInt(u.clientesAtivos, 0)),
-      mesesPorAno: buildMesesPorAno(u.empresasPorMes !== undefined ? u.empresasPorMes : (u.mesesPorAno !== undefined ? u.mesesPorAno : u.meses)),
-    };
-  };
+  const buildUnidade = u => ({
+    nome: toStr(u.nome),
+    empresasVencidas: 0, empresasExclusivaTst: 0, empresas: 0, clientesAtivos: 0, // o "padrão" da unidade não existe mais: meses sem número valem zero
+    mesesPorAno: Array.isArray(u.demandaPorMes) || Array.isArray(u.clientesAtivosPorMes)
+      ? mesesDeBackupV12(u.demandaPorMes, u.clientesAtivosPorMes)
+      : buildMesesPorAno(u.empresasPorMes !== undefined ? u.empresasPorMes : (u.mesesPorAno !== undefined ? u.mesesPorAno : u.meses)),
+  });
+  const buildPorte = x => ({ codigo: toStr(x.codigo).toUpperCase().slice(0, 3), nome: toStr(x.nome) || toStr(x.codigo), peso: Math.max(0.01, toNum(x.peso, 1)), ordem: toInt(x.ordem, 0) });
   const buildDocumento = d => ({
     nome: toStr(d.nome),
     horas: Math.max(0, toNum(d.horas, 0)),
@@ -162,7 +199,9 @@ const Store = (() => {
     respondeParaId: toStr(f.respondeParaId) || null,
     respondePara: toStr(f.respondePara), // nome (só no backup)
     ordem: Math.max(0, toInt(f.ordem, 0)),
+    custoMensal: Math.max(0, toNum(f.custoMensal, 0)), // custo médio mensal de uma pessoa (salário + encargos)
   });
+  const dataOuNull = v => { const s = toStr(v); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null; };
   const buildColaborador = c => ({
     nome: toStr(c.nome),
     funcaoId: toStr(c.funcaoId) || null,
@@ -170,6 +209,9 @@ const Store = (() => {
     empresasDia: Math.max(0, toNum(c.empresasDia, DEFAULT_COLABORADOR.empresasDia)),
     inspecoesDia: Math.max(0, toNum(c.inspecoesDia, DEFAULT_COLABORADOR.inspecoesDia)),
     relatoriosDia: Math.max(0, toNum(c.relatoriosDia, DEFAULT_COLABORADOR.relatoriosDia)),
+    dataAdmissao: dataOuNull(c.dataAdmissao),
+    dataDesligamento: dataOuNull(c.dataDesligamento),
+    custoMensal: toNum(c.custoMensal, 0) > 0 ? toNum(c.custoMensal, 0) : null, // opcional: sobrepõe o custo da função
     // formato legado (unidadeId/unidadeNome únicos) vira uma alocação de 100%
     alocacoes: buildAlocacoes(Array.isArray(c.alocacoes) ? c.alocacoes
       : (c.unidadeId || c.unidadeNome) ? [{ unidadeId: c.unidadeId, unidadeNome: c.unidadeNome, percentual: 100 }] : []),
@@ -180,33 +222,29 @@ const Store = (() => {
       ? base.diasUteis.map(v => clamp(toInt(v, 21), 0, 31))
       : DEFAULT_PARAMETROS.diasUteis.slice();
     const pos = (v, fb) => { const x = toNum(v, fb); return x > 0 ? x : fb; };
+    const rampup = Array.isArray(base.rampup) ? base.rampup.slice(0, 12).map(v => clamp(Math.round(toNum(v, 100)), 0, 100)) : DEFAULT_PARAMETROS.rampup.slice();
     return {
       diasUteis: dias,
       ocupacaoAlvo: clamp(pos(base.ocupacaoAlvo, DEFAULT_PARAMETROS.ocupacaoAlvo), 1, 100),
       prazoDias: clamp(Math.round(pos(base.prazoDias, DEFAULT_PARAMETROS.prazoDias)), 1, 365),
+      rampup,
     };
   };
-  const parametrosToRow = q => ({ dias_uteis: q.diasUteis, ocupacao_alvo: q.ocupacaoAlvo, prazo_dias: q.prazoDias });
-  const parametrosFromRow = r => buildParametros({ diasUteis: r.dias_uteis, ocupacaoAlvo: r.ocupacao_alvo, prazoDias: r.prazo_dias });
+  const parametrosToRow = q => ({ dias_uteis: q.diasUteis, ocupacao_alvo: q.ocupacaoAlvo, prazo_dias: q.prazoDias, rampup: q.rampup });
+  const parametrosFromRow = r => buildParametros({ diasUteis: r.dias_uteis, ocupacaoAlvo: r.ocupacao_alvo, prazoDias: r.prazo_dias, rampup: r.rampup });
 
   const TABELAS = {
     funcoes: {
       table: 'funcoes',
       build: buildFuncao,
-      toRow: f => ({ nome: f.nome, tipo_producao: f.tipoProducao, chefia: f.chefia, coordena: f.chefia ? f.coordena : 'todos', responde_para: f.chefia ? f.respondeParaId : null, ordem: f.ordem }),
-      fromRow: r => ({ id: r.id, nome: r.nome, tipoProducao: r.tipo_producao, chefia: r.chefia === true, coordena: r.coordena || 'todos', respondeParaId: r.responde_para || null, ordem: Number(r.ordem) }),
+      toRow: f => ({ nome: f.nome, tipo_producao: f.tipoProducao, chefia: f.chefia, coordena: f.chefia ? f.coordena : 'todos', responde_para: f.chefia ? f.respondeParaId : null, ordem: f.ordem, custo_mensal: f.custoMensal }),
+      fromRow: r => ({ id: r.id, nome: r.nome, tipoProducao: r.tipo_producao, chefia: r.chefia === true, coordena: r.coordena || 'todos', respondeParaId: r.responde_para || null, ordem: Number(r.ordem), custoMensal: Number(r.custo_mensal || 0) }),
     },
     unidades: {
       table: 'unidades',
       build: buildUnidade,
-      toRow: u => ({ nome: u.nome, empresas_vencidas: u.empresasVencidas, empresas_exclusiva_tst: u.empresasExclusivaTst, clientes_ativos: u.clientesAtivos }),
-      fromRow: r => ({
-        id: r.id, nome: r.nome,
-        empresasVencidas: Number(r.empresas_vencidas), empresasExclusivaTst: Number(r.empresas_exclusiva_tst || 0),
-        clientesAtivos: Number(r.clientes_ativos || 0),
-        empresas: Number(r.empresas_vencidas) + Number(r.empresas_exclusiva_tst || 0),
-        mesesPorAno: {}, meses: {},
-      }),
+      toRow: u => ({ nome: u.nome }),
+      fromRow: r => ({ id: r.id, nome: r.nome, empresasVencidas: 0, empresasExclusivaTst: 0, clientesAtivos: 0, empresas: 0, mesesPorAno: {}, meses: {} }),
     },
     documentos: {
       table: 'documentos',
@@ -217,8 +255,10 @@ const Store = (() => {
     colaboradores: {
       table: 'colaboradores',
       build: buildColaborador,
-      toRow: c => ({ nome: c.nome, funcao_id: c.funcaoId, empresas_dia: c.empresasDia, inspecoes_dia: c.inspecoesDia, relatorios_dia: c.relatoriosDia }),
-      fromRow: r => ({ id: r.id, nome: r.nome, funcaoId: r.funcao_id, empresasDia: Number(r.empresas_dia), inspecoesDia: Number(r.inspecoes_dia), relatoriosDia: Number(r.relatorios_dia), alocacoes: [] }),
+      toRow: c => ({ nome: c.nome, funcao_id: c.funcaoId, empresas_dia: c.empresasDia, inspecoes_dia: c.inspecoesDia, relatorios_dia: c.relatoriosDia,
+                     data_admissao: c.dataAdmissao, data_desligamento: c.dataDesligamento, custo_mensal: c.custoMensal }),
+      fromRow: r => ({ id: r.id, nome: r.nome, funcaoId: r.funcao_id, empresasDia: Number(r.empresas_dia), inspecoesDia: Number(r.inspecoes_dia), relatoriosDia: Number(r.relatorios_dia),
+                       dataAdmissao: r.data_admissao || null, dataDesligamento: r.data_desligamento || null, custoMensal: r.custo_mensal != null ? Number(r.custo_mensal) : null, alocacoes: [] }),
     },
   };
 
@@ -251,6 +291,7 @@ const Store = (() => {
       return c;
     });
     return {
+      portes: Array.isArray(raw.portes) ? raw.portes.map(x => buildPorte(x || {})).filter(x => x.codigo) : null,
       funcoes: lista('funcoes', buildFuncao),
       unidades,
       // Sem a chave "documentos" mantém o catálogo padrão; lista vazia explícita é respeitada.
@@ -279,7 +320,7 @@ const Store = (() => {
 
   /* ---------- estado (cache) ---------- */
 
-  let state = { funcoes: [], unidades: [], documentos: [], colaboradores: [], parametros: buildParametros(null) };
+  let state = { funcoes: [], unidades: [], documentos: [], colaboradores: [], parametros: buildParametros(null), portes: PORTES_PADRAO.slice() };
   let loaded = false;
   let loadedAt = 0;
 
@@ -308,10 +349,22 @@ const Store = (() => {
           return ['_alocacoes', data];
         }));
     consultas.push(
-      db.from('unidade_empresas_mes').select('unidade_id, ano, mes, empresas_vencidas, empresas_exclusiva_tst, clientes_ativos')
+      db.from('demanda_mensal').select('unidade_id, ano, mes, condicao, porte, quantidade')
         .then(({ data, error }) => {
-          if (error) throw falha(error, 'Falha ao carregar a variação mensal de empresas.');
-          return ['_meses', data];
+          if (error) throw falha(error, 'Falha ao carregar as empresas por mês.');
+          return ['_demanda', data];
+        }));
+    consultas.push(
+      db.from('unidade_mes').select('unidade_id, ano, mes, clientes_ativos')
+        .then(({ data, error }) => {
+          if (error) throw falha(error, 'Falha ao carregar os clientes ativos por mês.');
+          return ['_ativos', data];
+        }));
+    consultas.push(
+      db.from('portes').select('codigo, nome, peso, ordem').order('ordem').order('codigo')
+        .then(({ data, error }) => {
+          if (error) throw falha(error, 'Falha ao carregar os portes.');
+          return ['portes', data.map(r => ({ codigo: r.codigo, nome: r.nome, peso: Number(r.peso), ordem: Number(r.ordem) }))];
         }));
     const resultados = await Promise.all(consultas);
     state = Object.fromEntries(resultados);
@@ -323,12 +376,10 @@ const Store = (() => {
     delete state._alocacoes;
     state.colaboradores.forEach(c => { c.alocacoes = comNomes(porColab[c.id] || []); });
     const porUnidade = {};
-    state._meses.forEach(m => {
-      const porAno = (porUnidade[m.unidade_id] = porUnidade[m.unidade_id] || {});
-      (porAno[m.ano] = porAno[m.ano] || {})[m.mes] = { empresasVencidas: Number(m.empresas_vencidas), empresasExclusivaTst: Number(m.empresas_exclusiva_tst || 0), clientesAtivos: Number(m.clientes_ativos || 0) };
-    });
-    delete state._meses;
-    state.unidades.forEach(u => { u.mesesPorAno = porUnidade[u.id] || {}; aplicarAno(u); });
+    state._demanda.forEach(d => { (porUnidade[d.unidade_id] = porUnidade[d.unidade_id] || { demandaPorMes: [], clientesAtivosPorMes: [] }).demandaPorMes.push({ ano: d.ano, mes: d.mes, condicao: d.condicao, porte: d.porte, quantidade: Number(d.quantidade) }); });
+    state._ativos.forEach(a => { (porUnidade[a.unidade_id] = porUnidade[a.unidade_id] || { demandaPorMes: [], clientesAtivosPorMes: [] }).clientesAtivosPorMes.push({ ano: a.ano, mes: a.mes, clientesAtivos: Number(a.clientes_ativos) }); });
+    delete state._demanda; delete state._ativos;
+    state.unidades.forEach(u => { const x = porUnidade[u.id]; u.mesesPorAno = x ? mesesDeBackupV12(x.demandaPorMes, x.clientesAtivosPorMes) : {}; aplicarAno(u); });
     state.funcoes.sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR'));
     state.colaboradores.forEach(c => Object.assign(c, infoFuncao(c.funcaoId)));
     loaded = true;
@@ -343,7 +394,7 @@ const Store = (() => {
   }
 
   function clear() {
-    state = { funcoes: [], unidades: [], documentos: [], colaboradores: [], parametros: buildParametros(null) };
+    state = { funcoes: [], unidades: [], documentos: [], colaboradores: [], parametros: buildParametros(null), portes: PORTES_PADRAO.slice() };
     loaded = false;
     loadedAt = 0;
   }
@@ -351,7 +402,7 @@ const Store = (() => {
   /** Nome e tipo de produção de uma função (pelo id), para enriquecer o colaborador. */
   function infoFuncao(funcaoId) {
     const f = funcaoId ? state.funcoes.find(x => x.id === funcaoId) : null;
-    return { funcao: f ? f.nome : '', tipoProducao: f ? f.tipoProducao : 'nenhuma', chefia: !!(f && f.chefia), coordena: f && f.chefia ? f.coordena : 'todos', funcaoOrdem: f ? f.ordem : 9999 };
+    return { funcao: f ? f.nome : '', tipoProducao: f ? f.tipoProducao : 'nenhuma', chefia: !!(f && f.chefia), coordena: f && f.chefia ? f.coordena : 'todos', funcaoOrdem: f ? f.ordem : 9999, funcaoCustoMensal: f ? f.custoMensal : 0 };
   }
 
   /** Preenche unidadeNome de cada alocação a partir do cache de unidades. */
@@ -422,40 +473,77 @@ const Store = (() => {
 
   /* ---------- variação mensal de empresas por unidade ---------- */
 
+  /** Demanda por unidade × mês do ano selecionado: quantos clientes vencem, por condição e porte; e clientes ativos. */
   const empresasMes = {
-    /** Define o valor próprio de um mês do ano selecionado (valores) ou remove (null → volta ao padrão). */
-    async definir(unidadeId, mes, valores, { silent = false } = {}) {
+    /** Grava a quantidade de uma condição × porte num mês (0 apaga a linha). */
+    async definirDemanda(unidadeId, mes, condicao, porte, quantidade, { silent = false } = {}) {
       const u = state.unidades.find(x => x.id === unidadeId);
       if (!u) throw new Error('Unidade não encontrada.');
-      const doAno = { ...((u.mesesPorAno || {})[ano] || {}) };
-      if (valores) {
-        const row = {
-          unidade_id: unidadeId, ano, mes,
-          empresas_vencidas: Math.max(0, toInt(valores.empresasVencidas, 0)),
-          empresas_exclusiva_tst: Math.max(0, toInt(valores.empresasExclusivaTst, 0)),
-          clientes_ativos: Math.max(0, toInt(valores.clientesAtivos, 0)),
-        };
-        const { error } = await db.from('unidade_empresas_mes').upsert(row, { onConflict: 'unidade_id,ano,mes' });
-        if (error) throw falha(error, 'Não foi possível salvar o valor do mês.');
-        doAno[mes] = { empresasVencidas: row.empresas_vencidas, empresasExclusivaTst: row.empresas_exclusiva_tst, clientesAtivos: row.clientes_ativos };
+      const q = Math.max(0, toInt(quantidade, 0));
+      if (q > 0) {
+        const { error } = await db.from('demanda_mensal').upsert({ unidade_id: unidadeId, ano, mes, condicao, porte, quantidade: q }, { onConflict: 'unidade_id,ano,mes,condicao,porte' });
+        if (error) throw falha(error, 'Não foi possível salvar o número do mês.');
       } else {
-        const { error } = await db.from('unidade_empresas_mes').delete().eq('unidade_id', unidadeId).eq('ano', ano).eq('mes', mes);
-        if (error) throw falha(error, 'Não foi possível remover o valor do mês.');
-        delete doAno[mes];
+        const { error } = await db.from('demanda_mensal').delete().match({ unidade_id: unidadeId, ano, mes, condicao, porte });
+        if (error) throw falha(error, 'Não foi possível apagar o número do mês.');
       }
-      u.mesesPorAno = { ...(u.mesesPorAno || {}), [ano]: doAno };
-      aplicarAno(u);
+      const atual = ((u.mesesPorAno || {})[ano] || {})[mes] || montarMes({}, 0);
+      const demanda = { ...atual.demanda, [condicao]: { ...(atual.demanda[condicao] || {}) } };
+      if (q > 0) demanda[condicao][porte] = q; else delete demanda[condicao][porte];
+      this._guardar(u, mes, montarMes(demanda, atual.clientesAtivos));
       if (!silent) emit();
     },
-    /** Remove todos os valores próprios da unidade no ano selecionado (todos os meses voltam ao padrão). */
+    /** Grava os clientes ativos (informativo) de um mês (0 apaga a linha). */
+    async definirClientesAtivos(unidadeId, mes, quantidade, { silent = false } = {}) {
+      const u = state.unidades.find(x => x.id === unidadeId);
+      if (!u) throw new Error('Unidade não encontrada.');
+      const q = Math.max(0, toInt(quantidade, 0));
+      if (q > 0) {
+        const { error } = await db.from('unidade_mes').upsert({ unidade_id: unidadeId, ano, mes, clientes_ativos: q }, { onConflict: 'unidade_id,ano,mes' });
+        if (error) throw falha(error, 'Não foi possível salvar os clientes ativos.');
+      } else {
+        const { error } = await db.from('unidade_mes').delete().match({ unidade_id: unidadeId, ano, mes });
+        if (error) throw falha(error, 'Não foi possível apagar os clientes ativos.');
+      }
+      const atual = ((u.mesesPorAno || {})[ano] || {})[mes] || montarMes({}, 0);
+      this._guardar(u, mes, montarMes(atual.demanda, q));
+      if (!silent) emit();
+    },
+    _guardar(u, mes, valorMes) {
+      const doAno = { ...((u.mesesPorAno || {})[ano] || {}) };
+      const vazio = valorMes.empresasVencidas === 0 && valorMes.empresasExclusivaTst === 0 && valorMes.clientesAtivos === 0;
+      if (vazio) delete doAno[mes]; else doAno[mes] = valorMes;
+      u.mesesPorAno = { ...(u.mesesPorAno || {}), [ano]: doAno };
+      aplicarAno(u);
+    },
+    /** Apaga todos os números da unidade no ano selecionado. */
     async limpar(unidadeId) {
       const u = state.unidades.find(x => x.id === unidadeId);
       if (!u) throw new Error('Unidade não encontrada.');
-      const { error } = await db.from('unidade_empresas_mes').delete().eq('unidade_id', unidadeId).eq('ano', ano);
-      if (error) throw falha(error, 'Não foi possível limpar os valores do ano.');
+      const r1 = await db.from('demanda_mensal').delete().match({ unidade_id: unidadeId, ano });
+      if (r1.error) throw falha(r1.error, 'Não foi possível limpar os números do ano.');
+      const r2 = await db.from('unidade_mes').delete().match({ unidade_id: unidadeId, ano });
+      if (r2.error) throw falha(r2.error, 'Não foi possível limpar os clientes ativos do ano.');
       u.mesesPorAno = { ...(u.mesesPorAno || {}) };
       delete u.mesesPorAno[ano];
       aplicarAno(u);
+      emit();
+    },
+  };
+
+  /* ---------- portes (pesos) ---------- */
+  const portes = {
+    list: () => state.portes.slice(),
+    get: codigo => state.portes.find(p => p.codigo === codigo) || null,
+    /** Pesos por porte no formato do motor: { P: 1, M: 1.5, G: 2 }. */
+    pesos: () => Object.fromEntries(state.portes.map(p => [p.codigo, p.peso])),
+    async atualizar(codigo, patch) {
+      const atual = state.portes.find(p => p.codigo === codigo);
+      if (!atual) throw new Error('Porte não encontrado.');
+      const montado = buildPorte({ ...atual, ...patch, codigo });
+      const { data, error } = await db.from('portes').update({ nome: montado.nome, peso: montado.peso, ordem: montado.ordem }).eq('codigo', codigo).select().single();
+      if (error) throw falha(error, 'Não foi possível salvar o porte.');
+      state.portes = state.portes.map(p => (p.codigo === codigo ? { codigo: data.codigo, nome: data.nome, peso: Number(data.peso), ordem: Number(data.ordem) } : p));
       emit();
     },
   };
@@ -481,7 +569,7 @@ const Store = (() => {
   /* ---------- parâmetros do motor (linha única) ---------- */
 
   const parametros = {
-    get: () => ({ ...state.parametros, diasUteis: state.parametros.diasUteis.slice() }),
+    get: () => ({ ...state.parametros, diasUteis: state.parametros.diasUteis.slice(), rampup: state.parametros.rampup.slice() }),
     async update(patch, { silent = false } = {}) {
       const novo = buildParametros({ ...state.parametros, ...patch });
       const { data, error } = await db.from('parametros').update(parametrosToRow(novo)).eq('id', 1).select().single();
@@ -536,12 +624,11 @@ const Store = (() => {
       version: SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
       funcoes: state.funcoes.map(f => { const s = f.respondeParaId ? state.funcoes.find(x => x.id === f.respondeParaId) : null; return { ...f, respondePara: s ? s.nome : null }; }),
+      portes: state.portes,
       unidades: state.unidades.map(u => ({
-        ...u,
-        meses: undefined,
-        empresasPorMes: Object.entries(u.mesesPorAno || {})
-          .flatMap(([a, meses]) => Object.entries(meses || {}).map(([mes, v]) => ({ ano: Number(a), mes: Number(mes), ...v })))
-          .sort((a, b) => a.ano - b.ano || a.mes - b.mes),
+        id: u.id, nome: u.nome,
+        demandaPorMes: demandaLista(u),
+        clientesAtivosPorMes: clientesAtivosLista(u),
       })),
       documentos: state.documentos,
       colaboradores: state.colaboradores.map(c => ({ ...c, ...infoFuncao(c.funcaoId), alocacoes: comNomes(c.alocacoes || []) })),
@@ -595,7 +682,7 @@ const Store = (() => {
     let s = 0;
     for (let m = 1; m <= 12; m++) {
       const exc = (u.meses || {})[m];
-      s += exc ? (Number(exc.empresasVencidas) || 0) + (Number(exc.empresasExclusivaTst) || 0) : (u.empresas || 0);
+      s += exc ? (Number(exc.empresasVencidas) || 0) + (Number(exc.empresasExclusivaTst) || 0) : 0;
     }
     return s / 12;
   }
@@ -623,6 +710,7 @@ const Store = (() => {
     colaboradores: makeCollection('colaboradores'),
     parametros,
     empresasMes,
+    portes,
     mediaClientesMes,
     get ano() { return ano; },
     definirAno,

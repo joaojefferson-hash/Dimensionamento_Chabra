@@ -63,6 +63,33 @@ const ViewCalendario = {
             </div>
             <small class="muted">Quantos dias uma empresa tem para receber os documentos depois que vencem. O Dimensionamento diz quantas pessoas contratar para zerar o pendente nesse prazo.</small>
           </label>
+          <div class="field">
+            <span>Ramp-up de quem é contratado</span>
+            <div class="param-inline">
+              <span class="muted">1º mês</span><input class="input input-num input-pct" type="number" name="rampup0" min="0" max="100" step="5" inputmode="numeric" value="${p.rampup[0] != null ? p.rampup[0] : 100}"><span class="muted">%</span>
+              <span class="muted">2º mês</span><input class="input input-num input-pct" type="number" name="rampup1" min="0" max="100" step="5" inputmode="numeric" value="${p.rampup[1] != null ? p.rampup[1] : 100}"><span class="muted">%</span>
+              <span class="muted">3º mês</span><input class="input input-num input-pct" type="number" name="rampup2" min="0" max="100" step="5" inputmode="numeric" value="${p.rampup[2] != null ? p.rampup[2] : 100}"><span class="muted">%</span>
+            </div>
+            <small class="muted">Quanto uma pessoa nova produz nos primeiros meses de casa (depois, 100%). Vale para quem tem data de admissão e para as contratações simuladas no "E se…?".</small>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Porte dos clientes</h2>
+          <span class="saved-flag" id="porte-saved" aria-hidden="true">salvo ✓</span>
+        </div>
+        <p class="muted">O peso multiplica o esforço de cada cliente: um cliente de peso 2 exige o trabalho de dois pequenos (inspeção, relatório e finalização). Os números por porte são lançados em Empresas por Unidade.</p>
+        <form id="form-portes" class="form-portes" autocomplete="off">
+          ${Store.portes.list().map(pt => `
+            <label class="field">
+              <span>${UI.esc(pt.nome)} (${UI.esc(pt.codigo)})</span>
+              <div class="param-inline">
+                <span class="muted">peso</span>
+                <input class="input input-num input-pct" type="number" name="peso-${UI.esc(pt.codigo)}" data-porte="${UI.esc(pt.codigo)}" min="0.1" max="20" step="0.1" inputmode="decimal" value="${pt.peso}">
+              </div>
+            </label>`).join('')}
         </form>
       </section>
 
@@ -103,6 +130,27 @@ const ViewCalendario = {
     };
     ligarParametro(formPar.folga, { valida: v => v >= 0 && v <= 90, erro: 'A folga deve ficar entre 0% e 90%.', aplicar: v => ({ ocupacaoAlvo: 100 - v }), atual: () => Math.round(100 - Store.parametros.get().ocupacaoAlvo) });
     ligarParametro(formPar.prazoDias, { valida: v => v >= 1 && v <= 365, erro: 'O prazo deve ficar entre 1 e 365 dias.', aplicar: v => ({ prazoDias: v }), atual: () => Store.parametros.get().prazoDias });
+    [0, 1, 2].forEach(i => ligarParametro(formPar[`rampup${i}`], {
+      valida: v => v >= 0 && v <= 100, erro: 'O ramp-up deve ficar entre 0% e 100%.',
+      aplicar: v => { const r = [0, 1, 2].map(k => (k === i ? v : (Store.parametros.get().rampup[k] != null ? Store.parametros.get().rampup[k] : 100))); while (r.length && r[r.length - 1] >= 100) r.pop(); return { rampup: r }; },
+      atual: () => (Store.parametros.get().rampup[i] != null ? Store.parametros.get().rampup[i] : 100),
+    }));
+
+    // ---- pesos dos portes ----
+    const formPortes = el.querySelector('#form-portes');
+    formPortes.addEventListener('submit', e => e.preventDefault());
+    formPortes.querySelectorAll('input[data-porte]').forEach(input => {
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
+      input.addEventListener('change', async () => {
+        const v = UI.parseNum(input.value, NaN);
+        const atual = () => (Store.portes.get(input.dataset.porte) || { peso: 1 }).peso;
+        if (!(v >= 0.1 && v <= 20)) { UI.toast('O peso deve ficar entre 0,1 e 20.', 'error'); input.value = atual(); return; }
+        input.disabled = true;
+        try { await Store.portes.atualizar(input.dataset.porte, { peso: v }); const flag = el.querySelector('#porte-saved'); flag.classList.add('show'); setTimeout(() => flag.classList.remove('show'), 1500); }
+        catch (err) { UI.toast(err.message, 'error'); input.value = atual(); }
+        finally { input.disabled = false; }
+      });
+    });
 
     const formCal = el.querySelector('#form-calendario');
     formCal.addEventListener('submit', e => e.preventDefault());

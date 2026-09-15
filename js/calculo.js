@@ -4,23 +4,30 @@
    Funções puras sobre os cadastros; nada de DOM. Também roda em Node (testes).
 
    Entradas (formato do Store):
-     unidades:      [{ id, nome, empresasVencidas (Mensal), empresasExclusivaTst, meses?: { [1..12]: { empresasVencidas, empresasExclusivaTst } } }]
+     unidades:      [{ id, nome, meses?: { [1..12]: { empresasVencidas, empresasExclusivaTst,
+                                                     demanda?: { mensal: { P, M, G… }, exclusiva_tst: { … } } } } }]
+                    // empresasVencidas/ExclusivaTst = contagens (Σ dos portes); demanda = por porte (o motor pondera)
      colaboradores: [{ id, nome, funcao, tipoProducao ('tecnico' | 'administrativo' | 'nenhuma'), chefia,
-                       empresasDia, inspecoesDia, relatoriosDia, alocacoes: [{ unidadeId, percentual }] }]
+                       empresasDia, inspecoesDia, relatoriosDia, alocacoes: [{ unidadeId, percentual }],
+                       dataAdmissao? ('AAAA-MM-DD'), dataDesligamento?, custoMensal?, funcaoCustoMensal? }]
                     // tipoProducao 'nenhuma' = não entra nas contas; chefia = aparece como responsável pelas unidades
-     parametros:    { diasUteis[12], ocupacaoAlvo }
+     parametros:    { diasUteis[12], ocupacaoAlvo, rampup?: [50, 80], pesosPorte?: { P: 1, M: 1.5, G: 2 } }
      simulacoes:    [{ unidadeId, grupo: 'tecnico' | 'administrativo', quantidade (≠ 0; negativa = a menos), de, ate (0..11),
-                       inspecoesDia?, relatoriosDia?, empresasDia? }]   // "e se…": pessoas virtuais só nas contas
+                       inspecoesDia?, relatoriosDia?, empresasDia?, custoMensal? }]   // "e se…": pessoas virtuais só nas contas
      janela:        { de: 0..11, ate: 0..11 }   (meses, inclusive)
+     ano:           ano dos meses calculados (para admissão/desligamento e ramp-up; padrão = ano corrente)
 
    Modelo:
-     precisa(unidade, entrega, mês) = clientes Mensal + Exclusiva TST do mês
+     precisa(unidade, entrega, mês) = Σ clientes que vencem no mês × peso do porte (P 1,0 · M 1,5 · G 2,0)
                                       (cada um exige uma inspeção, um relatório e uma finalização)
-                                 (ex.: inspeção a cada 3 meses → 1/3 das empresas por mês)
      produção(colab, entrega, mês) = valor_por_dia × dias úteis do mês × fração alocada na unidade
+                                     × presença no mês (admissão/desligamento, proporcional aos dias)
+                                     × ramp-up (1º mês de casa rampup[0]%, 2º rampup[1]%…, depois 100%)
      consegue(unidade, entrega, mês) = Σ produção × (ocupaçãoAlvo/100)   ← folga para imprevistos
      sobra = consegue − precisa  (negativa = falta)
-     pessoas que faltam/sobram = sobra ÷ produção de uma pessoa inteira no período
+     pessoas que faltam/sobram = sobra ÷ produção de uma pessoa inteira (veterana) no período
+     custo: por função, custo médio mensal de uma pessoa (colaborador.custoMensal ou o da função);
+            faltam × custo = quanto custa contratar; sobram × custo = quanto custa a sobra
 
    Entregas: técnicos → inspeções e relatórios; administrativos → empresas finalizadas.
    A situação de uma função é a pior entre as suas entregas; a da unidade, a pior das funções.
@@ -53,15 +60,75 @@ const Calculo = (() => {
   function empresasDoMes(u, mes) {
     const exc = u.meses && u.meses[mes + 1];
     return exc
-      ? { empresasVencidas: n(exc.empresasVencidas), empresasExclusivaTst: n(exc.empresasExclusivaTst), excecao: true }
-      : { empresasVencidas: n(u.empresasVencidas), empresasExclusivaTst: n(u.empresasExclusivaTst), excecao: false };
+      ? { empresasVencidas: n(exc.empresasVencidas), empresasExclusivaTst: n(exc.empresasExclusivaTst), demanda: exc.demanda || null, excecao: true }
+      : { empresasVencidas: n(u.empresasVencidas), empresasExclusivaTst: n(u.empresasExclusivaTst), demanda: u.demanda || null, excecao: false };
   }
 
-  /** Empresas que precisam de atendimento (Mensal + Exclusiva TST). Com `mes` (0..11) usa a quantidade daquele mês. */
+  /** Peso de um porte (P 1,0 · M 1,5 · G 2,0…); porte desconhecido ou sem tabela de pesos = 1. */
+  function pesoPorte(p, porte) {
+    const pesos = p && p.pesosPorte;
+    const w = pesos && pesos[porte];
+    return Number.isFinite(Number(w)) && Number(w) > 0 ? Number(w) : 1;
+  }
+
+  /**
+   * Esforço que a carteira exige no mês, em "empresas equivalentes": Σ clientes que vencem × peso do porte.
+   * Sem detalhe por porte, vale a contagem (Mensal + Exclusiva TST). Com `mes` (0..11) usa a quantidade daquele mês.
+   */
   function empresasPonderadas(u, p, mes) {
     const q = mes === undefined ? u : empresasDoMes(u, mes);
+    const d = q.demanda;
+    if (d && typeof d === 'object') {
+      let total = 0;
+      Object.values(d).forEach(porPorte => {
+        if (porPorte && typeof porPorte === 'object') Object.entries(porPorte).forEach(([porte, qtd]) => { total += Math.max(0, n(qtd)) * pesoPorte(p, porte); });
+      });
+      return total;
+    }
     return n(q.empresasVencidas) + n(q.empresasExclusivaTst);
   }
+
+  /* ---------- presença no mês e ramp-up ---------- */
+
+  const parseData = s => {
+    if (!s) return null;
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s));
+    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+  };
+  const diasNoMes = (ano, mes) => new Date(ano, mes + 1, 0).getDate();
+
+  /**
+   * Presença de um colaborador num mês (0..1): fração dos dias do mês entre a admissão e o desligamento.
+   * Sem datas = 1. Meses antes da admissão ou depois do desligamento = 0.
+   */
+  function presencaNoMes(c, ano, mes) {
+    const adm = parseData(c.dataAdmissao), desl = parseData(c.dataDesligamento);
+    if (!adm && !desl) return 1;
+    const inicio = new Date(ano, mes, 1), fim = new Date(ano, mes, diasNoMes(ano, mes));
+    if (adm && adm > fim) return 0;
+    if (desl && desl < inicio) return 0;
+    const de = adm && adm > inicio ? adm : inicio;
+    const ate = desl && desl < fim ? desl : fim;
+    const dias = Math.round((ate - de) / 86400000) + 1;
+    return Math.max(0, Math.min(1, dias / diasNoMes(ano, mes)));
+  }
+
+  /**
+   * Ramp-up (0..1) de quem foi contratado: no 1º mês de casa produz rampup[0]%, no 2º rampup[1]%…, depois 100%.
+   * `mesesDeCasa` = 0 no mês da admissão. Sem admissão (veterano) = 1.
+   */
+  function fatorRampup(mesesDeCasa, rampup) {
+    if (mesesDeCasa == null || mesesDeCasa < 0) return 1;
+    const curva = Array.isArray(rampup) ? rampup : [];
+    return mesesDeCasa < curva.length ? Math.max(0, Math.min(100, n(curva[mesesDeCasa]))) / 100 : 1;
+  }
+  const mesesDeCasa = (c, ano, mes) => {
+    if (c.simulado) return c.quantidade > 0 && Number.isInteger(c.rampupDesde) ? mes - c.rampupDesde : null; // desligamento simulado não tem ramp-up
+    const adm = parseData(c.dataAdmissao);
+    return adm ? (ano - adm.getFullYear()) * 12 + (mes - adm.getMonth()) : null;
+  };
+  /** Produção efetiva no mês = presença × ramp-up (pessoas simuladas: presença 1 nos meses ativos). */
+  const fatorProducao = (c, ano, mes, p) => (c.simulado ? 1 : presencaNoMes(c, ano, mes)) * fatorRampup(mesesDeCasa(c, ano, mes), p.rampup);
 
   /** Produção de um colaborador numa entrega num mês (100% do tempo). */
   function producaoMes(colab, entrega, mes, p) {
@@ -128,6 +195,15 @@ const Calculo = (() => {
     };
   }
 
+  /**
+   * Impacto financeiro de uma função num mês/período: custo médio de uma pessoa, quanto custa contratar
+   * quem falta e quanto custa a sobra (pessoas inteiras × custo). Sem custo cadastrado, tudo zero.
+   */
+  function custoFuncao(resumo, custoPessoa) {
+    const c = Math.max(0, n(custoPessoa));
+    return { pessoa: c, contratar: c * n(resumo.faltam), sobra: c * n(resumo.sobram) };
+  }
+
   /** Frase de recomendação em linguagem simples. */
   function recomendacao(funcao, st, faltam, sobram, pessoas) {
     const rot = FUNCAO_CURTA[funcao].toLowerCase();
@@ -156,8 +232,11 @@ const Calculo = (() => {
    *   parametros: p
    * }
    */
-  function calcular({ unidades = [], colaboradores = [], parametros, janela, simulacoes = [] }) {
+  function calcular({ unidades = [], colaboradores = [], parametros, janela, simulacoes = [], ano = new Date().getFullYear() }) {
     const p = normalizarParametros(parametros);
+    const anoCalc = Number.isInteger(Number(ano)) ? Number(ano) : new Date().getFullYear();
+    /** Custo médio mensal de uma pessoa (o do colaborador, senão o da função). */
+    const custoDe = c => (n(c.custoMensal) > 0 ? n(c.custoMensal) : n(c.funcaoCustoMensal));
     const de = clampMes(janela && janela.de, 0);
     const ate = clampMes(janela && janela.ate, 11);
     const meses = [];
@@ -168,7 +247,7 @@ const Calculo = (() => {
     const fracaoEm = (c, unidadeId) => alocValidas(c).filter(a => a.unidadeId === unidadeId).reduce((s, a) => s + n(a.percentual), 0) / 100;
     // simulações viram pessoas virtuais (quantidade inteira, podendo ser negativa) ativas só em alguns meses
     const simulados = colaboradoresSimulados(simulacoes).filter(c => idsUnidades.has(c.unidadeId));
-    const ativoNoMes = (c, mes) => !c.mesesAtivos || c.mesesAtivos.includes(mes);
+    const ativoNoMes = (c, mes) => (c.mesesAtivos ? c.mesesAtivos.includes(mes) : presencaNoMes(c, anoCalc, mes) > 0);
     // quem não produz fica fora das contas; se for chefia, aparece como responsável pelas unidades
     const chefes = colaboradores.filter(c => c.chefia)
       .map(c => ({ id: c.id, nome: c.nome, funcao: c.funcao || '', coordena: c.coordena || 'todos', ordem: n(c.funcaoOrdem) || 9999, unidades: alocValidas(c).map(a => a.unidadeId) }))
@@ -185,6 +264,14 @@ const Calculo = (() => {
     // referência de "uma pessoa inteira" por grupo: os da unidade; senão, os da equipe; senão, o padrão
     const globalPorFuncao = {};
     FUNCOES.forEach(f => { const l = produtivos.filter(c => c.tipoProducao === f); globalPorFuncao[f] = l.length ? l : [COLAB_PADRAO]; });
+    // custo médio de uma pessoa por grupo, na equipe toda (referência quando a unidade não tem ninguém do grupo)
+    const custoGlobal = {};
+    FUNCOES.forEach(f => { const l = produtivos.filter(c => c.tipoProducao === f && custoDe(c) > 0); custoGlobal[f] = l.length ? l.reduce((s, c) => s + custoDe(c), 0) / l.length : 0; });
+    const custoMedio = (lista, f) => {
+      const comCusto = lista.filter(c => c.fracao > 0 && custoDe(c) > 0);
+      const peso = comCusto.reduce((s, c) => s + c.fracao, 0);
+      return peso > 0 ? comCusto.reduce((s, c) => s + custoDe(c) * c.fracao, 0) / peso : custoGlobal[f];
+    };
 
     const calcUnidade = u => {
       const colabs = produtivosESimulados
@@ -202,19 +289,28 @@ const Calculo = (() => {
         const q = empresasDoMes(u, mes);
         const precisa = empresasPonderadas(u, p, mes);
         const entregas = {};
-        const pessoasMes = {};
-        FUNCOES.forEach(f => { pessoasMes[f] = Math.max(0, porFuncao[f].filter(c => ativoNoMes(c, mes)).reduce((s, c) => s + c.fracao, 0)); });
+        const pessoasMes = {}, emRampup = {};
+        FUNCOES.forEach(f => {
+          const cf = porFuncao[f].filter(c => ativoNoMes(c, mes));
+          // pessoas = presença no mês (quem entra dia 15 conta meio); ramp-up só reduz a produção
+          pessoasMes[f] = Math.max(0, cf.reduce((s, c) => s + c.fracao * (c.simulado ? 1 : presencaNoMes(c, anoCalc, mes)), 0));
+          emRampup[f] = cf.filter(c => c.fracao > 0 && fatorRampup(mesesDeCasa(c, anoCalc, mes), p.rampup) < 1).reduce((s, c) => s + Math.abs(c.fracao), 0);
+        });
         ENTREGAS.forEach(e => {
           const cf = porFuncao[e.funcao].filter(c => ativoNoMes(c, mes));
           // desligamento simulado além do que existe não fica negativo: a equipe vai a zero
-          const consegueMax = Math.max(0, cf.reduce((s, c) => s + producaoMes(c, e, mes, p) * c.fracao, 0));
+          const consegueMax = Math.max(0, cf.reduce((s, c) => s + producaoMes(c, e, mes, p) * c.fracao * fatorProducao(c, anoCalc, mes, p), 0));
           const presentes = cf.filter(c => c.fracao > 0);
           const ref = presentes.length ? presentes : globalPorFuncao[e.funcao];
-          const producaoPessoaMax = ref.reduce((s, c) => s + producaoMes(c, e, mes, p), 0) / ref.length;
+          const producaoPessoaMax = ref.reduce((s, c) => s + producaoMes(c, e, mes, p), 0) / ref.length; // uma pessoa inteira, veterana
           entregas[e.id] = bloco(precisaMes(u, e, mes, p), consegueMax, pessoasMes[e.funcao], producaoPessoaMax, p);
         });
         const funcoes = {};
-        FUNCOES.forEach(f => { funcoes[f] = resumoFuncao(f, entregas); });
+        FUNCOES.forEach(f => {
+          funcoes[f] = resumoFuncao(f, entregas);
+          funcoes[f].emRampup = emRampup[f];
+          funcoes[f].custo = custoFuncao(funcoes[f], custoMedio(porFuncao[f].filter(c => ativoNoMes(c, mes)), f));
+        });
         return {
           mes, nome: MESES[mes], nomeLongo: MESES_LONGO[mes], diasUteis: n(p.diasUteis[mes]),
           empresas: q.empresasVencidas + q.empresasExclusivaTst, precisa, excecao: q.excecao,
@@ -277,6 +373,13 @@ const Calculo = (() => {
         r.faltam = partes.reduce((s, x) => s + x.faltam, 0);
         r.sobram = partes.reduce((s, x) => s + x.sobram, 0);
         r.ideal = partes.reduce((s, x) => s + x.ideal, 0); // quadro ideal do total = soma das unidades
+        r.emRampup = partes.reduce((s, x) => s + n(x.emRampup), 0);
+        const comCusto = partes.filter(x => x.custo && x.custo.pessoa > 0);
+        r.custo = {
+          pessoa: comCusto.length ? comCusto.reduce((s, x) => s + x.custo.pessoa, 0) / comCusto.length : 0,
+          contratar: partes.reduce((s, x) => s + (x.custo ? x.custo.contratar : 0), 0),
+          sobra: partes.reduce((s, x) => s + (x.custo ? x.custo.sobra : 0), 0),
+        };
         r.status = piorStatus(partes.map(x => x.status));
         r.recomendacao = recomendacao(f, r.status, r.faltam, r.sobram, r.pessoas);
       });
@@ -317,6 +420,8 @@ const Calculo = (() => {
         return {
           id: `sim-${i}`, nome: `Simulação ${i + 1}`, simulado: true, chefia: false,
           tipoProducao: s.grupo, unidadeId: s.unidadeId, quantidade: Math.round(n(s.quantidade)), mesesAtivos,
+          rampupDesde: Math.min(de, ate), // contratação simulada entra em ramp-up como uma contratação real
+          custoMensal: Math.max(0, n(s.custoMensal)),
           inspecoesDia: s.inspecoesDia == null ? COLAB_PADRAO.inspecoesDia : Math.max(0, n(s.inspecoesDia)),
           relatoriosDia: s.relatoriosDia == null ? COLAB_PADRAO.relatoriosDia : Math.max(0, n(s.relatoriosDia)),
           empresasDia: s.empresasDia == null ? COLAB_PADRAO.empresasDia : Math.max(0, n(s.empresasDia)),
@@ -340,7 +445,16 @@ const Calculo = (() => {
       entregas[e.id] = { ...b, porMes: { precisa: precisa / nMeses, consegue: b.consegue / nMeses } };
     });
     const funcoes = {};
-    FUNCOES.forEach(f => { funcoes[f] = resumoFuncao(f, entregas); });
+    FUNCOES.forEach(f => {
+      funcoes[f] = resumoFuncao(f, entregas);
+      const custos = mesesCalc.map(m => m.funcoes[f].custo || { pessoa: 0, contratar: 0, sobra: 0 });
+      // no período: contratar = custo de cobrir a falta de cada mês, somado; sobra idem (o que se paga sem produção)
+      funcoes[f].custo = {
+        pessoa: custos.length ? custos.reduce((s, c) => s + c.pessoa, 0) / custos.length : 0,
+        contratar: custos.reduce((s, c) => s + c.contratar, 0),
+        sobra: custos.reduce((s, c) => s + c.sobra, 0),
+      };
+    });
     return {
       nMeses,
       empresasMedia: mesesCalc.reduce((s, m) => s + m.empresas, 0) / nMeses,
@@ -355,9 +469,14 @@ const Calculo = (() => {
   function normalizarParametros(p) {
     const base = p || {};
     const dias = Array.isArray(base.diasUteis) && base.diasUteis.length === 12 ? base.diasUteis.map(n) : new Array(12).fill(21);
+    const rampup = Array.isArray(base.rampup) ? base.rampup.map(v => Math.max(0, Math.min(100, n(v)))) : [50, 80];
+    const pesosPorte = {};
+    Object.entries(base.pesosPorte || {}).forEach(([k, v]) => { if (n(v) > 0) pesosPorte[k] = n(v); });
     return {
       diasUteis: dias,
       ocupacaoAlvo: n(base.ocupacaoAlvo) || 85,
+      rampup,
+      pesosPorte,
     };
   }
 
@@ -528,7 +647,8 @@ const Calculo = (() => {
 
   return {
     MESES, MESES_LONGO, TEC, ADM, FUNCOES, FUNCAO_CURTA, FUNCAO_SINGULAR, ENTREGAS, ENTREGAS_DA_FUNCAO, COLAB_PADRAO, MARGEM_ATENCAO, colaboradoresSimulados,
-    empresasDoMes, empresasPonderadas, producaoMes, precisaMes, calcular, fila, normalizarParametros, ritmoTexto, piorStatus,
+    empresasDoMes, empresasPonderadas, pesoPorte, presencaNoMes, fatorRampup, custoFuncao,
+    producaoMes, precisaMes, calcular, fila, normalizarParametros, ritmoTexto, piorStatus,
   };
 })();
 

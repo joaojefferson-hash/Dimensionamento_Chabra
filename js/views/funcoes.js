@@ -43,6 +43,11 @@ const ViewFuncoes = {
             <input class="input" name="nome" required maxlength="80" placeholder="Ex.: Supervisor TST Externo"
                    value="${UI.esc(editing ? editing.nome : '')}">
           </label>
+          <label class="field span-2">
+            <span>Custo mensal de uma pessoa (R$)</span>
+            <input class="input input-num" type="number" name="custoMensal" min="0" step="100" inputmode="decimal" placeholder="0" value="${editing && editing.custoMensal > 0 ? editing.custoMensal : ''}">
+            <small>Salário + encargos, em média. Com isso o Dimensionamento mostra quanto custa contratar quem falta e quanto custa a sobra. Deixe vazio para não mostrar valores.</small>
+          </label>
           <div class="field span-4">
             <span>O que essa função entrega?</span>
             <div class="tipo-opcoes">
@@ -106,6 +111,7 @@ const ViewFuncoes = {
                   <th>O que entrega</th>
                   <th>Chefia</th>
                   <th>Coordena · responde para</th>
+                  <th class="num" title="Custo médio mensal de uma pessoa (salário + encargos)">Custo/mês</th>
                   <th class="num">Pessoas</th>
                   <th class="actions">Ações</th>
                 </tr>
@@ -117,6 +123,7 @@ const ViewFuncoes = {
                     <td><span class="chip ${corTipo(f.tipoProducao)}">${UI.esc(t.rotulo)}</span> <span class="muted">${UI.esc(t.descricao)}</span></td>
                     <td>${f.chefia ? '<span class="chip chip-chefia">Chefia</span>' : '<span class="muted">—</span>'}</td>
                     <td class="muted">${f.chefia ? `${coordenaTexto(f)} · ${f.respondeParaId ? `responde para <strong>${UI.esc(nomeFuncao(f.respondeParaId) || 'função excluída')}</strong>` : 'topo'}` : '—'}</td>
+                    <td class="num ${f.custoMensal > 0 ? '' : 'muted'}">${f.custoMensal > 0 ? UI.moeda(f.custoMensal) : '—'}</td>
                     <td class="num">${n}</td>
                     <td class="actions">
                       <button type="button" class="btn-link" data-action="subir" data-id="${f.id}" title="Mover para cima" ${i === 0 ? 'disabled' : ''}>▲</button>
@@ -147,6 +154,7 @@ const ViewFuncoes = {
       const chefia = form.chefia.checked;
       const coordena = chefia ? form.coordena.value : 'todos';
       const respondeParaId = chefia ? (form.respondePara.value || null) : null;
+      const custoMensal = Math.max(0, UI.parseNum(form.custoMensal.value, 0) || 0);
       // não pode responder para si mesma nem fechar um ciclo (A → B → A)
       for (let cur = respondeParaId, passos = 0; cur && passos < 50; passos++) {
         if (cur === this.editingId) { UI.toast('Essa escolha de "Responde para" fecharia um ciclo: a função acabaria respondendo para ela mesma.', 'error'); return; }
@@ -157,7 +165,7 @@ const ViewFuncoes = {
       try {
         if (this.editingId) {
           const antes = Store.funcoes.get(this.editingId);
-          await Store.funcoes.update(this.editingId, { nome, tipoProducao, chefia, coordena, respondeParaId });
+          await Store.funcoes.update(this.editingId, { nome, tipoProducao, chefia, coordena, respondeParaId, custoMensal });
           this.editingId = null;
           this.pendingFocus = true;
           const n = antes ? pessoasDe(antes) : 0;
@@ -166,7 +174,7 @@ const ViewFuncoes = {
             : 'Função atualizada.');
         } else {
           const ordem = funcoes.reduce((m, f) => Math.max(m, f.ordem), 0) + 1;
-          await Store.funcoes.add({ nome, tipoProducao, chefia, coordena, respondeParaId, ordem });
+          await Store.funcoes.add({ nome, tipoProducao, chefia, coordena, respondeParaId, ordem, custoMensal });
           this.pendingFocus = true;
           UI.toast('Função adicionada.');
         }

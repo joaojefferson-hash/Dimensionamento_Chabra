@@ -28,7 +28,10 @@ const ViewDimensionamento = {
     const simulacoes = Programacao.lerSimulacao();
     const janela = { de: 0, ate: 11 };
 
-    const r = Calculo.calcular({ unidades, colaboradores: Store.colaboradores.list(), parametros: p, janela, simulacoes });
+    const parametros = { ...p, pesosPorte: Store.portes.pesos() };
+    const r = Calculo.calcular({ unidades, colaboradores: Store.colaboradores.list(), parametros, janela, simulacoes, ano: Store.ano });
+    const temCusto = [TEC, ADM].some(f => r.total.meses.some(m => m.funcoes[f].custo && m.funcoes[f].custo.pessoa > 0));
+    const moeda = v => UI.moeda(v);
     const fila = Calculo.fila(r, { mesAtual, prazoMeses });
     const alvo = unidadeSel ? r.unidades.find(u => u.id === unidadeSel) : r.total;
     const filaAlvo = unidadeSel ? fila.unidades.find(u => u.id === unidadeSel).grupos : fila.total.grupos;
@@ -63,7 +66,8 @@ const ViewDimensionamento = {
           <div class="label">${Calculo.FUNCAO_CURTA[f]}</div>
           <div class="value">${numFte(m.pessoas[f])}<small> hoje</small> <span class="seta">→</span> <span class="${g.faltam > 0 ? 'txt-deficit' : 'txt-ok'}">${g.ideal}</span><small> ideal em ${M[mesAtual].toLowerCase()}</small></div>
           ${notaDistribuicao(g)}
-          <div class="stat-detalhe">Para zerar o pendente em ${p.prazoDias} dias (${rotuloPrazo}): <strong>${zerar}</strong></div>
+          <div class="stat-detalhe">Para zerar o pendente em ${p.prazoDias} dias (${rotuloPrazo}): <strong>${zerar}</strong>${res.pessoasPrazo > 0 && g.custo && g.custo.pessoa > 0 ? ` <span class="muted">≈ ${moeda(res.pessoasPrazo * g.custo.pessoa)}/mês</span>` : ''}</div>
+          ${g.emRampup > 0 ? `<div class="stat-detalhe muted">${numFte(g.emRampup)} em ramp-up (produzindo menos nos primeiros meses de casa)</div>` : ''}
           <div class="stat-detalhe muted" title="Ritmo da equipe por dia, já com a folga de ${Math.round(100 - p.ocupacaoAlvo)}%">Produz por dia: ${producao}</div>
         </div>`;
     };
@@ -83,9 +87,11 @@ const ViewDimensionamento = {
     const conclusao = m => {
       const partes = contratarTexto(m);
       const passado = m.mes < mesAtual;
-      if (partes.length) return `<strong class="txt-deficit">${passado ? 'Deveria ter contratado' : 'Contratar'} ${partes.join(' e ')}</strong>`;
+      const custoContratar = [TEC, ADM].reduce((s, f) => s + (m.funcoes[f].custo ? m.funcoes[f].custo.contratar : 0), 0);
+      const custoSobra = [TEC, ADM].reduce((s, f) => s + (m.funcoes[f].custo ? m.funcoes[f].custo.sobra : 0), 0);
+      if (partes.length) return `<strong class="txt-deficit">${passado ? 'Deveria ter contratado' : 'Contratar'} ${partes.join(' e ')}</strong>${custoContratar > 0 ? ` <span class="muted" title="Custo mensal de quem falta (salário + encargos)">≈ ${moeda(custoContratar)}/mês</span>` : ''}`;
       const limite = m.status === 'atencao';
-      return `<span class="txt-ok">${passado ? 'Não precisava contratar' : 'Dá conta'}</span>${limite ? '<span class="muted"> · no limite</span>' : ''}`;
+      return `<span class="txt-ok">${passado ? 'Não precisava contratar' : 'Dá conta'}</span>${limite ? '<span class="muted"> · no limite</span>' : ''}${custoSobra > 0 ? ` <span class="muted" title="Custo mensal das pessoas inteiras que sobram">sobra ≈ ${moeda(custoSobra)}/mês</span>` : ''}`;
     };
     const ondeHTML = m => {
       if (!varias) return '';
@@ -113,9 +119,15 @@ const ViewDimensionamento = {
     const algumFalta = f => alvo.meses.some(m => m.funcoes[f].faltam > 0);
     const conclusaoAno = () => {
       const partes = [TEC, ADM].filter(algumFalta).map(f => qtd(f, idealMax(f)));
-      return partes.length
+      const custoAno = [TEC, ADM].reduce((s, f) => s + (alvo.janela.funcoes[f].custo ? alvo.janela.funcoes[f].custo.contratar : 0), 0);
+      const sobraAno = [TEC, ADM].reduce((s, f) => s + (alvo.janela.funcoes[f].custo ? alvo.janela.funcoes[f].custo.sobra : 0), 0);
+      const custos = [];
+      if (custoAno > 0) custos.push(`cobrir o que falta ≈ ${moeda(custoAno)} no ano`);
+      if (sobraAno > 0) custos.push(`sobra ≈ ${moeda(sobraAno)} no ano`);
+      const custoTxt = custos.length ? ` <span class="muted">(${custos.join(' · ')})</span>` : '';
+      return (partes.length
         ? `Para não faltar em nenhum mês: <strong>${partes.join(' e ')}</strong>`
-        : `<span class="txt-ok">A equipe de hoje dá conta de todos os meses</span>`;
+        : `<span class="txt-ok">A equipe de hoje dá conta de todos os meses</span>`) + custoTxt;
     };
     const tabelaHTML = `
       <section class="card">
@@ -131,7 +143,7 @@ const ViewDimensionamento = {
             <thead>
               <tr>
                 <th>Mês</th>
-                <th class="num" title="Clientes Mensal + Exclusiva TST que vencem no mês (Empresas por Unidade)">Vencem</th>
+                <th class="num" title="Esforço do mês: clientes Mensal + Exclusiva TST que vencem, cada um valendo o peso do seu porte (Empresas por Unidade)">Vencem</th>
                 <th class="num col-pendente" title="O que fica em aberto no fim do mês: o que veio de antes + o que vence − o que a equipe atende. Nos meses passados o número lançado já é o que ficou em aberto.">Pendente no fim do mês</th>
                 <th class="num" title="Técnicos hoje → quadro ideal para o que vence no mês (pessoas inteiras). Passe o mouse para ver inspeções e relatórios.">Técnicos<br><small>hoje → ideal</small></th>
                 <th class="num" title="Administrativos hoje → quadro ideal para o que vence no mês (pessoas inteiras)">Administrativos<br><small>hoje → ideal</small></th>
@@ -161,7 +173,7 @@ const ViewDimensionamento = {
             </tfoot>
           </table>
         </div>
-        <p class="note">Quadro ideal = pessoas inteiras para dar conta do que vence no mês, com a folga de ${Math.round(100 - p.ocupacaoAlvo)}% para imprevistos. O pendente vai somando: o que a equipe não faz num mês passa para o seguinte. Folga, prazo e dias úteis ficam no Calendário.</p>
+        <p class="note">Quadro ideal = pessoas inteiras para dar conta do que vence no mês (cada cliente vale o peso do seu porte), com a folga de ${Math.round(100 - p.ocupacaoAlvo)}% para imprevistos. Quem tem data de admissão produz menos nos primeiros meses (ramp-up ${p.rampup.length ? p.rampup.map(v => v + '%').join(' → ') + ' → 100%' : 'desligado'}). O pendente vai somando: o que a equipe não faz num mês passa para o seguinte.${temCusto ? ' Os valores em R$ usam o custo mensal de cada função (salário + encargos).' : ' Para ver o impacto em R$, cadastre o custo mensal nas Funções.'} Folga, prazo, ramp-up, pesos dos portes e dias úteis ficam no Calendário.</p>
       </section>`;
 
     /* ---------- por unidade (quando "Todas") ---------- */

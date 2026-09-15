@@ -15,6 +15,12 @@ const UI = (() => {
   }
 
   /** Formata número no padrão pt-BR (ex.: 1.234,5). */
+  /** "R$ 12.000" (sem centavos; com centavos só se houver). */
+  function moeda(v) {
+    const x = Number(v) || 0;
+    return 'R$ ' + x.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: Math.abs(x - Math.round(x)) < 0.005 ? 0 : 2 });
+  }
+
   function fmt(n, digits = 1) {
     return Number(n || 0).toLocaleString('pt-BR', { maximumFractionDigits: digits });
   }
@@ -135,5 +141,5 @@ const UI = (() => {
     return Array.from(bytes, b => alfabeto[b % alfabeto.length]).join('');
   }
 
-  return { esc, fmt, parseNum, plural, busy, toast, confirm, askPassword, gerarSenha };
+  return { esc, fmt, moeda, parseNum, plural, busy, toast, confirm, askPassword, gerarSenha };
 })();

@@ -198,6 +198,7 @@ const ViewColaboradores = {
               <th>Nome</th>
               <th>Função</th>
               <th>Ritmo por dia</th>
+              <th title="Admissão / desligamento">Na equipe</th>
               <th>Unidades</th>
               <th class="num" title="Parte do tempo da pessoa dedicada a cada unidade">Tempo</th>
               <th class="actions">Ações</th>
@@ -209,6 +210,7 @@ const ViewColaboradores = {
                 <td>${UI.esc(c.nome)}</td>
                 <td>${ViewColaboradores.chipFuncao(c)}</td>
                 <td class="${c.tipoProducao === 'nenhuma' ? 'muted' : ''}">${UI.esc(Calculo.ritmoTexto(c))}</td>
+                <td class="col-datas">${ViewColaboradores.naEquipeHTML(c)}</td>
                 ${(() => {
                   const t = Store.totalAlocado(c);
                   const semProducao = c.tipoProducao === 'nenhuma';
@@ -251,6 +253,26 @@ const ViewColaboradores = {
       }
       return true;
     });
+  },
+
+  /** "desde mar/2026 · ramp-up" / "até 10/06/2026 (desligado)" / "—". */
+  naEquipeHTML(c) {
+    const fmtMes = s => { const [a, m] = s.split('-'); return `${Calculo.MESES[Number(m) - 1].toLowerCase()}/${a}`; };
+    const fmtDia = s => { const [a, m, d] = s.split('-'); return `${d}/${m}/${a}`; };
+    const hoje = new Date();
+    const partes = [];
+    if (c.dataAdmissao) {
+      const adm = new Date(c.dataAdmissao + 'T00:00:00');
+      const meses = (hoje.getFullYear() - adm.getFullYear()) * 12 + (hoje.getMonth() - adm.getMonth());
+      const rampup = Store.parametros.get().rampup;
+      const emRampup = adm <= hoje && meses >= 0 && meses < rampup.length;
+      partes.push(`<div>desde ${fmtMes(c.dataAdmissao)}${emRampup ? ` <span class="chip chip-warn" title="Nos primeiros meses de casa produz ${rampup[meses]}%">ramp-up ${rampup[meses]}%</span>` : adm > hoje ? ' <span class="chip chip-blue">a entrar</span>' : ''}</div>`);
+    }
+    if (c.dataDesligamento) {
+      const desl = new Date(c.dataDesligamento + 'T00:00:00');
+      partes.push(`<div class="${desl < hoje ? 'txt-deficit' : ''}">até ${fmtDia(c.dataDesligamento)}${desl < hoje ? ' (desligado)' : ''}</div>`);
+    }
+    return partes.length ? partes.join('') : '<span class="muted">—</span>';
   },
 
   render(el) {
@@ -331,6 +353,26 @@ const ViewColaboradores = {
                 <span>Quantas empresas esse colaborador consegue finalizar por dia?</span>
                 <input class="input" type="number" name="empresasDia" min="0" step="0.5" inputmode="decimal" value="${val('empresasDia')}">
                 <small>Quantas empresas essa pessoa consegue deixar prontas (documentação concluída) em um dia normal de trabalho.</small>
+              </label>
+            </div>
+          </div>
+
+          <div class="span-4">
+            <div class="form-grid">
+              <label class="field span-1">
+                <span>Data de admissão</span>
+                <input class="input" type="date" name="dataAdmissao" value="${editing && editing.dataAdmissao ? editing.dataAdmissao : ''}">
+                <small>Opcional. Com a data, a pessoa só conta a partir dela e entra em <strong>ramp-up</strong> (produz menos nos primeiros meses — a curva fica no Calendário).</small>
+              </label>
+              <label class="field span-1">
+                <span>Data de desligamento</span>
+                <input class="input" type="date" name="dataDesligamento" value="${editing && editing.dataDesligamento ? editing.dataDesligamento : ''}">
+                <small>Opcional. A partir dela a pessoa sai das contas (o mês conta proporcional aos dias). O cadastro fica, para o histórico.</small>
+              </label>
+              <label class="field span-2">
+                <span>Custo mensal desta pessoa (R$)</span>
+                <input class="input input-num" type="number" name="custoMensal" min="0" step="100" inputmode="decimal" placeholder="${funcaoAtual && funcaoAtual.custoMensal > 0 ? `${funcaoAtual.custoMensal} (da função)` : 'usa o da função'}" value="${editing && editing.custoMensal > 0 ? editing.custoMensal : ''}">
+                <small>Opcional. Vazio = usa o custo médio da função (tela Funções).</small>
               </label>
             </div>
           </div>
@@ -481,8 +523,12 @@ const ViewColaboradores = {
         }
         return v;
       };
+      const dataAdmissao = form.dataAdmissao.value || null;
+      const dataDesligamento = form.dataDesligamento.value || null;
+      if (dataAdmissao && dataDesligamento && dataDesligamento < dataAdmissao) { UI.toast('A data de desligamento não pode ser anterior à admissão.', 'error'); form.dataDesligamento.focus(); return; }
+      const custoMensal = UI.parseNum(form.custoMensal.value, 0) > 0 ? UI.parseNum(form.custoMensal.value, 0) : null;
       const dados = {
-        nome, funcaoId: funcaoSel.id,
+        nome, funcaoId: funcaoSel.id, dataAdmissao, dataDesligamento, custoMensal,
         empresasDia: editing ? editing.empresasDia : padrao.empresasDia,
         inspecoesDia: editing ? editing.inspecoesDia : padrao.inspecoesDia,
         relatoriosDia: editing ? editing.relatoriosDia : padrao.relatoriosDia,

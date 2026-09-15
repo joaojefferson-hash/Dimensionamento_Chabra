@@ -215,5 +215,12 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
   recomendação; depois simplificada para o modelo de produção diária com linguagem simples.
 - **Fase 3 (feita):** só documentos vencidos por mês, pendente acumulado, quadro ideal,
   papéis de acesso; as três telas de resultado viraram uma só (Dimensionamento).
+- **Fase 4 (feita, migração 0022):** porte do cliente (tabela `portes` com peso; demanda
+  normalizada em `demanda_mensal` por unidade × ano × mês × condição × porte; `unidade_mes`
+  para clientes ativos), ramp-up de contratações (`colaboradores.data_admissao` /
+  `data_desligamento`, `parametros.rampup`), impacto financeiro (`funcoes.custo_mensal`,
+  `colaboradores.custo_mensal` opcional). Motor: `presencaNoMes`, `fatorRampup`,
+  `empresasPonderadas` (Σ quantidade × peso), `funcoes[f].custo` {pessoa, contratar, sobra};
+  `calcular` recebe `ano`. Testes: `node tests/calculo.test.js`. Backup v12.
 - **Futuro:** apontamento de produção real por colaborador, feriados automáticos,
   distribuição não uniforme da demanda ao longo do ano.

@@ -206,6 +206,7 @@ em { font-style: normal; color: var(--primary-dark); font-weight: 500; }
   gap: 14px 16px;
   align-items: start;
 }
+.span-1 { grid-column: span 1; }
 .span-2 { grid-column: span 2; }
 .span-4 { grid-column: 1 / -1; }
 
@@ -1014,3 +1015,11 @@ form.busy { opacity: .7; pointer-events: none; }
 .detalhes-simulacao > .card-simulacao { border-radius: 0 0 10px 10px; margin-top: 0; }
 .form-parametros { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px 32px; }
 .form-parametros .field small { display: block; margin-top: 4px; line-height: 1.4; }
+
+/* porte na matriz de empresas */
+.seg-porte { margin-left: 4px; }
+.table-matriz td.cel-soma { text-align: center; font-weight: 600; color: var(--text); }
+.table-matriz.modo-soma td.cel-soma.cel-excecao { background: #eef4fb; }
+.form-portes { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 24px; }
+.col-datas { font-size: 12.5px; white-space: nowrap; }
+.col-datas .chip { margin-left: 4px; }

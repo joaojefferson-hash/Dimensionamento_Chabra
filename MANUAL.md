@@ -64,12 +64,14 @@ Nome de cada unidade/filial. A tela mostra a média mensal de clientes do ano se
 
 ### 4.2 Empresas por Unidade
 
-A base da demanda. Para cada unidade há três linhas por mês (janeiro a dezembro do **ano selecionado**):
+A base da demanda. Para cada unidade há três linhas por mês (janeiro a dezembro do **ano selecionado**), e cada cliente tem um **porte** (Pequeno, Médio ou Grande) que multiplica o esforço:
 
 - **Clientes ativos** — total de clientes da unidade no mês. **Só informativo** (histórico da carteira); não entra em nenhuma conta.
 - **Mensal** — clientes com contrato mensal cujos documentos vencem naquele mês.
 - **Exclusiva TST** — clientes na condição Exclusiva TST cujos documentos vencem naquele mês.
-- **Total** = Mensal + Exclusiva TST (é o que a programação usa).
+- **Total** = Mensal + Exclusiva TST (é o que o Dimensionamento usa, com cada cliente valendo o peso do seu porte).
+
+**Porte.** O seletor **Porte** (Pequeno · Médio · Grande · Todos) define o que você está digitando: escolha um porte e lance os números daquele porte; troque e lance os de outro. Em **Todos**, as células mostram a soma dos portes (só leitura; passe o mouse para ver "P 20 · M 3 · G 2") e a linha Total mostra entre parênteses o **esforço equivalente** (cada cliente × o peso do porte: P 1,0 · M 1,5 · G 2,0, editáveis no Calendário). Ex.: 75 pequenos + 2 grandes = 77 clientes, esforço 79.
 
 Cada cliente do Total precisa, naquele mês, de **uma inspeção e um relatório** (técnicos) e **uma finalização** (administrativos).
 
@@ -87,6 +89,8 @@ Cada função diz o que a pessoa entrega:
 
 Uma função pode ser **chefia de equipe**. Nesse caso informa-se **quem coordena** (toda a equipe / só os técnicos / só os administrativos) e **para quem responde** (outra chefia; vazio = topo). Isso monta o organograma e a linha "Chefia:" das programações. Hoje: Gerente de Segurança do Trabalho (topo, coordena todos) → Supervisor Geral (coordena todos) → Supervisor ADM (só administrativos); Supervisor TST Externo (só técnicos) responde ao Gerente.
 
+**Custo mensal de uma pessoa** (R$, salário + encargos, em média): opcional. Com ele o Dimensionamento mostra quanto custa contratar quem falta e quanto custa a sobra. Vazio = sem valores em R$.
+
 Uma função em uso não pode ser excluída; a ordem da lista (▲▼) é a ordem de exibição.
 
 ### 4.4 Colaboradores
@@ -97,9 +101,11 @@ Para cada pessoa: nome, função e o **ritmo por dia**, que é dela — não há
 - Administrativo: quantas **empresas finalizadas por dia**.
 - Sem produção: não há ritmo; se for chefia, só se marcam as unidades que ela lidera.
 
+**Data de admissão** (opcional): a pessoa só conta a partir dela (o mês de entrada conta proporcional aos dias) e entra em **ramp-up** — produz menos nos primeiros meses de casa (padrão: 1º mês 50%, 2º mês 80%, depois 100%; a curva fica no Calendário). Sem data = veterano, 100% desde sempre. **Data de desligamento** (opcional): a partir dela a pessoa sai das contas; o cadastro fica para o histórico. Com as datas, o Dimensionamento passa a usar a equipe real de cada mês. **Custo mensal** (opcional): sobrepõe o custo médio da função.
+
 **Unidades onde atua**: marque as unidades e divida o tempo em percentuais (a soma pode ficar abaixo de 100% — o resto não entra na programação — mas não acima). Quem divide o tempo conta proporcionalmente em cada unidade.
 
-Lista com busca, filtro por função/unidade/"só chefia" e colunas Unidades e Tempo. Pessoas sem unidade aparecem com aviso e não entram na programação.
+Lista com busca, filtro por função/unidade/"só chefia" e colunas Na equipe (desde mês/ano, "ramp-up 50%", "até dd/mm/aaaa (desligado)"), Unidades e Tempo. Pessoas sem unidade aparecem com aviso e não entram na programação.
 
 **Modo Organograma** (alternância no topo): números da equipe, barras de pessoas por unidade e a árvore de chefias — cada pessoa fica embaixo da chefia mais próxima que coordena o grupo dela na unidade; "Sem chefia definida" e "Sem unidade" ficam à parte. Clicar num nome abre a edição. Botão **Imprimir** (ou salvar em PDF) com escolha da folha (automática / retrato / paisagem).
 
@@ -107,7 +113,7 @@ Lista com busca, filtro por função/unidade/"só chefia" e colunas Unidades e T
 
 Dias úteis de cada mês (padrão 2026 = dias de semana menos feriados nacionais; botão para restaurar). É o que transforma ritmo por dia em produção por mês. O calendário é único, vale para todos os anos.
 
-Abaixo, os **parâmetros do dimensionamento**, compartilhados por todos: **folga para imprevistos** (%; padrão 15) e **prazo para atender** (dias; padrão 60).
+Abaixo, os **parâmetros do dimensionamento**, compartilhados por todos: **folga para imprevistos** (%; padrão 15), **prazo para atender** (dias; padrão 60) e o **ramp-up** de quem é contratado (1º, 2º e 3º mês de casa, em %; padrão 50 / 80 / 100 — vale para quem tem data de admissão e para as contratações simuladas). Depois, o **porte dos clientes**: o peso de Pequeno, Médio e Grande (padrão 1,0 / 1,5 / 2,0).
 
 ---
 
@@ -119,6 +125,8 @@ Linguagem da tela: nunca "capacidade", "fator" ou "gap" — sempre frases pronta
 
 ```
 produção de uma pessoa no mês = ritmo por dia × dias úteis do mês × % do tempo na unidade
+                                × presença no mês (admissão/desligamento, proporcional aos dias)
+                                × ramp-up (1º mês de casa 50%, 2º 80%, depois 100% — configurável)
 produção da equipe (consegue)  = soma das pessoas × (1 − folga para imprevistos)
 ```
 
@@ -128,10 +136,10 @@ produção da equipe (consegue)  = soma das pessoas × (1 − folga para imprevi
 ### 5.2 Demanda
 
 ```
-precisa (unidade, mês) = clientes Mensal + Exclusiva TST lançados no mês
+precisa (unidade, mês) = Σ clientes que vencem no mês × peso do porte   (P 1,0 · M 1,5 · G 2,0)
 ```
 
-Cada cliente exige uma inspeção, um relatório e uma finalização naquele mês.
+Cada cliente exige uma inspeção, um relatório e uma finalização naquele mês; um cliente grande exige o dobro de um pequeno.
 
 ### 5.3 Situação e pessoas
 
@@ -140,6 +148,7 @@ Cada cliente exige uma inspeção, um relatório e uma finalização naquele mê
 - No total "Todas as unidades", faltas e sobras são **somadas por unidade**: folga numa unidade não cobre falta em outra (a equipe não se desloca). Por isso o total pode "conseguir" mais do que precisa e ainda assim pedir contratação.
 - **Quadro ideal** = o que precisa no mês ÷ o que uma pessoa inteira faz no mês (com a folga), arredondado para cima. Os números de cada mês são **sempre em relação à equipe de hoje** e não somam entre si: o maior quadro ideal do ano cobre todos os meses ("Para não faltar em nenhum mês: 5 técnicos e 5 administrativos").
 - **Pendente** = o que vence no mês + o que sobrou do mês anterior − o que a equipe atende (só do mês atual em diante; nos meses passados o número lançado já é o que ficou em aberto). **Para zerar em N dias** = pessoas a mais para atender o pendente de hoje e o que vence dentro do prazo.
+- **Impacto financeiro** (só com o custo mensal cadastrado nas Funções): custo de uma pessoa = o do colaborador ou, se vazio, o da função (média da equipe da unidade). **Contratar ≈ R$** = pessoas que faltam × custo, por mês; **sobra ≈ R$** = pessoas inteiras que sobram × custo; no rodapé, a soma do ano. Aparece na conclusão de cada mês, no cartão de hoje ("+9 técnicos ≈ R$ 36.000/mês") e no rodapé.
 
 ### 5.4 Simulação "E se…?"
 
@@ -223,6 +232,9 @@ Tela Usuários (admin) → **Backup dos dados**: **Exportar JSON** baixa tudo (f
 | Prazo para atender | Dias que uma empresa tem para receber os documentos depois de vencer (padrão 60). |
 | Chefia | Função que lidera pessoas; aparece no Dimensionamento e no organograma. |
 | Simulação | Pessoas a mais/menos só para testar; não altera o cadastro. |
+| Porte | Tamanho/complexidade do cliente (P/M/G); o peso multiplica o esforço de cada cliente. |
+| Ramp-up | Produção reduzida de quem acabou de entrar (50% no 1º mês, 80% no 2º, depois 100%). |
+| Custo mensal | Salário + encargos de uma pessoa da função, por mês; base do impacto em R$. |
 
 ---
 
