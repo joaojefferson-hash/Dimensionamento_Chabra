@@ -12,7 +12,7 @@ Este documento descreve o programa inteiro: para que serve, quem acessa o quê, 
 O Chabra Dimensiona responde a três perguntas, com a equipe que a Chabra tem hoje:
 
 1. **Quanto a equipe produz?** Cada colaborador declara o seu ritmo por dia (inspeções, relatórios ou empresas finalizadas). O programa transforma isso em produção por mês, unidade por unidade.
-2. **Quanto trabalho existe?** Em cada unidade, mês a mês, quantos clientes estão com documentos vencidos (pendentes) — separados em **Mensal** e **Exclusiva TST**.
+2. **Quanto trabalho existe?** Em cada unidade, mês a mês, quantos clientes têm documentos vencendo naquele mês — separados em **Mensal** e **Exclusiva TST**.
 3. **A equipe dá conta? Quantas pessoas faltam ou sobram?** As programações comparam produção e demanda e dizem, em frases simples e com sinais verde / amarelo / vermelho, se cada unidade dá conta, está no limite ou precisa contratar — e quantas pessoas. A **Fila de atendimento** mostra o acumulado (backlog) e quantas pessoas contratar para zerá-lo dentro do prazo.
 
 Tudo fica na nuvem, compartilhado pela equipe. Cada alteração de cadastro é registrada no **Histórico** (quem, quando, o que mudou).
@@ -69,15 +69,15 @@ Nome de cada unidade/filial. A tela mostra a média mensal de clientes do ano se
 A base da demanda. Para cada unidade há três linhas por mês (janeiro a dezembro do **ano selecionado**):
 
 - **Clientes ativos** — total de clientes da unidade no mês. **Só informativo** (histórico da carteira); não entra em nenhuma conta.
-- **Mensal** — clientes com contrato mensal que estão com documentos vencidos no mês.
-- **Exclusiva TST** — clientes na condição Exclusiva TST com documentos vencidos no mês.
+- **Mensal** — clientes com contrato mensal cujos documentos vencem naquele mês.
+- **Exclusiva TST** — clientes na condição Exclusiva TST cujos documentos vencem naquele mês.
 - **Total** = Mensal + Exclusiva TST (é o que a programação usa).
 
 Cada cliente do Total precisa, naquele mês, de **uma inspeção e um relatório** (técnicos) e **uma finalização** (administrativos).
 
 Como usar: digite o número em cada mês; célula vazia conta como zero; tudo salva automaticamente. O seletor **Mostrar** filtra por condição; o seletor **Ano** troca o ano (os números são por ano; dá para preencher 2027 sem mexer em 2026). "limpar 2026" apaga todos os números daquela unidade no ano. À direita, **Total do ano** (soma dos 12 meses) e **Média** mensal; no rodapé, as somas de todas as unidades.
 
-> O número lançado em um mês é **o que está pendente** naquele mês — o que ainda não foi atendido. A Fila de atendimento lê exatamente assim (ver 6.3).
+> Preencha em cada mês **só os documentos que vencem naquele mês**. Não precisa somar o que já estava em aberto de meses anteriores — o sistema soma isso sozinho na Fila de atendimento (ver 6.3).
 
 ### 4.3 Funções
 
@@ -160,17 +160,19 @@ Sempre os 12 meses do ano selecionado (barra: ano, unidade, folga). Uma grade pa
 
 Barra: ano, período, **mês atual**, unidade, **prazo para atender** (dias; padrão 60; compartilhado) e folga.
 
-Como a fila é montada (por unidade e grupo):
+Como a fila é montada (por unidade e grupo), com a **mesma regra para todos os meses** — passados, atual e futuros — do primeiro mês com número em diante:
 
-- **Meses passados**: o número lançado é o que ficou pendente naquele mês (histórico; não se recalcula).
-- **Mês atual**: fila de hoje = número lançado; a equipe atende o que consegue no mês; o resto passa adiante.
-- **Meses seguintes**: o que sobrou do mês anterior + o número lançado (o que vence); a equipe atende o que consegue; o resto passa adiante.
+- **Pendentes** do mês = o que sobrou do mês anterior + o número lançado (o que vence no mês).
+- **Atendidas** = o menor entre os pendentes e o que a equipe consegue no mês.
+- **Ficam pendentes** = pendentes − atendidas (nunca negativo); passa para o mês seguinte.
+
+Mudar o número de um mês recalcula todos os seguintes. Nenhum mês fica "congelado": se em fevereiro venceram 71 e a equipe deu conta de 43, os 28 que sobraram somam-se aos que vencem em março, e assim por diante. A **Fila hoje** é o acumulado do mês atual (o que vence no mês + o que sobrou dos anteriores); logo abaixo do número aparece "Desse total, X vieram de meses anteriores ainda não atendidos".
 
 Para cada grupo:
 
 - Indicadores de hoje: **Produção por dia** (por entrega, com o gargalo), **Fila hoje**, **Vencem até o prazo**, **Contratar para cumprir o prazo** (pessoas a mais para zerar fila + o que vence dentro do prazo) e **Fila em dezembro** sem contratar.
 - Indicadores do período: **A atender** (pendentes + o que vence, do mês atual em diante), **Equipe consegue**, **Contratar até [mês final]**, **Fila no fim**.
-- Frases prontas com tudo isso; gráfico da fila no fim de cada mês; tabela mês a mês (Lançado · Pendentes · Consegue · Atendidas · Ficam pendentes · Situação) e, com todas as unidades, a grade por unidade (equipe, fila hoje, contratar em N dias, contratar até o fim do período e pendentes no fim de cada mês).
+- Frases prontas com tudo isso; gráfico da fila no fim de cada mês; tabela mês a mês (Vencem no mês · Pendentes · Consegue · Atendidas · Ficam pendentes · Situação) e, com todas as unidades, a grade por unidade (equipe, fila hoje, contratar em N dias, contratar até o fim do período e pendentes no fim de cada mês).
 - Situação do mês: **dá conta** = zerado no fim do mês; **no limite** = fica menos de um mês de trabalho; **precisa contratar** = fica mais de um mês de trabalho (prazo em risco).
 
 Empresas novas: cada uma tem 60 dias para receber os documentos; é só somá-la ao número do mês em que esse prazo vence.
@@ -191,7 +193,7 @@ Tela Usuários (admin) → **Backup dos dados**: **Exportar JSON** baixa tudo (f
 
 ## 9. Rotina sugerida
 
-1. **Todo mês**: em Empresas por Unidade, lançar em cada unidade os clientes ativos, o Mensal e o Exclusiva TST pendentes do mês (e, se souber, o que vence nos próximos meses).
+1. **Todo mês**: em Empresas por Unidade, lançar em cada unidade os clientes ativos e quantos Mensal e Exclusiva TST **vencem no mês** (só o do mês; o acumulado o programa calcula) — e, se souber, o que vence nos próximos meses.
 2. Manter Colaboradores em dia: quem entrou/saiu, ritmo por dia, unidades e percentuais.
 3. Conferir na **Programação Mensal** onde faltam pessoas e na **Fila de atendimento** o acumulado e o prazo.
 4. Para a diretoria: Fila de atendimento (mês atual + prazo de 60 dias), com a simulação "E se…?" para testar contratações antes de decidir.
@@ -207,10 +209,10 @@ Tela Usuários (admin) → **Backup dos dados**: **Exportar JSON** baixa tudo (f
 | Dias úteis | Dias de trabalho do mês (Calendário). |
 | Folga para imprevistos | % do tempo reservado; o programa conta que cada pessoa entrega (100 − folga)% do ritmo. |
 | Consegue | Quanto a equipe entrega no mês, já com a folga. |
-| Precisa | Clientes Mensal + Exclusiva TST lançados no mês (cada um = 1 inspeção, 1 relatório, 1 finalização). |
+| Precisa | Clientes Mensal + Exclusiva TST que vencem no mês (cada um = 1 inspeção, 1 relatório, 1 finalização). |
 | Faltam / sobram | Pessoas inteiras a mais ou a menos para o mês, em relação à equipe de hoje. |
 | Pessoa inteira | Uma pessoa 100% do tempo. Quem divide o tempo conta proporcionalmente (ex.: 2,8 pessoas). |
-| Fila / pendentes | Clientes com documentos vencidos ainda não atendidos. |
+| Fila / pendentes | O que vence no mês + o que sobrou dos meses anteriores sem atender. |
 | Prazo para atender | Dias que uma empresa tem para receber os documentos depois de vencer (padrão 60). |
 | Chefia | Função que lidera pessoas; aparece nos cartões e no organograma. |
 | Simulação | Pessoas a mais/menos só para testar; não altera o cadastro. |

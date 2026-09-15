@@ -123,14 +123,16 @@ pessoas que faltam/sobram    = sobra ÷ produção de uma pessoa inteira no per�
   hoje, não acumulado —, leitura "Mês a mês: … Contratando N a partir de X, nenhum mês
   fica descoberto" e a grade unidade × mês só com sinais) e
 - **Fila de atendimento** (tela para a diretoria, `js/views/fila.js` + `Calculo.fila`): o
-  número lançado em Empresas por Unidade é **o que está pendente** no mês. Meses passados =
-  histórico (pendentes lançados); mês atual = fila de hoje, a equipe atende o que consegue
-  (gargalo do grupo: técnicos = a menor entre inspeções e relatórios) e o resto passa
-  adiante; meses seguintes = sobra do anterior + o que vence (lançado). Situação = zerado /
+  número lançado em Empresas por Unidade é **só o que vence** no mês. A mesma regra vale para
+  todos os meses (passados, atual e futuros), do primeiro em diante, sem congelar nenhum:
+  pendentes = sobra do mês anterior + lançado; atendidas = min(pendentes, consegue) (gargalo
+  do grupo: técnicos = a menor entre inspeções e relatórios); sobra = pendentes − atendidas
+  (nunca negativa) passa adiante. Editar um mês recalcula os seguintes. Situação = zerado /
   fica menos de um mês de trabalho / fica mais de um mês. A partir do **mês atual** (seletor, por
   navegador; padrão = mês do calendário) e do **prazo para atender** (`parametros.prazo_dias`,
-  padrão 60 = 2 meses): produção por dia da equipe, fila hoje (acumulado de janeiro ao mês
-  anterior), entradas no prazo, **pessoas a contratar para cumprir o prazo** (por unidade,
+  padrão 60 = 2 meses): produção por dia da equipe, fila hoje (pendentes do mês atual, com o
+  detalhe "X vieram de meses anteriores"), o que vence nos meses seguintes do prazo,
+  **pessoas a contratar para cumprir o prazo** (por unidade,
   somadas no total), quando a fila zera sem contratar e a fila em dezembro. **Período**
   (de/até, o mesmo das programações): segunda linha de indicadores — fila no início,
   entram, equipe consegue, contratar no período (zerar a fila até o fim dele), fila no fim —

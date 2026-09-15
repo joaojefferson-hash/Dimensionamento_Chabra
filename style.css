@@ -958,3 +958,5 @@ form.busy { opacity: .7; pointer-events: none; }
 .table-matriz tfoot tr + tr th { border-top: 1px solid #cfd8d3; }
 .table-matriz tfoot th.col-nome { padding-left: 8px; }
 .table-matriz tfoot tr:first-child th { box-shadow: inset 0 1px 0 #cfd8d3; } /* linha de grade superior, abaixo da faixa de respiro */
+
+.stat .stat-detalhe { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; line-height: 1.35; }
