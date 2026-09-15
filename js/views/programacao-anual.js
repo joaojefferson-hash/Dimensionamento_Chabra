@@ -17,6 +17,7 @@ const ViewProgramacaoAnual = {
     const simulacoes = Programacao.lerSimulacao();
     const r = Calculo.calcular({ unidades, colaboradores, parametros: p, janela, simulacoes });
     const periodo = Programacao.descricaoJanela(janela);
+    const mesAtual = Programacao.lerMesAtual(); // o mesmo "mês atual" da Fila e da Mensal
     const TEC = Calculo.TEC, ADM = Calculo.ADM;
 
     const cartaoFuncao = (item, funcao) => {
@@ -66,6 +67,9 @@ const ViewProgramacaoAnual = {
 
       ${Programacao.barraHTML({ janela, ocupacaoAlvo: p.ocupacaoAlvo })}
 
+      ${unidades.length > 0 && janela.de < mesAtual ? `
+      <p class="aviso-historico">Este período inclui meses que já passaram (${Calculo.MESES_LONGO[janela.de].toLowerCase()} a ${Calculo.MESES_LONGO[Math.min(janela.ate, mesAtual - 1)].toLowerCase()}). Para o plano daqui para a frente, <button type="button" class="btn-link" data-action="periodo-hoje" data-local>veja só de ${Calculo.MESES_LONGO[mesAtual].toLowerCase()} a dezembro</button>. O histórico de projeção mês a mês (deveria ter contratado? em qual área?) está na <button type="button" class="btn-link" data-action="ir-mensal" data-local>Programação Mensal</button>.</p>` : ''}
+
       ${unidades.length === 0 ? `
         <section class="card"><div class="empty"><strong>Nenhuma unidade cadastrada</strong>Cadastre unidades, empresas por unidade e colaboradores para ver a programação.</div></section>` : `
 
@@ -83,6 +87,8 @@ const ViewProgramacaoAnual = {
       `}
     `;
 
+    el.querySelector('[data-action="periodo-hoje"]')?.addEventListener('click', () => { Programacao.salvarJanela({ de: mesAtual, ate: 11 }); App.render(); });
+    el.querySelector('[data-action="ir-mensal"]')?.addEventListener('click', () => App.navigate('programacao-mensal'));
     Programacao.bindBarra(el, { onJanela: () => App.render() });
     Programacao.bindSimulacao(el, { unidades, janela });
   },

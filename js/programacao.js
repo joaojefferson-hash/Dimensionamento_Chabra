@@ -79,7 +79,7 @@ const Programacao = (() => {
           <span class="param-label">Mês atual</span>
           <div class="param-inline" data-local>
             <select class="input input-sm" name="mesAtual" aria-label="Mês atual">${opcoesMes(mesAtual)}</select>
-            <span class="param-ajuda" title="A fila de hoje é o que se acumulou de janeiro até o mês anterior a este. O que entra e o que a equipe consegue são contados deste mês em diante.">?</span>
+            <span class="param-ajuda" title="Separa o que já passou (histórico) do que vem daqui para a frente (plano). Vale para a Fila de atendimento, a Programação Mensal e a coluna Acumulado de Empresas por Unidade; fica só neste navegador.">?</span>
           </div>
         </div>` : ''}
         ${unidades ? `

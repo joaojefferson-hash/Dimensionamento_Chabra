@@ -152,9 +152,16 @@ Card nas programações e na fila. Cada linha: unidade, grupo, pessoas (+ contra
 
 Barra: ano, período (de/até ou ano completo), folga. Um cartão "Todas as unidades" e um cartão por unidade, um embaixo do outro, cada um com a linha **Chefia:** (quem lidera a unidade), a demanda média por mês e dois quadros — Técnicos e Administrativos — com as frases "consegue × precisa" por entrega, o sinal de situação e a recomendação ("Faltam aproximadamente N…", "dão conta com folga — sobra o equivalente a N…"). Avisos no fim: pessoas sem unidade, tempo parcial, unidades sem gente.
 
+Se o período incluir meses que já passaram (antes do mês atual escolhido na Fila/Mensal), aparece um aviso com o atalho "veja só de [mês atual] a dezembro" (o plano) e o link para o histórico de projeção da Programação Mensal.
+
 ### 6.2 Programação Mensal
 
-Sempre os 12 meses do ano selecionado (barra: ano, unidade, folga). Uma grade para Técnicos e outra para Administrativos: por mês, dias úteis, clientes, equipe, consegue × precisa por entrega, **Faltam / sobram** e situação; rodapé com o ano. Abaixo, a frase do ano e a leitura mês a mês. Com "Todas as unidades", uma grade unidade × mês com os sinais do grupo e faltam/sobram por unidade — clique numa unidade para ver o detalhe.
+Barra: ano, **mês atual** (o mesmo da Fila e da coluna Acumulado), unidade, folga. A tela se divide em dois:
+
+- **Histórico de projeção** (meses antes do mês atual): uma linha por mês com o que venceu, o que técnicos e administrativos dariam conta (consegue × vence, faltam/sobram) e a **conclusão** — "Deveria ter contratado 1 técnico e 2 administrativos" ou "Não precisava contratar". Com "Todas as unidades", cada conclusão diz em qual unidade faltava. Abaixo, a frase-resumo ("De janeiro a agosto, precisava contratar em 5 de 8 meses: técnicos em…; administrativos em…"). A projeção é feita com a equipe de hoje e com a simulação "E se…?", se houver — simule uma pessoa a partir de um mês passado para ver se teria resolvido. O que ficou em aberto nesses meses está na Fila de atendimento.
+- **Plano** (do mês atual a dezembro): uma grade para Técnicos e outra para Administrativos: por mês, dias úteis, clientes, equipe, consegue × precisa por entrega, **Faltam / sobram** e situação; rodapé com o período. Abaixo, a frase do período e a leitura mês a mês. Com "Todas as unidades", uma grade unidade × mês com os sinais do grupo e faltam/sobram por unidade — clique numa unidade para ver o detalhe.
+
+Com o mês atual em janeiro não há histórico e o plano é o ano inteiro.
 
 ### 6.3 Fila de atendimento
 

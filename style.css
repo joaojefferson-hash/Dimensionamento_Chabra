@@ -968,3 +968,11 @@ form.busy { opacity: .7; pointer-events: none; }
 .table-matriz tr.linha-informativa td.col-acum { font-weight: 400; }
 .table-matriz thead th.th-mes-passado { color: var(--text-muted); }
 .table-matriz thead th.th-mes-atual { color: var(--primary-dark); text-decoration: underline; text-underline-offset: 3px; }
+
+/* programação mensal: histórico de projeção (meses passados) */
+.historico-projecao { border-left: 4px solid #b9c3be; }
+.table-historico td .col-pessoas { margin-top: 3px; font-size: 12px; white-space: normal; }
+.table-historico td.col-conclusao { white-space: normal; min-width: 220px; }
+.table-historico td.col-conclusao .onde { font-size: 12px; margin-top: 3px; }
+.aviso-historico { margin: -4px 0 16px; padding: 10px 14px; background: #fff7e6; border: 1px solid #f0d9a8; border-radius: 8px; color: #6b4a00; font-size: 13px; line-height: 1.5; }
+.aviso-historico .btn-link { font-size: 13px; padding: 0; color: var(--primary-dark); text-decoration: underline; }
