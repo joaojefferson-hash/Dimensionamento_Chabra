@@ -41,12 +41,12 @@ function marcar(uid, on) {
 async function salvar() {
   const nome = form.nome.trim();
   if (!nome) return;
-  if (!funcaoSel.value) { ui.toast('Escolha a função. Se ainda não existe, cadastre em Funções.', 'error'); return; }
-  if (cad.colaboradores.some(c => c.id !== editando.value && c.nome.trim().toLocaleLowerCase('pt-BR') === nome.toLocaleLowerCase('pt-BR'))) { ui.toast('Já existe um colaborador com esse nome.', 'error'); return; }
+  if (!funcaoSel.value) { ui.toast('Selecione a função. Caso ainda não exista, cadastre-a em Funções.', 'error'); return; }
+  if (cad.colaboradores.some(c => c.id !== editando.value && c.nome.trim().toLocaleLowerCase('pt-BR') === nome.toLocaleLowerCase('pt-BR'))) { ui.toast('Já existe um colaborador com este nome.', 'error'); return; }
   if (form.dataAdmissao && form.dataDesligamento && form.dataDesligamento < form.dataAdmissao) { ui.toast('A data de desligamento não pode ser anterior à admissão.', 'error'); return; }
   let alocacoes = Object.entries(form.alocacoes).filter(([, a]) => a.marcada).map(([unidadeId, a]) => ({ unidadeId, percentual: Math.max(0, Math.min(100, Number(a.percentual) || 0)) })).filter(a => a.percentual > 0);
   if (tipoSel.value === 'nenhuma') { const n = alocacoes.length; alocacoes = alocacoes.map(a => ({ ...a, percentual: Math.round((100 / n) * 100) / 100 })); }
-  if (alocacoes.reduce((s, a) => s + a.percentual, 0) > 100.0001) { ui.toast('A soma das unidades não pode passar de 100%.', 'error'); return; }
+  if (alocacoes.reduce((s, a) => s + a.percentual, 0) > 100.0001) { ui.toast('A soma da alocação nas unidades não pode exceder 100%.', 'error'); return; }
   const dados = {
     nome, funcaoId: funcaoSel.value.id,
     inspecoesDia: Math.max(0, Number(form.inspecoesDia) || 0), relatoriosDia: Math.max(0, Number(form.relatoriosDia) || 0), empresasDia: Math.max(0, Number(form.empresasDia) || 0),
@@ -61,13 +61,13 @@ async function salvar() {
   } catch (e) { ui.erro(e); } finally { ocupado.value = false; }
 }
 async function remover(c) {
-  const ok = await ui.confirmar({ titulo: 'Excluir colaborador', mensagem: `Excluir "${c.nome}"? Se a pessoa saiu da empresa, prefira informar a data de desligamento (o histórico continua certo).`, textoConfirmar: 'Excluir', perigo: true });
+  const ok = await ui.confirmar({ titulo: 'Excluir colaborador', mensagem: `Excluir "${c.nome}"? Em caso de desligamento, recomenda-se informar a data de desligamento em vez de excluir, preservando o histórico.`, textoConfirmar: 'Excluir', perigo: true });
   if (!ok) return;
   try { await cad.removerColaborador(c.id); ui.toast('Colaborador excluído.'); } catch (e) { ui.erro(e); }
 }
 
 /* ---- lista ---- */
-const ritmo = c => (c.tipoProducao === TEC ? `${num(c.inspecoesDia, 1)} inspeções · ${num(c.relatoriosDia, 1)} relatórios por dia` : c.tipoProducao === ADM ? `${num(c.empresasDia, 1)} empresas por dia` : 'sem produção');
+const ritmo = c => (c.tipoProducao === TEC ? `${num(c.inspecoesDia, 1)} inspeções · ${num(c.relatoriosDia, 1)} relatórios/dia` : c.tipoProducao === ADM ? `${num(c.empresasDia, 1)} empresas/dia` : 'sem produção');
 const naEquipe = c => {
   const hoje = new Date();
   const partes = [];
@@ -75,7 +75,7 @@ const naEquipe = c => {
     const [a, m] = c.dataAdmissao.split('-'); const adm = new Date(Number(a), Number(m) - 1, 1);
     const meses = (hoje.getFullYear() - adm.getFullYear()) * 12 + (hoje.getMonth() - adm.getMonth());
     const r = cad.parametros.rampup;
-    partes.push(`desde ${MESES[Number(m) - 1].toLowerCase()}/${a}${meses >= 0 && meses < r.length ? ` · ramp-up ${r[meses]}%` : meses < 0 ? ' · a entrar' : ''}`);
+    partes.push(`desde ${MESES[Number(m) - 1].toLowerCase()}/${a}${meses >= 0 && meses < r.length ? ` · adaptação ${r[meses]}%` : meses < 0 ? ' · admissão futura' : ''}`);
   }
   if (c.dataDesligamento) { const [a, m, d] = c.dataDesligamento.split('-'); partes.push(`até ${d}/${m}/${a}${c.dataDesligamento < hoje.toISOString().slice(0, 10) ? ' (desligado)' : ''}`); }
   return partes.join(' · ') || '—';
@@ -92,28 +92,28 @@ const totalAlocado = c => c.alocacoes.reduce((s, a) => s + a.percentual, 0);
 </script>
 
 <template>
-  <header class="page-header"><h1>Colaboradores</h1><p>Quem faz o trabalho: função, ritmo por dia, desde quando está na equipe e em quais unidades atua. É daqui que sai o "consegue" do Dimensionamento.</p></header>
+  <header class="page-header"><h1>Colaboradores</h1><p>Cadastro da equipe: função, produção diária, período de vigência e unidades de atuação. Estes dados determinam a produção considerada no Dimensionamento.</p></header>
 
   <section v-if="auth.podeEditar" class="card">
     <div class="card-head"><h2>{{ editando ? 'Editar colaborador' : 'Novo colaborador' }}</h2></div>
     <form class="grid gap-4 md:grid-cols-4" @submit.prevent="salvar">
       <label class="text-[13px] md:col-span-2"><span class="mb-1 block font-medium">Nome</span><input v-model="form.nome" class="input w-full" required maxlength="80"></label>
       <label class="text-[13px] md:col-span-2"><span class="mb-1 block font-medium">Função</span>
-        <select v-model="form.funcaoId" class="input w-full" required><option value="" disabled>Escolha…</option><option v-for="f in cad.funcoes" :key="f.id" :value="f.id">{{ f.nome }}{{ f.chefia ? ' (chefia)' : '' }}</option></select>
-        <small class="muted block">Define o que a pessoa entrega. Funções novas: tela Funções.</small>
+        <select v-model="form.funcaoId" class="input w-full" required><option value="" disabled>Selecione…</option><option v-for="f in cad.funcoes" :key="f.id" :value="f.id">{{ f.nome }}{{ f.chefia ? ' (chefia)' : '' }}</option></select>
+        <small class="muted block">Define o tipo de produção do colaborador. Novas funções são cadastradas na tela Funções.</small>
       </label>
-      <p v-if="tipoSel === 'nenhuma'" class="note md:col-span-4 !mt-0"><strong>Função sem produção.</strong> Não entra nas contas; se for chefia, aparece como responsável pelas unidades marcadas.</p>
+      <p v-if="tipoSel === 'nenhuma'" class="note md:col-span-4 !mt-0"><strong>Função sem produção.</strong> Não é considerada no cálculo; se for chefia, é exibida como responsável pelas unidades selecionadas.</p>
       <template v-if="tipoSel === TEC">
         <label class="text-[13px] md:col-span-2"><span class="mb-1 block font-medium">Inspeções por dia</span><input v-model="form.inspecoesDia" class="input w-full" type="number" min="0" step="0.5"></label>
         <label class="text-[13px] md:col-span-2"><span class="mb-1 block font-medium">Relatórios por dia</span><input v-model="form.relatoriosDia" class="input w-full" type="number" min="0" step="0.5"></label>
       </template>
       <label v-if="tipoSel === ADM" class="text-[13px] md:col-span-2"><span class="mb-1 block font-medium">Empresas finalizadas por dia</span><input v-model="form.empresasDia" class="input w-full" type="number" min="0" step="0.5"></label>
-      <label class="text-[13px]"><span class="mb-1 block font-medium">Data de admissão</span><input v-model="form.dataAdmissao" class="input w-full" type="date"><small class="muted block">Opcional: conta a partir dela e entra em ramp-up.</small></label>
-      <label class="text-[13px]"><span class="mb-1 block font-medium">Data de desligamento</span><input v-model="form.dataDesligamento" class="input w-full" type="date"><small class="muted block">Opcional: sai das contas a partir dela.</small></label>
-      <label class="text-[13px] md:col-span-2"><span class="mb-1 block font-medium">Custo mensal desta pessoa (R$)</span><input v-model="form.custoMensal" class="input w-full" type="number" min="0" step="100" :placeholder="funcaoSel && funcaoSel.custoMensal > 0 ? `${funcaoSel.custoMensal} (da função)` : 'usa o da função'"><small class="muted block">Opcional. Vazio = custo médio da função.</small></label>
+      <label class="text-[13px]"><span class="mb-1 block font-medium">Data de admissão</span><input v-model="form.dataAdmissao" class="input w-full" type="date"><small class="muted block">Opcional: o colaborador é considerado a partir desta data, com período de adaptação.</small></label>
+      <label class="text-[13px]"><span class="mb-1 block font-medium">Data de desligamento</span><input v-model="form.dataDesligamento" class="input w-full" type="date"><small class="muted block">Opcional: o colaborador deixa de ser considerado a partir desta data.</small></label>
+      <label class="text-[13px] md:col-span-2"><span class="mb-1 block font-medium">Custo mensal do colaborador (R$)</span><input v-model="form.custoMensal" class="input w-full" type="number" min="0" step="100" :placeholder="funcaoSel && funcaoSel.custoMensal > 0 ? `${funcaoSel.custoMensal} (da função)` : 'custo da função'"><small class="muted block">Opcional. Em branco, utiliza-se o custo médio da função.</small></label>
       <div class="text-[13px] md:col-span-4">
-        <span class="mb-1 block font-medium">{{ funcaoSel && funcaoSel.chefia ? 'Quais unidades essa pessoa lidera?' : 'Em quais unidades essa pessoa atua?' }}</span>
-        <p v-if="!cad.unidades.length" class="note !mt-0">Cadastre uma unidade primeiro.</p>
+        <span class="mb-1 block font-medium">{{ funcaoSel && funcaoSel.chefia ? 'Unidades sob responsabilidade' : 'Unidades de atuação' }}</span>
+        <p v-if="!cad.unidades.length" class="note !mt-0">É necessário cadastrar ao menos uma unidade.</p>
         <div v-else class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           <label v-for="u in cad.unidades" :key="u.id" class="flex items-center gap-2 rounded-lg border border-line px-3 py-2" :class="(form.alocacoes[u.id] || {}).marcada ? 'border-primary bg-primary-light' : ''">
             <input type="checkbox" :checked="(form.alocacoes[u.id] || {}).marcada" @change="marcar(u.id, $event.target.checked)">
@@ -121,7 +121,7 @@ const totalAlocado = c => c.alocacoes.reduce((s, a) => s + a.percentual, 0);
             <template v-if="(form.alocacoes[u.id] || {}).marcada && tipoSel !== 'nenhuma'"><input v-model="form.alocacoes[u.id].percentual" class="input input-sm w-16 text-right" type="number" min="1" max="100" step="1"><span class="muted">%</span></template>
           </label>
         </div>
-        <small v-if="tipoSel !== 'nenhuma'" class="muted block" :class="somaAloc > 100 ? 'text-danger-dark' : ''">Tempo alocado: {{ num(somaAloc) }}% {{ somaAloc < 100 ? '(o resto não entra no dimensionamento)' : somaAloc > 100 ? '— não pode passar de 100%' : '' }}</small>
+        <small v-if="tipoSel !== 'nenhuma'" class="muted block" :class="somaAloc > 100 ? 'text-danger-dark' : ''">Tempo alocado: {{ num(somaAloc) }}% {{ somaAloc < 100 ? '(o restante não é considerado no dimensionamento)' : somaAloc > 100 ? '— não pode exceder 100%' : '' }}</small>
       </div>
       <div class="flex gap-2 md:col-span-4">
         <button class="btn btn-primary" type="submit" :disabled="ocupado">{{ editando ? 'Salvar alterações' : 'Adicionar colaborador' }}</button>
@@ -134,14 +134,14 @@ const totalAlocado = c => c.alocacoes.reduce((s, a) => s + a.percentual, 0);
     <div class="card-head">
       <h2>Equipe <span class="muted font-normal">{{ listados.length }} de {{ cad.colaboradores.length }}</span></h2>
       <div class="flex flex-wrap gap-2">
-        <input v-model="busca" class="input input-sm w-52" placeholder="Buscar…">
+        <input v-model="busca" class="input input-sm w-52" placeholder="Pesquisar…">
         <select v-model="filtroFuncao" class="input input-sm"><option value="">Todas as funções</option><option v-for="f in cad.funcoes" :key="f.id" :value="f.id">{{ f.nome }}</option></select>
         <select v-model="filtroUnidade" class="input input-sm"><option value="">Todas as unidades</option><option v-for="u in cad.unidades" :key="u.id" :value="u.id">{{ u.nome }}</option></select>
       </div>
     </div>
     <div class="table-wrap">
       <table class="table">
-        <thead><tr><th>Nome</th><th>Função</th><th>Ritmo por dia</th><th>Na equipe</th><th>Unidades</th><th class="num">Tempo</th><th v-if="auth.podeEditar"></th></tr></thead>
+        <thead><tr><th>Nome</th><th>Função</th><th>Produção diária</th><th>Vigência</th><th>Unidades</th><th class="num">Alocação</th><th v-if="auth.podeEditar"></th></tr></thead>
         <tbody>
           <tr v-for="c in listados" :key="c.id" :class="c.id === editando ? 'bg-primary-light' : ''">
             <td class="font-medium">{{ c.nome }}</td>
@@ -149,7 +149,7 @@ const totalAlocado = c => c.alocacoes.reduce((s, a) => s + a.percentual, 0);
             <td :class="c.tipoProducao === 'nenhuma' ? 'muted' : ''">{{ ritmo(c) }}</td>
             <td class="text-[12.5px]" :class="c.dataDesligamento ? 'txt-deficit' : ''">{{ naEquipe(c) }}</td>
             <td><span v-if="!c.alocacoes.length" class="chip bg-warn-bg text-warn">sem unidade</span><template v-else><div v-for="a in c.alocacoes" :key="a.unidadeId">{{ a.unidadeNome }}</div></template></td>
-            <td class="num"><template v-if="c.alocacoes.length && c.tipoProducao !== 'nenhuma'"><div v-for="a in c.alocacoes" :key="a.unidadeId">{{ num(a.percentual) }}%</div><div v-if="totalAlocado(c) < 99.999" class="chip bg-warn-bg text-warn">{{ num(100 - totalAlocado(c)) }}% livre</div></template><span v-else class="muted">—</span></td>
+            <td class="num"><template v-if="c.alocacoes.length && c.tipoProducao !== 'nenhuma'"><div v-for="a in c.alocacoes" :key="a.unidadeId">{{ num(a.percentual) }}%</div><div v-if="totalAlocado(c) < 99.999" class="chip bg-warn-bg text-warn">{{ num(100 - totalAlocado(c)) }}% não alocado</div></template><span v-else class="muted">—</span></td>
             <td v-if="auth.podeEditar" class="num whitespace-nowrap"><button class="btn-link mr-3" type="button" @click="editar(c)">Editar</button><button class="btn-link text-danger-dark" type="button" @click="remover(c)">Excluir</button></td>
           </tr>
         </tbody>

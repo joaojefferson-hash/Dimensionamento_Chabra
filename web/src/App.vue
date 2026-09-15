@@ -31,13 +31,13 @@ onUnmounted(() => document.removeEventListener('visibilitychange', aoVoltar));
     <Sidebar />
     <main class="min-w-0 flex-1 px-6 py-6 lg:px-8">
       <div v-if="auth.papel === 'leitura'" class="mb-4 rounded-lg border border-line bg-primary-light px-4 py-2 text-[13px] text-primary-dark">
-        Acesso de <strong>leitura</strong>: você vê tudo, mas não altera cadastros. O ano, o mês atual, a unidade e o "E se…?" funcionam (ficam só neste navegador).
+        Acesso de <strong>leitura</strong>: consulta completa, sem alteração de cadastros. Ano, mês atual, unidade e simulação de cenários permanecem disponíveis (preferências deste navegador).
       </div>
       <div v-if="cad.erro" class="card border-danger bg-danger-bg text-danger-dark">
         <strong>Não foi possível carregar os dados.</strong> {{ cad.erro }}
         <button class="btn btn-ghost ml-3" type="button" @click="cad.carregar()">Tentar novamente</button>
       </div>
-      <div v-else-if="!cad.carregado" class="text-muted">Carregando os cadastros…</div>
+      <div v-else-if="!cad.carregado" class="text-muted">Carregando cadastros…</div>
       <router-view v-else />
     </main>
   </div>

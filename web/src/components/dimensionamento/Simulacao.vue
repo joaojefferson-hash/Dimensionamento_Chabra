@@ -36,7 +36,7 @@ const nomeUnidade = id => (cad.unidadePorId[id] || {}).nome || '?';
 const descricao = s => {
   const q = Math.round(Number(s.quantidade) || 0);
   const rot = Math.abs(q) === 1 ? Calculo.FUNCAO_SINGULAR[s.grupo] : Calculo.FUNCAO_SINGULAR[s.grupo] + 's';
-  const quando = s.de === 0 && s.ate === 11 ? 'ano todo' : s.ate === 11 ? `a partir de ${MESES[s.de].toLowerCase()}` : s.de === s.ate ? `só em ${MESES[s.de].toLowerCase()}` : `${MESES[s.de].toLowerCase()}–${MESES[s.ate].toLowerCase()}`;
+  const quando = s.de === 0 && s.ate === 11 ? 'ano inteiro' : s.ate === 11 ? `a partir de ${MESES[s.de].toLowerCase()}` : s.de === s.ate ? `somente em ${MESES[s.de].toLowerCase()}` : `${MESES[s.de].toLowerCase()}–${MESES[s.ate].toLowerCase()}`;
   return `${q > 0 ? '+' : '−'}${Math.abs(q)} ${rot} em ${nomeUnidade(s.unidadeId)} (${quando})`;
 };
 const resumo = computed(() => pref.simulacoes.map(descricao).join(' · '));
@@ -44,21 +44,21 @@ const resumo = computed(() => pref.simulacoes.map(descricao).join(' · '));
 
 <template>
   <details class="mb-5 rounded-card border border-line bg-surface" :open="pref.simulacoes.length > 0">
-    <summary class="cursor-pointer px-4 py-3 font-semibold">E se…? Simular contratações ou desligamentos
-      <span v-if="pref.simulacoes.length" class="chip chip-blue ml-2 font-normal">simulando: {{ resumo }}</span>
+    <summary class="cursor-pointer px-4 py-3 font-semibold">Simulação de cenários: contratações e desligamentos
+      <span v-if="pref.simulacoes.length" class="chip chip-blue ml-2 font-normal">cenário ativo: {{ resumo }}</span>
     </summary>
     <div class="border-t border-line px-4 py-4">
-      <p class="muted mb-3 text-[13px]">Teste contratações (quantidade positiva) ou desligamentos (negativa) numa unidade. A pessoa entra no mês escolhido e fica até o mês final (por padrão, dezembro). Quem entra passa pelo ramp-up como uma contratação real. Fica só neste navegador — não mexe no cadastro.</p>
+      <p class="muted mb-3 text-[13px]">Simule contratações (quantidade positiva) ou desligamentos (quantidade negativa) em uma unidade. O colaborador simulado passa a integrar a equipe no mês inicial e permanece até o mês final (por padrão, dezembro); contratações simuladas passam pelo período de adaptação como uma contratação real. A simulação fica apenas neste navegador e não altera o cadastro.</p>
       <div v-if="pref.simulacoes.length" class="table-wrap mb-3">
         <table class="table">
-          <thead><tr><th>Unidade</th><th>Grupo</th><th class="num">Pessoas (+/−)</th><th>Na equipe</th><th>Ritmo por dia de cada pessoa</th><th></th></tr></thead>
+          <thead><tr><th>Unidade</th><th>Área</th><th class="num">Pessoas (+/−)</th><th>Período</th><th>Produção diária por pessoa</th><th></th></tr></thead>
           <tbody>
             <tr v-for="(s, i) in pref.simulacoes" :key="i">
               <td><select class="input input-sm" :value="s.unidadeId" @change="mudarGrupoOuUnidade(i, { unidadeId: $event.target.value })"><option v-for="u in cad.unidades" :key="u.id" :value="u.id">{{ u.nome }}</option></select></td>
               <td><select class="input input-sm" :value="s.grupo" @change="mudarGrupoOuUnidade(i, { grupo: $event.target.value })"><option :value="TEC">Técnicos</option><option :value="ADM">Administrativos</option></select></td>
-              <td class="num"><input class="input input-sm w-20 text-right" type="number" step="1" :value="s.quantidade" title="Positivo = contratar; negativo = desligar" @change="pref.alterarSimulacao(i, { quantidade: Math.round(Number($event.target.value)) || 1 })"></td>
+              <td class="num"><input class="input input-sm w-20 text-right" type="number" step="1" :value="s.quantidade" title="Positivo = contratação; negativo = desligamento" @change="pref.alterarSimulacao(i, { quantidade: Math.round(Number($event.target.value)) || 1 })"></td>
               <td class="whitespace-nowrap">
-                <span class="muted text-[12px]">a partir de</span> <select class="input input-sm" :value="s.de" @change="mudarMeses(i, 'de', $event.target.value)"><option v-for="(m, k) in MESES" :key="k" :value="k">{{ m }}</option></select>
+                <span class="muted text-[12px]">de</span> <select class="input input-sm" :value="s.de" @change="mudarMeses(i, 'de', $event.target.value)"><option v-for="(m, k) in MESES" :key="k" :value="k">{{ m }}</option></select>
                 <span class="muted text-[12px]">até</span> <select class="input input-sm" :value="s.ate" @change="mudarMeses(i, 'ate', $event.target.value)"><option v-for="(m, k) in MESES" :key="k" :value="k">{{ m }}</option></select>
               </td>
               <td class="whitespace-nowrap">
@@ -74,8 +74,8 @@ const resumo = computed(() => pref.simulacoes.map(descricao).join(' · '));
         </table>
       </div>
       <div class="flex items-center gap-3">
-        <button class="btn btn-ghost" type="button" :disabled="!cad.unidades.length" @click="adicionar">+ Adicionar pessoas para simular</button>
-        <button v-if="pref.simulacoes.length" class="btn btn-ghost" type="button" @click="pref.limparSimulacao()">Limpar simulação</button>
+        <button class="btn btn-ghost" type="button" :disabled="!cad.unidades.length" @click="adicionar">+ Adicionar simulação</button>
+        <button v-if="pref.simulacoes.length" class="btn btn-ghost" type="button" @click="pref.limparSimulacao()">Remover todas</button>
       </div>
     </div>
   </details>

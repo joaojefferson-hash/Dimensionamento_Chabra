@@ -26,7 +26,7 @@ function cancelar() { editando.value = null; nome.value = ''; }
 async function salvar() {
   const n = nome.value.trim();
   if (!n) return;
-  if (duplicado.value) { ui.toast('Já existe uma unidade com esse nome.', 'error'); return; }
+  if (duplicado.value) { ui.toast('Já existe uma unidade com este nome.', 'error'); return; }
   ocupado.value = true;
   try {
     if (editando.value) { await cad.atualizarUnidade(editando.value, { nome: n }); ui.toast('Unidade atualizada.'); }
@@ -35,14 +35,14 @@ async function salvar() {
   } catch (e) { ui.erro(e); } finally { ocupado.value = false; }
 }
 async function remover(u) {
-  const ok = await ui.confirmar({ titulo: 'Excluir unidade', mensagem: `Excluir "${u.nome}"? Os números por mês dela e a alocação dos colaboradores nela também são apagados.`, textoConfirmar: 'Excluir', perigo: true });
+  const ok = await ui.confirmar({ titulo: 'Excluir unidade', mensagem: `Excluir "${u.nome}"? Os lançamentos mensais e a alocação de colaboradores nesta unidade também serão excluídos.`, textoConfirmar: 'Excluir', perigo: true });
   if (!ok) return;
   try { await cad.removerUnidade(u.id); ui.toast('Unidade excluída.'); } catch (e) { ui.erro(e); }
 }
 </script>
 
 <template>
-  <header class="page-header"><h1>Unidades</h1><p>As unidades/filiais da consultoria. Os clientes que vencem em cada mês ficam em Empresas por Unidade; a equipe, em Colaboradores.</p></header>
+  <header class="page-header"><h1>Unidades</h1><p>Unidades (filiais) da consultoria. Os vencimentos mensais são lançados em Empresas por Unidade; a equipe, em Colaboradores.</p></header>
 
   <section v-if="auth.podeEditar" class="card">
     <div class="card-head"><h2>{{ editando ? 'Editar unidade' : 'Nova unidade' }}</h2></div>
@@ -58,7 +58,7 @@ async function remover(u) {
     <p v-if="!cad.unidades.length" class="muted">Nenhuma unidade cadastrada.</p>
     <div v-else class="table-wrap">
       <table class="table">
-        <thead><tr><th>Unidade</th><th class="num" :title="`Média mensal de clientes (Mensal + Exclusiva TST) em ${pref.ano}`">Clientes/mês ({{ pref.ano }})</th><th class="num">Pessoas</th><th v-if="auth.podeEditar"></th></tr></thead>
+        <thead><tr><th>Unidade</th><th class="num" :title="`Média mensal de clientes (Mensal + Exclusiva TST) em ${pref.ano}`">Clientes/mês ({{ pref.ano }})</th><th class="num">Colaboradores</th><th v-if="auth.podeEditar"></th></tr></thead>
         <tbody>
           <tr v-for="u in cad.unidades" :key="u.id" :class="u.id === editando ? 'bg-primary-light' : ''">
             <td class="font-medium">{{ u.nome }}</td>

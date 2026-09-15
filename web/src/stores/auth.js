@@ -37,7 +37,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function entrar(email, senha) {
     const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
-    if (error) throw erroAmigavel(error, 'Não foi possível entrar. Confira e-mail e senha.');
+    if (error) throw erroAmigavel(error, 'Não foi possível autenticar. Verifique o e-mail e a senha.');
   }
 
   async function sair() {
@@ -47,7 +47,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function trocarSenha(nova) {
     const { error } = await supabase.auth.updateUser({ password: nova });
-    if (error) throw erroAmigavel(error, 'Não foi possível trocar a senha.');
+    if (error) throw erroAmigavel(error, 'Não foi possível alterar a senha.');
   }
 
   return { sessao, pronto, usuario, papel, logado, isAdmin, podeEditar, nome, iniciar, entrar, sair, trocarSenha };

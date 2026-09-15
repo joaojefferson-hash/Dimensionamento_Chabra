@@ -33,13 +33,13 @@ const ultimo = ref(null);
 const aba = computed(() => abas.value[abaSel.value] || null);
 const cabecalhos = computed(() => (aba.value ? aba.value.cabecalhos : []));
 const CAMPOS = [
-  { id: 'unidade', rotulo: 'Unidade (coluna)', obrig: false, ajuda: 'só quando o arquivo mistura unidades; com a unidade escolhida acima, é ignorada' },
-  { id: 'vencimento', rotulo: 'Data de vencimento', obrig: true, ajuda: 'a data que define o mês' },
-  { id: 'cliente', rotulo: 'Cliente (nome)', obrig: false, ajuda: 'para contar cada cliente uma vez por mês' },
-  { id: 'clienteId', rotulo: 'Código do cliente', obrig: false, ajuda: 'identifica cada estabelecimento (dois códigos = dois atendimentos); sem código, usa o nome' },
-  { id: 'condicao', rotulo: 'Condição', obrig: false, ajuda: 'Mensal / Exclusiva TST (sem coluna: usa o padrão abaixo)' },
+  { id: 'unidade', rotulo: 'Unidade (coluna)', obrig: false, ajuda: 'apenas quando o arquivo contém várias unidades; ignorada quando há unidade selecionada acima' },
+  { id: 'vencimento', rotulo: 'Data de vencimento', obrig: true, ajuda: 'data que define o mês de referência' },
+  { id: 'cliente', rotulo: 'Cliente (nome)', obrig: false, ajuda: 'permite contar cada cliente uma única vez por mês' },
+  { id: 'clienteId', rotulo: 'Código do cliente', obrig: false, ajuda: 'identifica cada estabelecimento (dois códigos = dois atendimentos); sem código, utiliza-se o nome' },
+  { id: 'condicao', rotulo: 'Condição', obrig: false, ajuda: 'Mensal / Exclusiva TST (sem coluna, utiliza-se a condição selecionada abaixo)' },
   { id: 'porte', rotulo: 'Porte', obrig: false, ajuda: 'P/M/G, pequeno/médio/grande ou nº de funcionários' },
-  { id: 'situacao', rotulo: 'Situação', obrig: false, ajuda: 'para deixar de fora renovados / em dia' },
+  { id: 'situacao', rotulo: 'Situação', obrig: false, ajuda: 'permite desconsiderar registros renovados / em dia' },
 ];
 
 async function escolher(ev) {
@@ -47,7 +47,7 @@ async function escolher(ev) {
   if (!f) return;
   try {
     const { abas: lidas } = lerPlanilha(await f.arrayBuffer());
-    if (!lidas.some(a => a.linhas.length)) { ui.toast('A planilha não tem linhas com dados.', 'error'); return; }
+    if (!lidas.some(a => a.linhas.length)) { ui.toast('A planilha não contém linhas com dados.', 'error'); return; }
     abas.value = lidas; abaSel.value = lidas.findIndex(a => a.linhas.length);
     arquivoNome.value = f.name; ultimo.value = null;
     Object.keys(porteCliente).forEach(k => delete porteCliente[k]);
@@ -126,7 +126,7 @@ async function gravar() {
   try {
     const r = await cad.substituirDemandaAno(ano.value, linhasRpc.value);
     ultimo.value = r;
-    ui.toast(`Importado: ${num(totalImportar.value)} clientes em ${unidadesAlvo.length} unidade(s) de ${ano.value}.`);
+    ui.toast(`Importação concluída: ${num(totalImportar.value)} clientes em ${unidadesAlvo.length} unidade(s) de ${ano.value}.`);
     emit('importado');
   } catch (e) { ui.erro(e); } finally { gravando.value = false; }
 }
@@ -136,9 +136,9 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
 <template>
   <section class="card">
     <div class="card-head">
-      <div><h2>Importar do SGG</h2><div class="muted text-[13px]">Traga a planilha de vencimentos (.xlsx ou .csv): o sistema conta, por unidade e mês, quantos clientes vencem.</div></div>
+      <div><h2>Importar do SGG</h2><div class="muted text-[13px]">Selecione a planilha de vencimentos (.xlsx ou .csv): o sistema contabiliza, por unidade e mês, a quantidade de clientes com vencimento.</div></div>
       <div class="flex gap-2">
-        <label class="btn btn-primary cursor-pointer">Escolher planilha… <input type="file" accept=".xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden @change="escolher"></label>
+        <label class="btn btn-primary cursor-pointer">Selecionar planilha… <input type="file" accept=".xlsx,.xls,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden @change="escolher"></label>
         <button v-if="abas.length" class="btn btn-ghost" type="button" @click="fechar">Fechar</button>
       </div>
     </div>
@@ -152,10 +152,10 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
           <div class="muted mt-1">{{ aba.linhas.length }} linhas · {{ cabecalhos.length }} colunas</div>
         </div>
         <div class="text-[13px] md:col-span-2">
-          <span class="mb-1 block font-medium">Quais colunas usar</span>
+          <span class="mb-1 block font-medium">Colunas utilizadas</span>
           <div class="grid gap-2 sm:grid-cols-2">
             <label v-for="c in CAMPOS" :key="c.id" class="flex items-center gap-2"><span class="w-36 shrink-0" :title="c.ajuda">{{ c.rotulo }}<span v-if="c.obrig" class="text-danger">*</span></span>
-              <select v-model="mapa[c.id]" class="input input-sm w-full"><option :value="null">— {{ c.obrig ? 'escolha' : 'não usar' }} —</option><option v-for="(h, i) in cabecalhos" :key="i" :value="i">{{ h || `(coluna ${i + 1})` }}</option></select>
+              <select v-model="mapa[c.id]" class="input input-sm w-full"><option :value="null">— {{ c.obrig ? 'selecione' : 'não utilizar' }} —</option><option v-for="(h, i) in cabecalhos" :key="i" :value="i">{{ h || `(coluna ${i + 1})` }}</option></select>
             </label>
           </div>
         </div>
@@ -164,34 +164,34 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
       <div class="mt-4 grid gap-4 text-[13px] md:grid-cols-5">
         <label><span class="mb-1 block font-medium">Unidade do cadastro</span>
           <select v-model="opcoes.unidadeId" class="input input-sm w-full"><option value="">— pela coluna do arquivo —</option><option v-for="u in cad.unidades" :key="u.id" :value="u.id">{{ u.nome }}</option></select>
-          <small class="muted block">{{ unidadeFixa ? 'Todas as linhas contam para esta unidade.' : (mapa.unidade != null ? 'Cada linha vai para a unidade da coluna "' + cabecalhos[mapa.unidade] + '".' : 'Escolha a unidade: o arquivo não tem coluna de unidade.') }}</small></label>
+          <small class="muted block">{{ unidadeFixa ? 'Todas as linhas são atribuídas a esta unidade.' : (mapa.unidade != null ? 'Cada linha é atribuída à unidade indicada na coluna "' + cabecalhos[mapa.unidade] + '".' : 'Selecione a unidade: o arquivo não possui coluna de unidade.') }}</small></label>
         <label><span class="mb-1 block font-medium">Condição</span>
           <select v-model="opcoes.condicao" class="input input-sm w-full">
             <option v-if="mapa.condicao != null" value="">— pela coluna "{{ cabecalhos[mapa.condicao] }}" —</option>
             <option value="mensal">Mensal</option>
             <option value="exclusiva_tst">Exclusiva TST</option>
           </select>
-          <small class="muted block">{{ opcoes.condicao === '' && mapa.condicao != null ? 'Texto com "Exclusiva"/"TST" vira Exclusiva TST; o resto, Mensal.' : 'Todas as linhas contam nesta condição.' }}</small></label>
-        <label><span class="mb-1 block font-medium">Como contar</span><select v-model="opcoes.contarPor" class="input input-sm w-full"><option value="cliente">cada cliente uma vez por mês</option><option value="linha">cada linha (documento)</option></select>
-          <small v-if="opcoes.contarPor === 'cliente' && mapa.cliente == null && mapa.clienteId == null" class="block text-warn">Sem coluna de cliente, cada linha conta uma vez.</small>
-          <small v-else-if="opcoes.contarPor === 'cliente'" class="muted block">Identifica pelo {{ mapa.clienteId != null ? 'código' : 'nome' }}.</small></label>
-        <div v-if="situacoes.length" class="md:col-span-5"><span class="mb-1 block font-medium">Situações que entram</span>
+          <small class="muted block">{{ opcoes.condicao === '' && mapa.condicao != null ? 'Texto contendo "Exclusiva"/"TST" é classificado como Exclusiva TST; os demais, como Mensal.' : 'Todas as linhas são atribuídas a esta condição.' }}</small></label>
+        <label><span class="mb-1 block font-medium">Critério de contagem</span><select v-model="opcoes.contarPor" class="input input-sm w-full"><option value="cliente">cada cliente uma única vez por mês</option><option value="linha">cada linha (documento)</option></select>
+          <small v-if="opcoes.contarPor === 'cliente' && mapa.cliente == null && mapa.clienteId == null" class="block text-warn">Sem coluna de cliente, cada linha é contada uma vez.</small>
+          <small v-else-if="opcoes.contarPor === 'cliente'" class="muted block">Identificação pelo {{ mapa.clienteId != null ? 'código' : 'nome' }}.</small></label>
+        <div v-if="situacoes.length" class="md:col-span-5"><span class="mb-1 block font-medium">Situações consideradas</span>
           <div class="flex flex-wrap gap-3"><label v-for="s in situacoes" :key="s.valor" class="flex items-center gap-1"><input type="checkbox" :checked="(situacoesSel || []).includes(s.valor)" @change="alternarSituacao(s.valor, $event.target.checked)"> {{ s.valor }} <span class="muted">({{ s.n }})</span></label></div>
         </div>
         <div v-if="mapa.porte == null"><span class="mb-1 block font-medium">Porte (sem coluna)</span><select v-model="opcoes.portePadrao" class="input input-sm w-full"><option v-for="p in cad.portes" :key="p.codigo" :value="p.codigo">{{ p.nome }}</option></select></div>
-        <div v-else><label class="flex items-center gap-2"><input v-model="opcoes.usarFaixas" type="checkbox"> <span>A coluna de porte é nº de funcionários</span></label>
+        <div v-else><label class="flex items-center gap-2"><input v-model="opcoes.usarFaixas" type="checkbox"> <span>A coluna de porte contém o número de funcionários</span></label>
           <div v-if="opcoes.usarFaixas" class="mt-1 flex flex-wrap items-center gap-1"><span class="muted">Pequeno até</span><input v-model="opcoes.faixaP" class="input input-sm w-16" type="number" min="0"><span class="muted">· Médio até</span><input v-model="opcoes.faixaM" class="input input-sm w-16" type="number" min="0"><span class="muted">· acima: Grande</span></div>
         </div>
       </div>
 
       <div v-if="resumo && outrosAnos.length" class="mt-3 rounded-lg px-3 py-2 text-[12.5px]" :class="linhasNoAno ? 'bg-warn-bg text-warn' : 'bg-danger-bg text-danger-dark'">
-        O ano selecionado no topo da tela é <strong>{{ ano }}</strong>{{ linhasNoAno ? ` (${linhasNoAno} linhas do arquivo)` : ' e o arquivo não tem nenhum vencimento nele' }}. O arquivo também tem:
+        O ano selecionado no topo da tela é <strong>{{ ano }}</strong>{{ linhasNoAno ? ` (${linhasNoAno} linhas do arquivo)` : ', e o arquivo não contém vencimentos nesse ano' }}. O arquivo também contém:
         <button v-for="a in outrosAnos" :key="a.ano" class="btn-link ml-2 font-semibold" type="button" @click="pref.definirAno(a.ano)">{{ a.ano }} ({{ a.linhas }} linhas) — usar {{ a.ano }}</button>
       </div>
       <div v-if="resumo && resumo.avisos.length" class="mt-3 rounded-lg bg-warn-bg px-3 py-2 text-[12.5px] text-warn"><div v-for="(a, i) in resumo.avisos" :key="i">{{ a }}</div></div>
 
       <template v-if="resumo && nomesArquivo.length">
-        <h3 class="mt-4 mb-2 text-[14px] font-semibold">Prévia — clientes que vencem por mês em {{ ano }} <span class="muted font-normal">({{ num(resumo.linhasUsadas) }} de {{ num(resumo.totalLinhas) }} linhas usadas · Mensal {{ num(porCondicao.mensal) }} · Exclusiva TST {{ num(porCondicao.exclusiva_tst) }})</span></h3>
+        <h3 class="mt-4 mb-2 text-[14px] font-semibold">Prévia — vencimentos por mês em {{ ano }} <span class="muted font-normal">({{ num(resumo.linhasUsadas) }} de {{ num(resumo.totalLinhas) }} linhas consideradas · Mensal {{ num(porCondicao.mensal) }} · Exclusiva TST {{ num(porCondicao.exclusiva_tst) }})</span></h3>
         <div class="table-wrap">
           <table class="table table-grade text-center [&_td]:px-1.5 [&_th]:px-1.5">
             <thead><tr><th class="text-left">{{ unidadeFixa ? 'Unidade' : 'No arquivo' }}</th><th v-if="!unidadeFixa" class="text-left">Unidade do cadastro</th><th v-for="m in MESES" :key="m">{{ m }}</th><th class="bg-page">Total</th></tr></thead>
@@ -199,32 +199,32 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
               <tr v-for="nome in nomesArquivo" :key="nome" :class="mapaUnidades[nome] ? '' : 'bg-danger-bg'">
                 <td class="text-left font-medium">{{ nome }}</td>
                 <td v-if="!unidadeFixa" class="text-left"><select v-model="mapaUnidades[nome]" class="input input-sm"><option :value="null">— não importar —</option><option v-for="u in cad.unidades" :key="u.id" :value="u.id">{{ u.nome }}</option></select></td>
-                <td v-for="mes in 12" :key="mes" :title="mapaUnidades[nome] ? `hoje: ${atualMes(nome, mes)}` : ''">
-                  <strong>{{ totalMesUnidade(nome, mes) || '–' }}</strong><small v-if="Math.abs(ponderadoMesUnidade(nome, mes) - totalMesUnidade(nome, mes)) > 0.05" class="muted" title="Esforço equivalente: cada cliente vale o peso do seu porte"> ({{ num(ponderadoMesUnidade(nome, mes), 1) }})</small>
-                  <small v-if="mapaUnidades[nome] && atualMes(nome, mes) !== totalMesUnidade(nome, mes)" class="muted block text-[11px]">era {{ atualMes(nome, mes) }}</small>
+                <td v-for="mes in 12" :key="mes" :title="mapaUnidades[nome] ? `valor atual: ${atualMes(nome, mes)}` : ''">
+                  <strong>{{ totalMesUnidade(nome, mes) || '–' }}</strong><small v-if="Math.abs(ponderadoMesUnidade(nome, mes) - totalMesUnidade(nome, mes)) > 0.05" class="muted" title="Demanda equivalente: cada cliente ponderado pelo porte"> ({{ num(ponderadoMesUnidade(nome, mes), 1) }})</small>
+                  <small v-if="mapaUnidades[nome] && atualMes(nome, mes) !== totalMesUnidade(nome, mes)" class="muted block text-[11px]">atual: {{ atualMes(nome, mes) }}</small>
                 </td>
                 <td class="bg-page font-semibold">{{ totalUnidade(nome) }}</td>
               </tr>
             </tbody>
           </table>
         </div>
-        <p v-if="semUnidade.length" class="mt-2 text-[12.5px] text-danger-dark">Sem unidade do cadastro (não serão importadas): {{ semUnidade.join(', ') }}. Escolha a unidade na coluna ao lado, ou escolha uma unidade única lá em cima, ou cadastre-a em Unidades.</p>
+        <p v-if="semUnidade.length" class="mt-2 text-[12.5px] text-danger-dark">Sem unidade do cadastro (não serão importadas): {{ semUnidade.join(', ') }}. Selecione a unidade correspondente na coluna ao lado, selecione uma unidade única acima ou cadastre-a em Unidades.</p>
         <div class="mt-3 flex items-center gap-3">
           <button class="btn btn-primary" type="button" :disabled="gravando || !linhasRpc.length" @click="gravar">{{ gravando ? 'Importando…' : `Importar ${num(totalImportar)} clientes para ${ano}` }}</button>
-          <span class="muted text-[12.5px]">Substitui Mensal e Exclusiva TST de {{ ano }} nas unidades acima (todos os meses). Clientes ativos não mudam.</span>
+          <span class="muted text-[12.5px]">Substitui os lançamentos Mensal e Exclusiva TST de {{ ano }} nas unidades acima (todos os meses). Clientes ativos não são alterados.</span>
         </div>
-        <p v-if="ultimo" class="mt-2 text-[12.5px] text-ok">Feito: {{ ultimo.inseridas }} lançamentos gravados ({{ ultimo.apagadas }} anteriores substituídos).</p>
+        <p v-if="ultimo" class="mt-2 text-[12.5px] text-ok">Concluído: {{ ultimo.inseridas }} lançamentos gravados ({{ ultimo.apagadas }} anteriores substituídos).</p>
       </template>
       <div v-if="resumo && resumo.detalhes.length" class="mt-3">
-          <button class="btn-link text-[13px]" type="button" @click="mostrarEmpresas = !mostrarEmpresas">{{ mostrarEmpresas ? 'Ocultar' : 'Ver' }} as {{ resumo.detalhes.length }} empresas do arquivo{{ foraCount ? ` (${foraCount} ficam de fora)` : '' }}</button>
+          <button class="btn-link text-[13px]" type="button" @click="mostrarEmpresas = !mostrarEmpresas">{{ mostrarEmpresas ? 'Ocultar' : 'Exibir' }} as {{ resumo.detalhes.length }} empresas do arquivo{{ foraCount ? ` (${foraCount} não consideradas)` : '' }}</button>
           <div v-if="mostrarEmpresas" class="mt-2">
             <div class="mb-2 flex flex-wrap items-center gap-3">
               <input v-model="filtroEmpresas" class="input input-sm w-72" placeholder="Filtrar por empresa, código ou situação…">
-              <span class="muted text-[12.5px]">Na coluna Porte, escolha o porte de cada empresa: a prévia muda na hora e a escolha fica guardada pelo código do cliente para as próximas importações.{{ salvandoPorte ? ' Salvando…' : '' }}</span>
+              <span class="muted text-[12.5px]">Na coluna Porte, selecione o porte de cada empresa: a prévia é atualizada imediatamente e a seleção é armazenada pelo código do cliente para as próximas importações.{{ salvandoPorte ? ' Salvando…' : '' }}</span>
             </div>
             <div class="table-wrap max-h-[420px] overflow-y-auto">
               <table class="table table-grade">
-                <thead><tr><th>Empresa</th><th>Código</th><th v-if="!unidadeFixa">Unidade</th><th>Vencimento</th><th>Mês</th><th>Condição</th><th title="Escolha o porte da empresa: muda a prévia na hora e fica guardado para as próximas importações">Porte</th><th>Situação</th><th>Entra?</th></tr></thead>
+                <thead><tr><th>Empresa</th><th>Código</th><th v-if="!unidadeFixa">Unidade</th><th>Vencimento</th><th>Mês</th><th>Condição</th><th title="Selecione o porte da empresa: a prévia é atualizada imediatamente e a seleção é armazenada para as próximas importações">Porte</th><th>Situação</th><th>Considerada</th></tr></thead>
                 <tbody>
                   <tr v-for="d in empresas" :key="d.i" :class="d.usada ? '' : 'text-muted'">
                     <td class="font-medium">{{ d.cliente || '—' }}</td>
@@ -233,7 +233,7 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
                     <td class="whitespace-nowrap">{{ fmtData(d.data) }}</td>
                     <td>{{ d.mes ? MESES[d.mes - 1] + (d.ano && ano !== d.ano ? '/' + d.ano : '') : '—' }}</td>
                     <td>{{ rotuloCond(d.condicao) }}</td>
-                    <td><select v-if="d.chave" class="input input-sm" :value="d.porte" :title="d.codigo ? 'Fica guardado para este cliente' : 'Sem código: vale só nesta importação'" @change="escolherPorte(d, $event.target.value)"><option v-for="p in cad.portes" :key="p.codigo" :value="p.codigo">{{ p.nome }}</option></select><span v-else>{{ nomePorte(d.porte) }}</span></td>
+                    <td><select v-if="d.chave" class="input input-sm" :value="d.porte" :title="d.codigo ? 'Armazenado para este cliente' : 'Sem código: válido apenas nesta importação'" @change="escolherPorte(d, $event.target.value)"><option v-for="p in cad.portes" :key="p.codigo" :value="p.codigo">{{ p.nome }}</option></select><span v-else>{{ nomePorte(d.porte) }}</span></td>
                     <td>{{ d.situacao || '—' }}</td>
                     <td><span v-if="d.usada" class="chip bg-ok-bg text-ok">sim</span><span v-else class="chip bg-page text-muted" :title="d.motivo">não · {{ d.motivo }}</span></td>
                   </tr>
@@ -243,6 +243,6 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
           </div>
         </div>
     </template>
-    <p v-else class="muted text-[13px]">Como funciona: cada linha da planilha deve ter a <strong>unidade</strong>, a <strong>data de vencimento</strong> e, se possível, o <strong>cliente</strong> (para contar cada cliente uma vez por mês), a <strong>condição</strong> (Mensal / Exclusiva TST) e o <strong>porte</strong>. O sistema reconhece as colunas pelos títulos e você confirma antes de gravar. Nada é alterado até clicar em Importar.</p>
+    <p v-else class="muted text-[13px]">Cada linha da planilha deve conter a <strong>unidade</strong>, a <strong>data de vencimento</strong> e, preferencialmente, o <strong>cliente</strong> (para contar cada cliente uma única vez por mês), a <strong>condição</strong> (Mensal / Exclusiva TST) e o <strong>porte</strong>. O sistema identifica as colunas pelos títulos e apresenta uma prévia para conferência. Nenhum dado é alterado até a confirmação em Importar.</p>
   </section>
 </template>

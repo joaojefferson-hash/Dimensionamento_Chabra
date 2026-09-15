@@ -131,7 +131,7 @@ export function resumir(linhas, mapa, opcoes = {}) {
     const det = { cliente: texto(mapa.cliente), codigo: texto(mapa.clienteId), situacao: texto(mapa.situacao), data: null, mes: null, ano: null, condicao: null, porte: null, unidade: unidadeFixa || texto(mapa.unidade), usada: false, motivo: '' };
     detalhes.push(det);
     const fora = motivo => { det.motivo = motivo; };
-    if (mapa.situacao != null && situacoes) { const sv = det.situacao || '(vazio)'; if (!situacoes.includes(sv)) { foraSituacao++; fora('situação desmarcada'); return; } }
+    if (mapa.situacao != null && situacoes) { const sv = det.situacao || '(vazio)'; if (!situacoes.includes(sv)) { foraSituacao++; fora('situação não selecionada'); return; } }
     const data = lerData(l[mapa.vencimento]);
     if (!data) { semData++; fora('sem data de vencimento'); return; }
     det.data = data; det.ano = data.getFullYear(); det.mes = data.getMonth() + 1;
@@ -139,7 +139,7 @@ export function resumir(linhas, mapa, opcoes = {}) {
     if (!unidade) { semUnidade++; fora('sem unidade'); return; }
     const y = data.getFullYear();
     anos[y] = (anos[y] || 0) + 1;
-    if (ano != null && y !== ano) { outroAno++; fora(`vence em ${y}, não em ${ano}`); return; }
+    if (ano != null && y !== ano) { outroAno++; fora(`vencimento em ${y}, não em ${ano}`); return; }
     const mes = data.getMonth() + 1;
     const cond = condicaoFixa || (mapa.condicao != null ? lerCondicao(l[mapa.condicao]) : condicaoPadrao);
     // porte: o escolhido para o cliente (pelo código; sem código, pelo nome) > coluna do arquivo > padrão
@@ -150,7 +150,7 @@ export function resumir(linhas, mapa, opcoes = {}) {
     const idCliente = mapa.clienteId != null ? l[mapa.clienteId] : mapa.cliente != null ? l[mapa.cliente] : null;
     if (contarPor === 'cliente' && idCliente != null && String(idCliente).trim() !== '') {
       const k = `${chave(unidade)}|${y}|${mes}|${chave(idCliente)}`;
-      if (vistos.has(k)) { fora('mesmo cliente já contado neste mês'); return; }
+      if (vistos.has(k)) { fora('cliente já contabilizado neste mês'); return; }
       vistos.add(k);
     }
     const u = (porUnidade[unidade] = porUnidade[unidade] || {});
@@ -160,10 +160,10 @@ export function resumir(linhas, mapa, opcoes = {}) {
     det.usada = true;
     usadas++;
   });
-  if (foraSituacao) avisos.push(`${foraSituacao} linha(s) com situação desmarcada foram ignoradas.`);
-  if (semData) avisos.push(`${semData} linha(s) sem data de vencimento reconhecível foram ignoradas.`);
-  if (semUnidade) avisos.push(`${semUnidade} linha(s) sem unidade foram ignoradas.`);
-  if (outroAno) avisos.push(`${outroAno} linha(s) de outros anos foram ignoradas (só o ano ${ano} entra).`);
+  if (foraSituacao) avisos.push(`${foraSituacao} linha(s) com situação não selecionada foram desconsideradas.`);
+  if (semData) avisos.push(`${semData} linha(s) sem data de vencimento válida foram desconsideradas.`);
+  if (semUnidade) avisos.push(`${semUnidade} linha(s) sem unidade foram desconsideradas.`);
+  if (outroAno) avisos.push(`${outroAno} linha(s) de outros anos foram desconsideradas (apenas o ano ${ano} é importado).`);
   const anosEncontrados = Object.entries(anos).map(([a, n]) => ({ ano: Number(a), linhas: n })).sort((x, y) => x.ano - y.ano);
   return { ano, porUnidade, avisos, totalLinhas: linhas.length, linhasUsadas: usadas, anosEncontrados, detalhes };
 }

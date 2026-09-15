@@ -21,7 +21,7 @@ const anos = computed(() => cad.anosDisponiveis(pref.ano));
     </label>
     <label class="text-[12px]">
       <span class="mb-1 block font-semibold uppercase tracking-wider text-muted">Mês atual</span>
-      <select class="input input-sm" :value="pref.mesAtual" @change="pref.definirMesAtual($event.target.value)" title="Separa o que já passou do plano daqui para a frente. Fica só neste navegador.">
+      <select class="input input-sm" :value="pref.mesAtual" @change="pref.definirMesAtual($event.target.value)" title="Separa o período realizado da projeção. Preferência deste navegador.">
         <option v-for="(m, i) in MESES_LONGO" :key="i" :value="i">{{ m }}</option>
       </select>
     </label>

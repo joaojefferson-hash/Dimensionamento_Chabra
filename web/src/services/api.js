@@ -16,17 +16,17 @@ import { supabase, erroAmigavel } from './supabase.js';
 
 export const CONDICOES = [
   { condicao: 'mensal',        campo: 'empresasVencidas',     rotulo: 'Mensal',        ajuda: 'clientes com contrato mensal cujos documentos vencem no mês' },
-  { condicao: 'exclusiva_tst', campo: 'empresasExclusivaTst', rotulo: 'Exclusiva TST', ajuda: 'clientes na condição Exclusiva TST (mesmo atendimento completo)' },
+  { condicao: 'exclusiva_tst', campo: 'empresasExclusivaTst', rotulo: 'Exclusiva TST', ajuda: 'clientes na condição Exclusiva TST (atendimento completo)' },
 ];
 export const TIPOS_PRODUCAO = [
-  { id: 'tecnico',        rotulo: 'Técnico',        descricao: 'faz inspeções e relatórios — entra no dimensionamento como técnico' },
-  { id: 'administrativo', rotulo: 'Administrativo', descricao: 'finaliza empresas — entra como administrativo' },
-  { id: 'nenhuma',        rotulo: 'Sem produção',   descricao: 'não tem ritmo diário e não entra nas contas (ex.: supervisores)' },
+  { id: 'tecnico',        rotulo: 'Técnico',        descricao: 'realiza inspeções e relatórios — considerado no dimensionamento como técnico' },
+  { id: 'administrativo', rotulo: 'Administrativo', descricao: 'finaliza empresas — considerado como administrativo' },
+  { id: 'nenhuma',        rotulo: 'Sem produção',   descricao: 'sem produção diária; não é considerada no cálculo (ex.: supervisores)' },
 ];
 export const COORDENA = [
   { id: 'todos',           rotulo: 'Toda a equipe' },
-  { id: 'tecnicos',        rotulo: 'Só os técnicos' },
-  { id: 'administrativos', rotulo: 'Só os administrativos' },
+  { id: 'tecnicos',        rotulo: 'Somente os técnicos' },
+  { id: 'administrativos', rotulo: 'Somente os administrativos' },
 ];
 export const PARAMETROS_PADRAO = { diasUteis: [21, 18, 22, 20, 20, 21, 23, 21, 21, 21, 19, 22], ocupacaoAlvo: 85, prazoDias: 60, rampup: [50, 80] };
 

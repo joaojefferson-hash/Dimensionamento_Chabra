@@ -27,13 +27,13 @@ onMounted(() => carregar());
 const CAMPOS = {
   unidades: { nome: 'nome' },
   colaboradores: { nome: 'nome', funcao_id: 'função', empresas_dia: 'empresas por dia', inspecoes_dia: 'inspeções por dia', relatorios_dia: 'relatórios por dia', data_admissao: 'admissão', data_desligamento: 'desligamento', custo_mensal: 'custo mensal' },
-  funcoes: { nome: 'nome', tipo_producao: 'tipo de produção', chefia: 'chefia de equipe', coordena: 'coordena', responde_para: 'responde para', ordem: 'ordem', custo_mensal: 'custo mensal' },
+  funcoes: { nome: 'nome', tipo_producao: 'tipo de produção', chefia: 'chefia de equipe', coordena: 'coordena', responde_para: 'subordinada a', ordem: 'ordem', custo_mensal: 'custo mensal' },
   demanda_mensal: { quantidade: 'quantidade' },
   unidade_mes: { clientes_ativos: 'clientes ativos' },
   unidade_empresas_mes: { empresas_vencidas: 'clientes Mensal', empresas_exclusiva_tst: 'clientes Exclusiva TST', clientes_ativos: 'clientes ativos' },
   portes: { nome: 'nome', peso: 'peso' },
   colaborador_unidades: { percentual: '% do tempo' },
-  parametros: { ocupacao_alvo: 'folga para imprevistos', dias_uteis: 'dias úteis', prazo_dias: 'prazo para atender (dias)', rampup: 'ramp-up (%)' },
+  parametros: { ocupacao_alvo: 'margem para imprevistos', dias_uteis: 'dias úteis', prazo_dias: 'prazo de atendimento (dias)', rampup: 'período de adaptação (%)' },
 };
 const fmtVal = (campo, v) => {
   if (v == null) return '—';
@@ -69,8 +69,8 @@ function frase(h) {
     case 'unidade_mes': return op === 'insert' ? `Registrou ${d.clientes_ativos} clientes ativos em ${mesDe(r)} de ${uni}` : op === 'delete' ? `Apagou os clientes ativos de ${mesDe(r)} de ${uni}` : `Alterou os clientes ativos de ${mesDe(r)} de ${uni}${mud()}`;
     case 'unidade_empresas_mes': return `${op === 'insert' ? 'Definiu' : op === 'delete' ? 'Apagou' : 'Alterou'} os números de ${mesDe(r)} de ${uni} (formato antigo)${op === 'update' ? mud() : ''}`;
     case 'portes': return `Alterou o porte ${r.nome || r.codigo}${mud()}`;
-    case 'parametros': return `Alterou as configurações${mud() || ' (sem mudança visível)'}`;
-    case 'backup': return `Importou um backup: ${r.unidades || 0} unidades, ${r.colaboradores || 0} colaboradores — substituiu todos os cadastros`;
+    case 'parametros': return `Alterou os parâmetros${mud() || ' (sem alteração visível)'}`;
+    case 'backup': return `Importou um backup: ${r.unidades || 0} unidades, ${r.colaboradores || 0} colaboradores — todos os cadastros foram substituídos`;
     default: return `${op} em ${h.tabela}`;
   }
 }
@@ -84,13 +84,13 @@ const quando = s => new Date(s).toLocaleString('pt-BR', { day: '2-digit', month:
 </script>
 
 <template>
-  <header class="page-header"><h1>Histórico</h1><p>Tudo o que mudou nos cadastros: quem, quando, antes e depois. Registrado automaticamente pelo banco.</p></header>
+  <header class="page-header"><h1>Histórico</h1><p>Registro de todas as alterações nos cadastros: autor, data, valor anterior e valor atual. Registrado automaticamente.</p></header>
   <section class="card">
-    <div class="card-head"><h2>Alterações</h2><input v-model="filtro" class="input input-sm w-64" placeholder="Filtrar por texto ou pessoa…"></div>
-    <p v-if="!linhas.length && !carregando" class="muted">Nada registrado{{ filtro ? ' com esse filtro' : '' }}.</p>
+    <div class="card-head"><h2>Alterações</h2><input v-model="filtro" class="input input-sm w-64" placeholder="Filtrar por texto ou autor…"></div>
+    <p v-if="!linhas.length && !carregando" class="muted">Nenhum registro{{ filtro ? ' para este filtro' : '' }}.</p>
     <div v-else class="table-wrap">
       <table class="table">
-        <thead><tr><th class="whitespace-nowrap">Quando</th><th>Quem</th><th>O quê</th></tr></thead>
+        <thead><tr><th class="whitespace-nowrap">Data</th><th>Autor</th><th>Alteração</th></tr></thead>
         <tbody><tr v-for="x in linhas" :key="x.h.id"><td class="whitespace-nowrap text-muted">{{ quando(x.h.quando) }}</td><td class="whitespace-nowrap">{{ x.quem }}</td><td>{{ x.frase }}</td></tr></tbody>
       </table>
     </div>

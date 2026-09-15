@@ -15,7 +15,7 @@ async function entrar() {
   ocupado.value = true;
   try {
     await auth.entrar(email.value.trim(), senha.value);
-    if (!auth.papel) { erro.value = 'Sua conta ainda não tem um papel definido. Peça ao administrador.'; await auth.sair(); return; }
+    if (!auth.papel) { erro.value = 'Esta conta ainda não possui perfil de acesso definido. Contate o administrador.'; await auth.sair(); return; }
     router.push({ name: 'dimensionamento' });
   } catch (e) {
     erro.value = e.message;
@@ -44,8 +44,8 @@ async function entrar() {
         <input v-model="senha" class="input w-full" type="password" autocomplete="current-password" required>
       </label>
       <p v-if="erro" class="mb-3 rounded-lg bg-danger-bg px-3 py-2 text-[13px] text-danger-dark">{{ erro }}</p>
-      <button class="btn btn-primary w-full justify-center" type="submit" :disabled="ocupado">{{ ocupado ? 'Entrando…' : 'Entrar' }}</button>
-      <p class="mt-3 text-[12px] text-muted">Sem conta ou esqueceu a senha? Fale com o administrador.</p>
+      <button class="btn btn-primary w-full justify-center" type="submit" :disabled="ocupado">{{ ocupado ? 'Autenticando…' : 'Entrar' }}</button>
+      <p class="mt-3 text-[12px] text-muted">Para criar acesso ou redefinir a senha, contate o administrador.</p>
     </form>
   </div>
 </template>

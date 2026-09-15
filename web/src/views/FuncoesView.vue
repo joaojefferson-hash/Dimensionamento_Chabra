@@ -29,10 +29,10 @@ function cancelar() { editando.value = null; Object.assign(form, vazio()); }
 async function salvar() {
   const nome = form.nome.trim();
   if (!nome) return;
-  if (cad.funcoes.some(f => f.id !== editando.value && f.nome.trim().toLocaleLowerCase('pt-BR') === nome.toLocaleLowerCase('pt-BR'))) { ui.toast('Já existe uma função com esse nome.', 'error'); return; }
+  if (cad.funcoes.some(f => f.id !== editando.value && f.nome.trim().toLocaleLowerCase('pt-BR') === nome.toLocaleLowerCase('pt-BR'))) { ui.toast('Já existe uma função com este nome.', 'error'); return; }
   const respondeParaId = form.chefia ? form.respondeParaId || null : null;
   for (let cur = respondeParaId, passos = 0; cur && passos < 50; passos++) {
-    if (cur === editando.value) { ui.toast('Essa escolha de "Responde para" fecharia um ciclo.', 'error'); return; }
+    if (cur === editando.value) { ui.toast('A função selecionada em "Subordinada a" formaria um ciclo hierárquico.', 'error'); return; }
     const f = cad.funcaoPorId[cur]; cur = f ? f.respondeParaId : null;
   }
   const dados = { nome, tipoProducao: form.tipoProducao, chefia: form.chefia, coordena: form.chefia ? form.coordena : 'todos', respondeParaId, custoMensal: Math.max(0, Number(form.custoMensal) || 0) };
@@ -45,7 +45,7 @@ async function salvar() {
 }
 async function remover(f) {
   const n = pessoasDe(f);
-  if (n > 0) { ui.toast(`"${f.nome}" está em uso por ${n} ${n === 1 ? 'pessoa' : 'pessoas'}. Mude a função delas antes.`, 'error'); return; }
+  if (n > 0) { ui.toast(`"${f.nome}" está atribuída a ${n} ${n === 1 ? 'colaborador' : 'colaboradores'}. Altere a função desses colaboradores antes de excluir.`, 'error'); return; }
   const ok = await ui.confirmar({ titulo: 'Excluir função', mensagem: `Excluir "${f.nome}"?`, textoConfirmar: 'Excluir', perigo: true });
   if (!ok) return;
   try { await cad.removerFuncao(f.id); ui.toast('Função excluída.'); } catch (e) { ui.erro(e); }
@@ -62,23 +62,23 @@ async function mover(f, delta) {
 </script>
 
 <template>
-  <header class="page-header"><h1>Funções</h1><p>Cada função diz o que a pessoa entrega e, se for chefia, quem coordena e para quem responde (isso monta o organograma). O custo mensal alimenta os valores em R$ do Dimensionamento.</p></header>
+  <header class="page-header"><h1>Funções</h1><p>Cada função define o tipo de produção do colaborador e, no caso de chefia, a equipe coordenada e a subordinação hierárquica. O custo mensal é utilizado nos valores em R$ do Dimensionamento.</p></header>
 
   <section v-if="auth.podeEditar" class="card">
     <div class="card-head"><h2>{{ editando ? 'Editar função' : 'Nova função' }}</h2></div>
     <form class="grid gap-4 md:grid-cols-2" @submit.prevent="salvar">
       <label class="text-[13px]"><span class="mb-1 block font-medium">Nome da função</span><input v-model="form.nome" class="input w-full" required maxlength="80" placeholder="Ex.: Supervisor TST Externo"></label>
-      <label class="text-[13px]"><span class="mb-1 block font-medium">Custo mensal de uma pessoa (R$)</span><input v-model="form.custoMensal" class="input w-full" type="number" min="0" step="100" placeholder="salário + encargos, em média"><small class="muted block">Deixe vazio para não mostrar valores em R$.</small></label>
+      <label class="text-[13px]"><span class="mb-1 block font-medium">Custo mensal por colaborador (R$)</span><input v-model="form.custoMensal" class="input w-full" type="number" min="0" step="100" placeholder="salário + encargos (média)"><small class="muted block">Em branco, os valores em R$ não são exibidos.</small></label>
       <div class="text-[13px] md:col-span-2">
-        <span class="mb-1 block font-medium">O que essa função entrega?</span>
+        <span class="mb-1 block font-medium">Tipo de produção</span>
         <div class="grid gap-2 md:grid-cols-3">
           <label v-for="t in TIPOS_PRODUCAO" :key="t.id" class="flex cursor-pointer gap-2 rounded-lg border border-line p-3" :class="form.tipoProducao === t.id ? 'border-primary bg-primary-light' : ''"><input v-model="form.tipoProducao" type="radio" :value="t.id"><span><strong>{{ t.rotulo }}</strong><small class="muted block">{{ t.descricao }}</small></span></label>
         </div>
       </div>
-      <label class="flex items-start gap-2 text-[13px] md:col-span-2"><input v-model="form.chefia" type="checkbox" class="mt-1"><span><strong>Chefia de equipe</strong><small class="muted block">Marque para quem lidera pessoas. Aparece como chefia das unidades em que a pessoa está — mesmo sem produção própria.</small></span></label>
+      <label class="flex items-start gap-2 text-[13px] md:col-span-2"><input v-model="form.chefia" type="checkbox" class="mt-1"><span><strong>Chefia de equipe</strong><small class="muted block">Selecione para funções de liderança. O colaborador é exibido como chefia das unidades em que atua, mesmo sem produção própria.</small></span></label>
       <template v-if="form.chefia">
-        <div class="text-[13px]"><span class="mb-1 block font-medium">Quem essa chefia coordena?</span><select v-model="form.coordena" class="input w-full"><option v-for="c in COORDENA" :key="c.id" :value="c.id">{{ c.rotulo }}</option></select></div>
-        <div class="text-[13px]"><span class="mb-1 block font-medium">Responde para</span><select v-model="form.respondeParaId" class="input w-full"><option value="">Ninguém — é o topo</option><option v-for="f in chefias" :key="f.id" :value="f.id">{{ f.nome }}</option></select></div>
+        <div class="text-[13px]"><span class="mb-1 block font-medium">Equipe coordenada</span><select v-model="form.coordena" class="input w-full"><option v-for="c in COORDENA" :key="c.id" :value="c.id">{{ c.rotulo }}</option></select></div>
+        <div class="text-[13px]"><span class="mb-1 block font-medium">Subordinada a</span><select v-model="form.respondeParaId" class="input w-full"><option value="">Nenhuma — nível superior</option><option v-for="f in chefias" :key="f.id" :value="f.id">{{ f.nome }}</option></select></div>
       </template>
       <div class="flex gap-2 md:col-span-2">
         <button class="btn btn-primary" type="submit" :disabled="ocupado">{{ editando ? 'Salvar alterações' : 'Adicionar função' }}</button>
@@ -91,13 +91,13 @@ async function mover(f, delta) {
     <div class="card-head"><h2>Funções cadastradas</h2><span class="muted">{{ cad.funcoes.length }} {{ cad.funcoes.length === 1 ? 'função' : 'funções' }}</span></div>
     <div class="table-wrap">
       <table class="table">
-        <thead><tr><th>Função</th><th>O que entrega</th><th>Chefia</th><th>Coordena · responde para</th><th class="num">Custo/mês</th><th class="num">Pessoas</th><th v-if="auth.podeEditar"></th></tr></thead>
+        <thead><tr><th>Função</th><th>Tipo de produção</th><th>Chefia</th><th>Coordena · subordinada a</th><th class="num">Custo mensal</th><th class="num">Colaboradores</th><th v-if="auth.podeEditar"></th></tr></thead>
         <tbody>
           <tr v-for="(f, i) in cad.funcoes" :key="f.id" :class="f.id === editando ? 'bg-primary-light' : ''">
             <td class="font-medium">{{ f.nome }}</td>
             <td><span class="chip" :class="f.tipoProducao === 'tecnico' ? 'bg-ok-bg text-ok' : f.tipoProducao === 'administrativo' ? 'chip-blue' : 'bg-page text-muted'">{{ tipo(f.tipoProducao).rotulo }}</span></td>
             <td>{{ f.chefia ? 'Chefia' : '—' }}</td>
-            <td class="muted">{{ f.chefia ? `${coordenaTxt(f)} · ${f.respondeParaId ? 'responde para ' + nomeFuncao(f.respondeParaId) : 'topo'}` : '—' }}</td>
+            <td class="muted">{{ f.chefia ? `${coordenaTxt(f)} · ${f.respondeParaId ? 'subordinada a ' + nomeFuncao(f.respondeParaId) : 'nível superior'}` : '—' }}</td>
             <td class="num" :class="f.custoMensal > 0 ? '' : 'muted'">{{ f.custoMensal > 0 ? moeda(f.custoMensal) : '—' }}</td>
             <td class="num">{{ pessoasDe(f) }}</td>
             <td v-if="auth.podeEditar" class="num whitespace-nowrap">

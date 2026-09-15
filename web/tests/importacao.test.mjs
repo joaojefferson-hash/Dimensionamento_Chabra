@@ -106,7 +106,7 @@ teste('formato real do SGG (VENCIMENTO(s) DE PGR(s)): Região, Data Validade, Em
   const r = resumir(rows, m, { ano: 2025, situacoes: ['Vencido'] });
   assert.deepStrictEqual(r.porUnidade['Teresópolis'][9], { mensal: { P: 2 }, exclusiva_tst: { P: 1 } }); // Frades conta 2 (dois códigos)
   assert.deepStrictEqual(r.porUnidade['Teresópolis'][2], { mensal: { P: 1 } });
-  assert.ok(r.avisos.some(a => /desmarcada/.test(a)));
+  assert.ok(r.avisos.some(a => /não selecionada/.test(a)));
 });
 
 console.log(`\n${passaram} testes passaram.`);

@@ -16,7 +16,7 @@ const cad = useCadastrosStore();
 const pref = usePreferenciasStore();
 const ui = useUiStore();
 
-const ATIVOS = { campo: 'clientesAtivos', rotulo: 'Clientes ativos', ajuda: 'total de clientes da unidade no mês — só informativo, não entra em nenhuma conta' };
+const ATIVOS = { campo: 'clientesAtivos', rotulo: 'Clientes ativos', ajuda: 'total de clientes da unidade no mês — apenas informativo, não é considerado no cálculo' };
 const condSel = ref('todas');
 const porteSel = ref((() => { try { return localStorage.getItem('chabra-dimensiona:empresas-porte') || 'P'; } catch (_) { return 'P'; } })());
 const escolherPorte = v => { porteSel.value = v; try { localStorage.setItem('chabra-dimensiona:empresas-porte', v); } catch (_) { /* ignora */ } };
@@ -63,15 +63,15 @@ async function mudar(u, mes, campo, ev) {
   } catch (e) { ui.erro(e); ev.target.value = antes || ''; } finally { delete salvando.value[chave]; }
 }
 async function limpar(u) {
-  const ok = await ui.confirmar({ titulo: `Limpar ${pref.ano}`, mensagem: `Apagar todos os números de ${pref.ano} de "${u.nome}" (clientes ativos, Mensal e Exclusiva TST, todos os portes)?`, textoConfirmar: 'Apagar', perigo: true });
+  const ok = await ui.confirmar({ titulo: `Limpar ${pref.ano}`, mensagem: `Excluir todos os lançamentos de ${pref.ano} de "${u.nome}" (clientes ativos, Mensal e Exclusiva TST, todos os portes)?`, textoConfirmar: 'Excluir', perigo: true });
   if (!ok) return;
-  try { await cad.limparAno(u.id, pref.ano); ui.toast(`Números de ${pref.ano} apagados.`); } catch (e) { ui.erro(e); }
+  try { await cad.limparAno(u.id, pref.ano); ui.toast(`Lançamentos de ${pref.ano} excluídos.`); } catch (e) { ui.erro(e); }
 }
 </script>
 
 <template>
   <header class="page-header"><h1>Empresas por Unidade</h1>
-    <p>Quantos clientes de cada unidade têm <strong>documentos vencendo em cada mês</strong>, por condição (Mensal e Exclusiva TST) e por porte ({{ cad.portes.map(p => `${p.nome} = peso ${num(p.peso, 1)}`).join(', ') }} — o porte multiplica o esforço). <strong>Preencha em cada mês só o que vence naquele mês</strong> — nos meses que já passaram, o que venceu e ainda está em aberto; o acumulado o Dimensionamento calcula. Célula vazia conta como zero; tudo salva automaticamente.</p>
+    <p>Quantidade de clientes de cada unidade com <strong>documentos a vencer em cada mês</strong>, por condição (Mensal e Exclusiva TST) e por porte ({{ cad.portes.map(p => `${p.nome} = peso ${num(p.peso, 1)}`).join(', ') }} — o porte multiplica a demanda). <strong>Informe em cada mês apenas os vencimentos daquele mês</strong>; nos meses já decorridos, o que venceu e permanece em aberto. O acumulado é calculado pelo Dimensionamento. Célula em branco equivale a zero; os dados são salvos automaticamente.</p>
   </header>
 
   <form class="card flex flex-wrap items-end gap-5 !py-4" @submit.prevent>
@@ -79,48 +79,48 @@ async function limpar(u) {
       <span class="mb-1 block font-semibold uppercase tracking-wider text-muted">Ano</span>
       <select class="input input-sm" :value="pref.ano" @change="pref.definirAno($event.target.value)"><option v-for="a in anos" :key="a" :value="a">{{ a }}</option></select>
     </label>
-    <span class="muted pb-1 text-[12.5px]">Vale para a tabela e para a importação. O mesmo ano do Dimensionamento.</span>
+    <span class="muted pb-1 text-[12.5px]">Aplica-se à tabela e à importação. Mesmo ano do Dimensionamento.</span>
   </form>
 
-  <section v-if="!cad.unidades.length" class="card"><p class="muted">Cadastre as unidades primeiro.</p></section>
+  <section v-if="!cad.unidades.length" class="card"><p class="muted">É necessário cadastrar as unidades previamente.</p></section>
   <ImportarPlanilha v-if="cad.unidades.length && auth.podeEditar" />
   <section v-if="cad.unidades.length" class="card">
     <div class="card-head">
-      <h2>Clientes que vencem, por mês · {{ pref.ano }}</h2>
+      <h2>Vencimentos por mês · {{ pref.ano }}</h2>
       <div class="flex flex-wrap items-center gap-2 text-[12px]">
-        <span class="muted">Mostrar:</span>
+        <span class="muted">Exibir:</span>
         <div class="flex overflow-hidden rounded-lg border border-line">
-          <button v-for="o in [{ v: 'todas', t: 'Todas' }, ...CONDICOES.map(c => ({ v: c.campo, t: 'Só ' + c.rotulo })), { v: ATIVOS.campo, t: 'Só Clientes ativos' }]" :key="o.v" type="button" class="px-3 py-1" :class="condSel === o.v ? 'bg-primary text-white' : 'bg-white hover:bg-primary-light'" @click="condSel = o.v">{{ o.t }}</button>
+          <button v-for="o in [{ v: 'todas', t: 'Todas' }, ...CONDICOES.map(c => ({ v: c.campo, t: 'Somente ' + c.rotulo })), { v: ATIVOS.campo, t: 'Somente Clientes ativos' }]" :key="o.v" type="button" class="px-3 py-1" :class="condSel === o.v ? 'bg-primary text-white' : 'bg-white hover:bg-primary-light'" @click="condSel = o.v">{{ o.t }}</button>
         </div>
         <span class="muted ml-2">Porte:</span>
-        <div class="flex overflow-hidden rounded-lg border border-line" title="Digite um porte de cada vez. Em Todos, as células mostram a soma dos portes.">
+        <div class="flex overflow-hidden rounded-lg border border-line" title="Os lançamentos são feitos por porte. Em Todos, as células exibem a soma dos portes.">
           <button v-for="p in cad.portes" :key="p.codigo" type="button" class="px-3 py-1" :class="porteSel === p.codigo ? 'bg-primary text-white' : 'bg-white hover:bg-primary-light'" :title="`${p.nome} — peso ${num(p.peso, 1)}`" @click="escolherPorte(p.codigo)">{{ p.nome }}</button>
           <button type="button" class="px-3 py-1" :class="somaPortes ? 'bg-primary text-white' : 'bg-white hover:bg-primary-light'" @click="escolherPorte('todos')">Todos</button>
         </div>
       </div>
     </div>
     <p class="muted mb-3 text-[13px]">
-      <template v-if="somaPortes">Mostrando a <strong>soma dos portes</strong> (só leitura). Para digitar, escolha um porte acima. A linha Total mostra entre parênteses o esforço equivalente quando há clientes médios ou grandes.</template>
-      <template v-else>Digitando o porte <strong>{{ porteObj ? porteObj.nome : porteSel }}</strong> (peso {{ porteObj ? num(porteObj.peso, 1) : 1 }}). Clientes de outro porte: troque o porte acima.</template>
-      A linha <strong>Clientes ativos</strong> é só informativa.
+      <template v-if="somaPortes">Exibindo a <strong>soma dos portes</strong> (somente leitura). Para lançar valores, selecione um porte acima. A linha Total exibe entre parênteses a demanda equivalente quando há clientes de porte médio ou grande.</template>
+      <template v-else>Lançamento do porte <strong>{{ porteObj ? porteObj.nome : porteSel }}</strong> (peso {{ porteObj ? num(porteObj.peso, 1) : 1 }}). Para clientes de outro porte, altere a seleção acima.</template>
+      A linha <strong>Clientes ativos</strong> é apenas informativa.
     </p>
     <div class="table-wrap">
       <table class="table table-grade text-center [&_td]:px-1 [&_th]:px-1 [&_th]:text-center">
         <thead>
           <tr>
             <th class="text-left">Unidade</th><th class="text-left">Condição</th>
-            <th v-for="(m, i) in MESES" :key="m" :class="i < pref.mesAtual ? 'text-muted/70' : i === pref.mesAtual ? 'text-primary-dark underline underline-offset-4' : ''" :title="i < pref.mesAtual ? 'Mês passado: o que venceu e ainda está em aberto' : i === pref.mesAtual ? 'Mês atual' : ''">{{ m }}</th>
-            <th class="bg-warn-bg text-warn" :title="`Soma de janeiro até ${MESES_LONGO[pref.mesAtual].toLowerCase()}: são os Pendentes hoje do Dimensionamento`">Acumulado até {{ MESES[pref.mesAtual].toLowerCase() }}</th>
+            <th v-for="(m, i) in MESES" :key="m" :class="i < pref.mesAtual ? 'text-muted/70' : i === pref.mesAtual ? 'text-primary-dark underline underline-offset-4' : ''" :title="i < pref.mesAtual ? 'Mês decorrido: vencimentos que permanecem em aberto' : i === pref.mesAtual ? 'Mês atual' : ''">{{ m }}</th>
+            <th class="bg-warn-bg text-warn" :title="`Soma de janeiro a ${MESES_LONGO[pref.mesAtual].toLowerCase()}: corresponde às Pendências atuais do Dimensionamento`">Acumulado até {{ MESES[pref.mesAtual].toLowerCase() }}</th>
             <th class="bg-page">Total {{ pref.ano }}</th><th class="bg-page">Média</th>
           </tr>
         </thead>
         <tbody>
           <template v-for="u in cad.unidades" :key="u.id">
             <tr v-for="(c, ci) in (mostrarTotal ? [ATIVOS, ...CONDICOES] : conds)" :key="c.campo" :class="[ci === 0 ? 'border-t-[6px]! border-t-page!' : '', c === ATIVOS ? 'text-muted' : '']">
-              <td v-if="ci === 0" class="bg-white text-left align-top font-semibold" :rowspan="(mostrarTotal ? 3 : conds.length) + (mostrarTotal ? 1 : 0)">{{ u.nome }}<div v-if="auth.podeEditar && temNumeros(u)"><button class="btn-link text-[12px] font-normal" type="button" @click="limpar(u)">limpar {{ pref.ano }}</button></div></td>
+              <td v-if="ci === 0" class="bg-white text-left align-top font-semibold" :rowspan="(mostrarTotal ? 3 : conds.length) + (mostrarTotal ? 1 : 0)">{{ u.nome }}<div v-if="auth.podeEditar && temNumeros(u)"><button class="btn-link text-[12px] font-normal" type="button" @click="limpar(u)">excluir lançamentos de {{ pref.ano }}</button></div></td>
               <td class="whitespace-nowrap text-left"><span class="chip" :class="c === ATIVOS ? 'bg-page text-muted' : c.campo === 'empresasVencidas' ? 'bg-ok-bg text-ok' : 'chip-blue'" :title="c.ajuda">{{ c.rotulo }}</span></td>
               <td v-for="mes in 12" :key="mes" :class="valor(u, mes, c.campo) ? 'bg-[#eef4fb]' : ''">
-                <span v-if="c !== ATIVOS && somaPortes" class="font-semibold" :title="detalhe(u, mes, c.campo) || 'nenhum cliente'">{{ valor(u, mes, c.campo) || '–' }}</span>
+                <span v-if="c !== ATIVOS && somaPortes" class="font-semibold" :title="detalhe(u, mes, c.campo) || 'sem clientes'">{{ valor(u, mes, c.campo) || '–' }}</span>
                 <input v-else class="input input-sm w-12 !px-1 text-center" type="number" min="0" step="1" :value="valor(u, mes, c.campo) || ''" placeholder="–" :disabled="!auth.podeEditar || salvando[`${u.id}-${mes}-${c.campo}`]" :title="c !== ATIVOS ? detalhe(u, mes, c.campo) : ''" @change="mudar(u, mes, c.campo, $event)">
               </td>
               <td class="bg-warn-bg font-semibold">{{ c === ATIVOS ? '—' : fmt(acumulado(u, c.campo)) }}</td>
@@ -129,7 +129,7 @@ async function limpar(u) {
             </tr>
             <tr v-if="mostrarTotal" :key="u.id + '-total'" class="font-semibold">
               <td class="text-left">Total<small v-if="somaPortes" class="muted font-normal"> (equivalente)</small></td>
-              <td v-for="mes in 12" :key="mes">{{ totalMes(u, mes) }}<small v-if="somaPortes && Math.abs(ponderado(u, mes) - totalMes(u, mes)) > 0.05" class="muted font-normal" title="Esforço equivalente: cada cliente vale o peso do seu porte"> ({{ num(ponderado(u, mes), 1) }})</small></td>
+              <td v-for="mes in 12" :key="mes">{{ totalMes(u, mes) }}<small v-if="somaPortes && Math.abs(ponderado(u, mes) - totalMes(u, mes)) > 0.05" class="muted font-normal" title="Demanda equivalente: cada cliente ponderado pelo porte"> ({{ num(ponderado(u, mes), 1) }})</small></td>
               <td class="bg-warn-bg">{{ fmt(acumulado(u, null)) }}</td><td class="bg-page">{{ fmt(somaAno(u, null)) }}</td><td class="bg-page">{{ fmt(somaAno(u, null) / 12) }}</td>
             </tr>
           </template>
@@ -145,6 +145,6 @@ async function limpar(u) {
         </tfoot>
       </table>
     </div>
-    <p class="note">O Dimensionamento usa a soma das duas condições em cada mês, com cada cliente valendo o peso do seu porte ({{ cad.portes.map(p => `${p.codigo} ${num(p.peso, 1)}`).join(' · ') }}; os pesos ficam no Calendário). O que ficou em aberto vai somando mês a mês: a coluna <strong>Acumulado</strong> é essa soma de janeiro até o mês atual (os "Pendentes hoje" do Dimensionamento).</p>
+    <p class="note">O Dimensionamento considera a soma das duas condições em cada mês, com cada cliente ponderado pelo porte ({{ cad.portes.map(p => `${p.codigo} ${num(p.peso, 1)}`).join(' · ') }}; os pesos são definidos no Calendário). As pendências são acumuladas mês a mês: a coluna <strong>Acumulado</strong> corresponde à soma de janeiro até o mês atual (as "Pendências atuais" do Dimensionamento).</p>
   </section>
 </template>
