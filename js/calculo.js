@@ -4,7 +4,7 @@
    Funções puras sobre os cadastros; nada de DOM. Também roda em Node (testes).
 
    Entradas (formato do Store):
-     unidades:      [{ id, nome, empresasVencidas, meses?: { [1..12]: { empresasVencidas } } }]
+     unidades:      [{ id, nome, empresasVencidas (Mensal), empresasExclusivaTst, meses?: { [1..12]: { empresasVencidas, empresasExclusivaTst } } }]
      colaboradores: [{ id, nome, funcao, tipoProducao ('tecnico' | 'administrativo' | 'nenhuma'), chefia,
                        empresasDia, inspecoesDia, relatoriosDia, alocacoes: [{ unidadeId, percentual }] }]
                     // tipoProducao 'nenhuma' = não entra nas contas; chefia = aparece como responsável pelas unidades
@@ -14,8 +14,8 @@
      janela:        { de: 0..11, ate: 0..11 }   (meses, inclusive)
 
    Modelo:
-     precisa(unidade, entrega, mês) = empresas com documentos vencidos no mês
-                                      (cada uma exige uma inspeção, um relatório e uma finalização)
+     precisa(unidade, entrega, mês) = clientes Mensal + Exclusiva TST do mês
+                                      (cada um exige uma inspeção, um relatório e uma finalização)
                                  (ex.: inspeção a cada 3 meses → 1/3 das empresas por mês)
      produção(colab, entrega, mês) = valor_por_dia × dias úteis do mês × fração alocada na unidade
      consegue(unidade, entrega, mês) = Σ produção × (ocupaçãoAlvo/100)   ← folga para imprevistos
@@ -53,14 +53,14 @@ const Calculo = (() => {
   function empresasDoMes(u, mes) {
     const exc = u.meses && u.meses[mes + 1];
     return exc
-      ? { empresasVencidas: n(exc.empresasVencidas), excecao: true }
-      : { empresasVencidas: n(u.empresasVencidas), excecao: false };
+      ? { empresasVencidas: n(exc.empresasVencidas), empresasExclusivaTst: n(exc.empresasExclusivaTst), excecao: true }
+      : { empresasVencidas: n(u.empresasVencidas), empresasExclusivaTst: n(u.empresasExclusivaTst), excecao: false };
   }
 
-  /** Empresas que precisam de atendimento (= com documentos vencidos). Com `mes` (0..11) usa a quantidade daquele mês. */
+  /** Empresas que precisam de atendimento (Mensal + Exclusiva TST). Com `mes` (0..11) usa a quantidade daquele mês. */
   function empresasPonderadas(u, p, mes) {
     const q = mes === undefined ? u : empresasDoMes(u, mes);
-    return n(q.empresasVencidas);
+    return n(q.empresasVencidas) + n(q.empresasExclusivaTst);
   }
 
   /** Produção de um colaborador numa entrega num mês (100% do tempo). */
@@ -214,7 +214,7 @@ const Calculo = (() => {
         FUNCOES.forEach(f => { funcoes[f] = resumoFuncao(f, entregas); });
         return {
           mes, nome: MESES[mes], nomeLongo: MESES_LONGO[mes], diasUteis: n(p.diasUteis[mes]),
-          empresas: q.empresasVencidas, precisa, excecao: q.excecao,
+          empresas: q.empresasVencidas + q.empresasExclusivaTst, precisa, excecao: q.excecao,
           pessoas: pessoasMes,
           entregas, funcoes, status: piorStatus(FUNCOES.map(f => funcoes[f].status)),
         };

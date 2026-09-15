@@ -89,7 +89,7 @@ const ViewProgramacaoMensal = {
               <tr>
                 <th>Mês</th>
                 <th class="num">Dias úteis</th>
-                <th class="num" title="Empresas com documentos vencidos no mês — cada uma precisa de inspeção, relatório e finalização">Docs. vencidos</th>
+                <th class="num" title="Clientes Mensal + Exclusiva TST com documentos vencidos no mês — cada um precisa de inspeção, relatório e finalização">Clientes</th>
                 <th class="num" title="Pessoas do grupo contadas no mês (com a simulação, se houver)">Equipe</th>
                 ${entregas.map(e => `<th class="num">${e.rotulo}</th>`).join('')}
                 <th class="num th-pessoas" title="Quantas pessoas faltam (ou sobram) para dar conta do mês, em relação à equipe de hoje. Não é acumulado: contratar o maior valor cobre todos os meses.">Faltam / sobram</th>

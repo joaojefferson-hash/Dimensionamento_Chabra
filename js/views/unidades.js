@@ -55,7 +55,7 @@ const ViewUnidades = {
               <thead>
                 <tr>
                   <th>Nome</th>
-                  <th class="num" title="Padrão do ano; a variação por mês fica em Empresas por Unidade">Docs. vencidos (padrão)</th>
+                  <th class="num" title="Padrão (Mensal + Exclusiva TST); a variação por mês fica em Empresas por Unidade">Clientes (padrão)</th>
                   <th class="actions">Ações</th>
                 </tr>
               </thead>

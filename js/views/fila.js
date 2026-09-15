@@ -121,7 +121,7 @@ const ViewFila = {
                 <th>Mês</th>
                 <th class="num">Dias úteis</th>
                 <th class="num" title="Pessoas do grupo no mês (com a simulação, se houver)">Equipe</th>
-                <th class="num" title="Empresas com documentos vencidos que entram no mês">Entram</th>
+                <th class="num" title="Clientes (Mensal + Exclusiva TST) com documentos vencidos que entram no mês">Entram</th>
                 <th class="num" title="Acumulado dos meses anteriores">Fila no início</th>
                 <th class="num" title="O que a equipe consegue atender no mês (já com a folga)">Consegue</th>
                 <th class="num">Atendidas</th>
