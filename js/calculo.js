@@ -395,11 +395,16 @@ const Calculo = (() => {
       const filaInicio = trecho.length ? trecho[0].filaInicio : 0;
       const filaFim = trecho.length ? trecho[trecho.length - 1].filaFim : 0;
       const entram = soma('entram'), consegue = soma('consegue'), atendidas = soma('atendidas');
-      const producaoPessoa = soma('producaoPessoa');
-      const falta = Math.max(0, filaInicio + entram - consegue);
-      const sobra = Math.max(0, consegue - (filaInicio + entram));
+      // pessoas a contratar: só dali para a frente (meses já passados não mudam com contratação)
+      const inicioContratacao = Math.max(per.de, t);
+      const futuro = meses.slice(inicioContratacao, per.ate + 1);
+      const somaF = campo => futuro.reduce((s, m) => s + m[campo], 0);
+      const producaoPessoa = somaF('producaoPessoa');
+      const filaInicioF = futuro.length ? futuro[0].filaInicio : 0;
+      const falta = futuro.length ? Math.max(0, filaInicioF + somaF('entram') - somaF('consegue')) : 0;
+      const sobra = futuro.length ? Math.max(0, somaF('consegue') - (filaInicioF + somaF('entram'))) : 0;
       return {
-        de: per.de, ate: per.ate, nMeses: trecho.length,
+        de: per.de, ate: per.ate, nMeses: trecho.length, contratarDe: inicioContratacao,
         filaInicio, entram, consegue, atendidas, filaFim, falta,
         pessoas: falta > 1e-9 && producaoPessoa > 0 ? Math.ceil(falta / producaoPessoa - 1e-9) : 0,
         pessoasSobram: sobra > 1e-9 && producaoPessoa > 0 ? Math.floor(sobra / producaoPessoa + 1e-9) : 0,

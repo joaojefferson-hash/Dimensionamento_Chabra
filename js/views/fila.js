@@ -72,7 +72,7 @@ const ViewFila = {
         out.push(`<strong>No período (${rotuloPeriodo}):</strong> ${pr.filaInicio > 0.5 ? `começa com <strong>${num(pr.filaInicio)}</strong> na fila, ` : ''}entram <strong>${num(pr.entram)}</strong> empresas e a equipe consegue atender <strong>${num(pr.consegue)}</strong>; termina com <strong>${num(pr.filaFim)}</strong> na fila. `
           + (cabe
             ? `<span class="txt-ok">A equipe dá conta do período</span>${pr.pessoasSobram > 0 ? ` — sobra o equivalente a ${pr.pessoasSobram} ${plural(pr.pessoasSobram)}` : ''}.`
-            : `<span class="txt-deficit">Para zerar a fila dentro do período, faltam ${pr.pessoas} ${plural(pr.pessoas)}</span> (a partir de ${M[pr.de].toLowerCase()}).`));
+            : `<span class="txt-deficit">Para a fila estar zerada no fim de ${M[pr.ate].toLowerCase()}, faltam ${pr.pessoas} ${plural(pr.pessoas)}</span> a partir de ${M[pr.contratarDe].toLowerCase()} (o que já passou não muda).`));
       }
       return out.map(t => `<p class="rec-linha">${t}</p>`).join('');
     };
@@ -125,7 +125,7 @@ const ViewFila = {
           <div class="stat" title="Fila no início do primeiro mês do período"><div class="label">Fila no início</div><div class="value ${g.periodo.filaInicio > 0.5 ? 'neg' : ''}">${num(g.periodo.filaInicio)}<small> empresas</small></div></div>
           <div class="stat" title="Empresas que entram no período"><div class="label">Entram no período</div><div class="value">${num(g.periodo.entram)}<small> empresas</small></div></div>
           <div class="stat" title="O que a equipe consegue atender no período (já com a folga)"><div class="label">Equipe consegue</div><div class="value">${num(g.periodo.consegue)}<small> empresas</small></div></div>
-          <div class="stat" title="Pessoas a contratar para zerar a fila até o fim do período"><div class="label">Contratar no período</div><div class="value ${g.periodo.pessoas > 0 ? 'neg' : 'txt-ok'}">${g.periodo.pessoas > 0 ? `${g.periodo.pessoas}<small> ${plural(g.periodo.pessoas)}</small>` : 'ninguém'}</div></div>
+          <div class="stat" title="Pessoas a contratar, a partir de ${M[g.periodo.contratarDe]}, para a fila estar zerada no fim de ${M[g.periodo.ate]}"><div class="label">Contratar até ${Calculo.MESES[g.periodo.ate].toLowerCase()}</div><div class="value ${g.periodo.pessoas > 0 ? 'neg' : 'txt-ok'}">${g.periodo.pessoas > 0 ? `${g.periodo.pessoas}<small> ${plural(g.periodo.pessoas)}</small>` : 'ninguém'}</div></div>
           <div class="stat" title="Como termina o período sem contratar"><div class="label">Fila no fim</div><div class="value ${g.periodo.filaFim > 0.5 ? 'neg' : 'txt-ok'}">${num(g.periodo.filaFim)}<small> empresas</small></div></div>
         </div>
 
@@ -168,18 +168,22 @@ const ViewFila = {
 
         ${!unidadeSel && fila.unidades.length > 1 ? `
         <div class="card-head sub-head">
-          <h3>${Calculo.FUNCAO_CURTA[f]} por unidade — fila no fim de cada mês</h3>
+          <h3>${Calculo.FUNCAO_CURTA[f]} por unidade</h3>
           <span class="muted">clique numa unidade para ver o detalhe</span>
         </div>
+        <p class="muted">Uma linha por unidade. <strong>Equipe</strong> = ${PLURAL[f]} da unidade hoje (em pessoas inteiras). <strong>Fila hoje</strong> = empresas acumuladas no início de ${M[mesAtual].toLowerCase()}. <strong>Contratar em ${p.prazoDias} dias</strong> = pessoas a mais para atender a fila e as entradas dos próximos ${p.prazoDias} dias. <strong>Contratar até ${M[g.periodo.ate].toLowerCase()}</strong> = pessoas a mais para a fila estar zerada no fim do período (a partir de ${M[g.periodo.contratarDe].toLowerCase()}). As colunas dos meses mostram quantas empresas <strong>ficam pendentes no fim de cada mês</strong> sem contratar (verde = zero; amarelo = menos de um mês de entradas; vermelho = mais de um mês).</p>
         <div class="table-wrap">
           <table class="table table-grade table-fila-unidades">
             <thead>
               <tr>
-                <th>Unidade</th>
-                <th class="num">Equipe</th>
-                <th class="num">Fila hoje</th>
-                <th class="num" title="Pessoas a contratar para atender no prazo de ${p.prazoDias} dias">Contratar (prazo)</th>
-                <th class="num" title="Pessoas a contratar para zerar a fila até o fim do período">Contratar (período)</th>
+                <th rowspan="2">Unidade</th>
+                <th rowspan="2" class="num" title="${PLURAL[f]} da unidade hoje, em pessoas inteiras">Equipe</th>
+                <th rowspan="2" class="num" title="Empresas acumuladas no início de ${M[mesAtual]}">Fila hoje</th>
+                <th rowspan="2" class="num" title="Pessoas a contratar para atender a fila e as entradas dos próximos ${p.prazoDias} dias">Contratar em ${p.prazoDias} dias</th>
+                <th rowspan="2" class="num" title="Pessoas a contratar, a partir de ${M[g.periodo.contratarDe]}, para a fila estar zerada no fim de ${M[g.periodo.ate]}">Contratar até ${Calculo.MESES[g.periodo.ate].toLowerCase()}</th>
+                <th colspan="${noPeriodo(g.meses).length}" class="th-group">Empresas pendentes no fim de cada mês (sem contratar)</th>
+              </tr>
+              <tr class="sub">
                 ${noPeriodo(g.meses).map(m => `<th class="num">${m.nome}</th>`).join('')}
               </tr>
             </thead>
