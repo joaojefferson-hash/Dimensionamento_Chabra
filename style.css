@@ -633,7 +633,8 @@ form.busy { opacity: .7; pointer-events: none; }
   background: var(--primary-light); color: var(--primary-dark); font-size: 12px; font-weight: 700; cursor: help;
 }
 
-.grade-cartoes { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 20px; } /* um cartão por unidade, um embaixo do outro */
+.grade-cartoes { display: grid; grid-template-columns: 1fr; gap: 32px; margin-bottom: 32px; } /* um cartão por unidade, um embaixo do outro, com respiro */
+.grade-cartoes .cartao-unidade { padding: 22px 24px; }
 .cartao-unidade { margin-bottom: 0; border-left: 5px solid var(--border); }
 .cartao-unidade.row-ok      { border-left-color: #2e9e6e; background: #fff; }
 .cartao-unidade.row-atencao { border-left-color: #e0a800; background: #fff; }
@@ -641,7 +642,7 @@ form.busy { opacity: .7; pointer-events: none; }
 .cartao-unidade .card-head { align-items: flex-start; }
 .cartao-unidade .card-head h2 { margin-bottom: 2px; }
 
-.blocos-funcao { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.blocos-funcao { display: grid; grid-template-columns: 1fr; gap: 18px; margin-top: 8px; }
 @media (min-width: 1100px) { .blocos-funcao { grid-template-columns: 1fr 1fr; } } /* com o cartão na largura toda, técnicos e administrativos lado a lado */
 .bloco-funcao { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: #fafbfa; }
 .bloco-funcao.row-ok      { background: #f3faf7; border-color: #cfe9dc; }
