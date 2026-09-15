@@ -309,14 +309,6 @@ const App = (() => {
       }
     });
 
-    document.getElementById('btn-export').addEventListener('click', exportJSON);
-    const fileInput = document.getElementById('file-import');
-    document.getElementById('btn-import').addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', () => {
-      const file = fileInput.files && fileInput.files[0];
-      if (file) importJSON(file).finally(() => { fileInput.value = ''; });
-    });
-
     const formLogin = document.getElementById('form-login');
     formLogin.addEventListener('submit', e => { e.preventDefault(); login(formLogin); });
     document.getElementById('btn-logout').addEventListener('click', logout);
@@ -350,7 +342,7 @@ const App = (() => {
     else showScreen('login');
   }
 
-  return { navigate, render, updateBadges, init };
+  return { navigate, render, updateBadges, init, exportJSON, importJSON };
 })();
 
 App.init();

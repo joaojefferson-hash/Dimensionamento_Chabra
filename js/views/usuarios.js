@@ -115,6 +115,19 @@ const ViewUsuarios = {
         </div>
         <div id="usuarios-lista"><div class="empty">Carregando usuários…</div></div>
       </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Backup dos dados</h2>
+          <span class="muted">os dados ficam na nuvem, compartilhados com toda a equipe</span>
+        </div>
+        <p class="muted">Exporte um arquivo JSON com todos os cadastros quando quiser guardar uma cópia. Importar um arquivo <strong>substitui todos os dados atuais</strong>, para toda a equipe — use só para restaurar um backup.</p>
+        <div class="form-actions">
+          <button type="button" class="btn btn-primary" data-action="exportar">Exportar JSON</button>
+          <button type="button" class="btn btn-ghost" data-action="importar">Importar JSON…</button>
+          <input type="file" id="file-import" accept="application/json,.json" hidden>
+        </div>
+      </section>
     `;
 
     const form = el.querySelector('#form-usuario');
@@ -216,6 +229,15 @@ const ViewUsuarios = {
         UI.toast(err.message, 'error');
         btn.disabled = false;
       }
+    });
+
+    // ---- backup (exportar / importar) ----
+    const fileInput = el.querySelector('#file-import');
+    el.querySelector('[data-action="exportar"]').addEventListener('click', () => App.exportJSON());
+    el.querySelector('[data-action="importar"]').addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (file) App.importJSON(file).finally(() => { fileInput.value = ''; });
     });
 
     // Em modo edição a lista já está em cache: só desenha. Senão, busca no servidor.

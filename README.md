@@ -205,7 +205,8 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
 
 ## Backup e migração
 
-- **Exportar JSON** baixa `{ funcoes, unidades, documentos, colaboradores, parametros }`.
+- **Exportar JSON** (card "Backup dos dados" na tela Usuários, só admin) baixa
+  `{ funcoes, unidades, documentos, colaboradores, parametros }`.
 - **Importar JSON** valida, mostra um resumo e chama `importar_backup(jsonb)`,
   que substitui **todos** os dados numa única transação (para toda a equipe).
 - Se o navegador ainda tiver dados da versão anterior (só `localStorage`), o app
