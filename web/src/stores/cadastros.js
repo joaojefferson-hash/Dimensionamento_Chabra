@@ -146,7 +146,7 @@ export const useCadastrosStore = defineStore('cadastros', () => {
     const atual = mesDaUnidade(u, ano, mes);
     guardarMes(u, ano, mes, api.montarMes(atual.demanda, q));
   }
-  async function substituirDemandaAno(ano, linhas) { const r = await api.demanda.substituirAno(ano, linhas); await carregar(); return r; }
+  async function substituirDemandaAno(ano, linhas, condicao = null) { const r = await api.demanda.substituirAno(ano, linhas, condicao); await carregar(); return r; }
   /** Grava o porte de clientes (lista de { codigo, nome, porte }) e atualiza o cache. */
   async function salvarClientesPorte(lista) {
     await api.salvarClientesPorte(lista);

@@ -154,9 +154,10 @@ export const demanda = {
     if (r.error) lancar(r.error, 'Não foi possível salvar os clientes ativos.');
     return q;
   },
-  /** Importação: substitui a demanda de um ano das unidades presentes nas linhas (RPC, uma transação). */
-  async substituirAno(ano, linhas) {
-    const { data, error } = await supabase.rpc('substituir_demanda_ano', { p_ano: ano, p_linhas: linhas });
+  /** Importação: substitui a demanda de um ano das unidades presentes nas linhas (RPC, uma transação).
+   *  Com `condicao` ('mensal' | 'exclusiva_tst'), substitui somente essa condição; sem, as duas. */
+  async substituirAno(ano, linhas, condicao = null) {
+    const { data, error } = await supabase.rpc('substituir_demanda_ano', { p_ano: ano, p_linhas: linhas, p_condicao: condicao || null });
     if (error) lancar(error, 'Não foi possível importar a demanda.');
     return data;
   },

@@ -86,7 +86,16 @@ const totalMesUnidade = (nome, mes) => { const m = ((resumo.value || {}).porUnid
 const totalUnidade = nome => { let s = 0; for (let m = 1; m <= 12; m++) s += totalMesUnidade(nome, m); return s; };
 /** Esforço equivalente do mês (cada cliente × peso do porte); mostrado quando difere da contagem. */
 const ponderadoMesUnidade = (nome, mes) => { const m = ((resumo.value || {}).porUnidade[nome] || {})[mes]; if (!m) return 0; return Object.values(m).reduce((s, portes) => s + Object.entries(portes).reduce((a, [p, q]) => a + q * (cad.pesosPorte[p] || 1), 0), 0); };
-const atualMes = (nome, mes) => { const id = mapaUnidades[nome]; const u = id ? cad.unidadePorId[id] : null; const x = u ? ((u.mesesPorAno || {})[ano.value] || {})[mes] : null; return x ? x.empresasVencidas + x.empresasExclusivaTst : 0; };
+const atualMes = (nome, mes) => {
+  const id = mapaUnidades[nome]; const u = id ? cad.unidadePorId[id] : null; const x = u ? ((u.mesesPorAno || {})[ano.value] || {})[mes] : null;
+  if (!x) return 0;
+  return condicaoFixa.value === 'mensal' ? x.empresasVencidas : condicaoFixa.value === 'exclusiva_tst' ? x.empresasExclusivaTst : x.empresasVencidas + x.empresasExclusivaTst;
+};
+const rotuloCond = c => (c === 'exclusiva_tst' ? 'Exclusiva TST' : c === 'mensal' ? 'Mensal' : '—');
+/** O que a importação substitui: só a condição fixa, ou as duas quando a condição vem da coluna. */
+const rotuloCondFixa = computed(() => (condicaoFixa.value ? rotuloCond(condicaoFixa.value) : null));
+const escopoTxt = computed(() => (rotuloCondFixa.value ? `os lançamentos ${rotuloCondFixa.value}` : 'os lançamentos Mensal e Exclusiva TST'));
+const preservaTxt = computed(() => (condicaoFixa.value === 'mensal' ? 'Exclusiva TST e Clientes ativos não são alterados.' : condicaoFixa.value === 'exclusiva_tst' ? 'Mensal e Clientes ativos não são alterados.' : 'Clientes ativos não são alterados.'));
 const semUnidade = computed(() => nomesArquivo.value.filter(n => !mapaUnidades[n]));
 const linhasRpc = computed(() => (resumo.value ? montarLinhasRpc(resumo.value.porUnidade, mapaUnidades) : []));
 const totalImportar = computed(() => linhasRpc.value.reduce((s, l) => s + l.quantidade, 0));
@@ -116,15 +125,14 @@ async function escolherPorte(d, porte) {
 }
 const nomePorte = c => { const p = cad.portes.find(x => x.codigo === c); return p ? p.nome : c; };
 const fmtData = d => (d ? d.toLocaleDateString('pt-BR') : '—');
-const rotuloCond = c => (c === 'exclusiva_tst' ? 'Exclusiva TST' : c === 'mensal' ? 'Mensal' : '—');
 
 async function gravar() {
   const unidadesAlvo = [...new Set(linhasRpc.value.map(l => l.unidade_id))].map(id => cad.unidadePorId[id].nome);
-  const ok = await ui.confirmar({ titulo: `Importar demanda de ${ano.value}`, mensagem: `Substituir os números de ${ano.value} (Mensal e Exclusiva TST, todos os meses) de: ${unidadesAlvo.join(', ')} pelos ${num(totalImportar.value)} clientes da planilha? Clientes ativos não mudam. Isso vale para toda a equipe.`, textoConfirmar: 'Substituir', perigo: true });
+  const ok = await ui.confirmar({ titulo: `Importar demanda de ${ano.value}`, mensagem: `Substituir ${escopoTxt.value} de ${ano.value} (todos os meses) de: ${unidadesAlvo.join(', ')} pelos ${num(totalImportar.value)} clientes da planilha? ${preservaTxt.value} A alteração se aplica a todos os usuários.`, textoConfirmar: 'Substituir', perigo: true });
   if (!ok) return;
   gravando.value = true;
   try {
-    const r = await cad.substituirDemandaAno(ano.value, linhasRpc.value);
+    const r = await cad.substituirDemandaAno(ano.value, linhasRpc.value, condicaoFixa.value);
     ultimo.value = r;
     ui.toast(`Importação concluída: ${num(totalImportar.value)} clientes em ${unidadesAlvo.length} unidade(s) de ${ano.value}.`);
     emit('importado');
@@ -199,7 +207,7 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
               <tr v-for="nome in nomesArquivo" :key="nome" :class="mapaUnidades[nome] ? '' : 'bg-danger-bg'">
                 <td class="text-left font-medium">{{ nome }}</td>
                 <td v-if="!unidadeFixa" class="text-left"><select v-model="mapaUnidades[nome]" class="input input-sm"><option :value="null">— não importar —</option><option v-for="u in cad.unidades" :key="u.id" :value="u.id">{{ u.nome }}</option></select></td>
-                <td v-for="mes in 12" :key="mes" :title="mapaUnidades[nome] ? `valor atual: ${atualMes(nome, mes)}` : ''">
+                <td v-for="mes in 12" :key="mes" :title="mapaUnidades[nome] ? `valor atual${rotuloCondFixa ? ' (' + rotuloCondFixa + ')' : ''}: ${atualMes(nome, mes)}` : ''">
                   <strong>{{ totalMesUnidade(nome, mes) || '–' }}</strong><small v-if="Math.abs(ponderadoMesUnidade(nome, mes) - totalMesUnidade(nome, mes)) > 0.05" class="muted" title="Demanda equivalente: cada cliente ponderado pelo porte"> ({{ num(ponderadoMesUnidade(nome, mes), 1) }})</small>
                   <small v-if="mapaUnidades[nome] && atualMes(nome, mes) !== totalMesUnidade(nome, mes)" class="muted block text-[11px]">atual: {{ atualMes(nome, mes) }}</small>
                 </td>
@@ -211,7 +219,7 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
         <p v-if="semUnidade.length" class="mt-2 text-[12.5px] text-danger-dark">Sem unidade do cadastro (não serão importadas): {{ semUnidade.join(', ') }}. Selecione a unidade correspondente na coluna ao lado, selecione uma unidade única acima ou cadastre-a em Unidades.</p>
         <div class="mt-3 flex items-center gap-3">
           <button class="btn btn-primary" type="button" :disabled="gravando || !linhasRpc.length" @click="gravar">{{ gravando ? 'Importando…' : `Importar ${num(totalImportar)} clientes para ${ano}` }}</button>
-          <span class="muted text-[12.5px]">Substitui os lançamentos Mensal e Exclusiva TST de {{ ano }} nas unidades acima (todos os meses). Clientes ativos não são alterados.</span>
+          <span class="muted text-[12.5px]">Substitui {{ escopoTxt }} de {{ ano }} nas unidades acima (todos os meses). {{ preservaTxt }}</span>
         </div>
         <p v-if="ultimo" class="mt-2 text-[12.5px] text-ok">Concluído: {{ ultimo.inseridas }} lançamentos gravados ({{ ultimo.apagadas }} anteriores substituídos).</p>
       </template>
