@@ -218,9 +218,9 @@ Single-tenant: toda a equipe autenticada compartilha os mesmos cadastros
 - **Fase 5 (em andamento):** front novo em `web/` (Vue 3 + Vite + Pinia + Tailwind v4) contra o
   mesmo banco e o mesmo motor (sincronizado de `js/calculo.js` por `web/scripts/sync-engine.mjs`).
   Etapa 3 feita: serviços (`src/services/api.js`), stores (`auth`, `cadastros`, `preferencias`,
-  `dimensionamento`), router com guard por papel, layout, login e o bloco "Hoje" do
-  Dimensionamento. Etapa 4: componentes e telas de cadastro; depois troca o deploy.
-  Ver `web/README.md`.
+  `dimensionamento`), router com guard por papel, layout e login. Etapa 4 feita: Dimensionamento
+  completo (TabelaMeses, PorUnidade, Simulacao) e todas as telas de cadastro (falta só o modo
+  Organograma). Próximo: trocar o deploy do Vercel para `web/`. Ver `web/README.md`.
 - **Fase 4 (feita, migração 0022):** porte do cliente (tabela `portes` com peso; demanda
   normalizada em `demanda_mensal` por unidade × ano × mês × condição × porte; `unidade_mes`
   para clientes ativos), ramp-up de contratações (`colaboradores.data_admissao` /

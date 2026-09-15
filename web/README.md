@@ -43,8 +43,8 @@ web/
       BarraOpcoes.vue       ano · mês atual · unidade (liga na store de preferências)
     views/
       LoginView.vue
-      DimensionamentoView.vue   Etapa 3: barra + bloco "Hoje"; Etapa 4: TabelaMeses, PorUnidade, Simulacao
-      EmConstrucaoView.vue      placeholder dos cadastros (Etapa 4)
+      DimensionamentoView.vue   barra + Hoje + TabelaMeses + PorUnidade + Simulacao + avisos
+      Unidades/Empresas/Colaboradores/Funcoes/Calendario/Historico/UsuariosView.vue
   src/style.css             Tailwind v4 + tokens da marca (@theme) + peças (.card, .stat, .table, .status…)
 ```
 
@@ -61,9 +61,16 @@ views ──ações──▶ stores/cadastros ──api.*──▶ Supabase   (o
 Regras: componentes nunca importam `api.js` nem o motor diretamente — só stores.
 O motor nunca importa nada de Vue/Supabase. `api.js` não guarda estado.
 
-## Etapa 4 (próxima)
+## Etapa 4 (feita)
 
-Componentes: `TabelaMeses.vue` (12 meses: vencem, pendente, hoje → ideal por área, conclusão, R$),
-`PorUnidade.vue`, `Simulacao.vue` (E se…?), e as telas de cadastro (Unidades, Empresas por
-Unidade com porte, Colaboradores com admissão/desligamento/custo, Funções, Calendário,
-Histórico, Usuários). Depois: deploy do `web/` no Vercel no lugar do app atual.
+Componentes do Dimensionamento (`components/dimensionamento/`): `TabelaMeses.vue` (12 meses:
+vencem, pendente, hoje → ideal por área, conclusão com R$), `PorUnidade.vue`, `Simulacao.vue`
+(E se…?, com ramp-up). Telas de cadastro em `views/`: Unidades, Empresas por Unidade (porte),
+Colaboradores (admissão/desligamento/custo, alocações), Funções (custo), Calendário (dias úteis,
+folga, prazo, ramp-up, pesos dos portes), Histórico, Usuários (Edge Function + backup).
+`stores/ui.js` + `components/ui/Avisos.vue`: toasts e confirmação. Acesso de leitura: formulários
+escondidos/desabilitados via `auth.podeEditar`.
+
+Ainda não portado: modo **Organograma** e impressão (tela Colaboradores do app atual). Próximo
+passo: trocar o deploy do Vercel para `web/` (Root Directory = web, build `npm run build`,
+output `dist`).

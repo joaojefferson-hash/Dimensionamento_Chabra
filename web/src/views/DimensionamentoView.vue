@@ -1,8 +1,12 @@
 <script setup>
-/* Dimensionamento — Etapa 3: barra (ano · mês atual · unidade) e o bloco "Hoje" ligados à store.
-   A tabela mês a mês, a linha por unidade e o "E se…?" viram componentes na Etapa 4. */
+/* Dimensionamento — a tela de resultado: barra (ano · mês atual · unidade), chefia, bloco "Hoje",
+   tabela dos 12 meses, uma linha por unidade (quando "Todas"), "E se…?" e avisos de cadastro. */
 import { computed } from 'vue';
 import BarraOpcoes from '../components/BarraOpcoes.vue';
+import TabelaMeses from '../components/dimensionamento/TabelaMeses.vue';
+import PorUnidade from '../components/dimensionamento/PorUnidade.vue';
+import Simulacao from '../components/dimensionamento/Simulacao.vue';
+import ChefiaLinha from '../components/ChefiaLinha.vue';
 import { useCadastrosStore } from '../stores/cadastros.js';
 import { usePreferenciasStore } from '../stores/preferencias.js';
 import { useDimensionamentoStore } from '../stores/dimensionamento.js';
@@ -17,6 +21,16 @@ const p = computed(() => cad.parametros);
 const fimPrazo = computed(() => Math.min(11, pref.mesAtual + dim.prazoMeses - 1));
 const rotuloPrazo = computed(() => (fimPrazo.value === pref.mesAtual ? mesMin(pref.mesAtual) : `${mesMin(pref.mesAtual)} a ${mesMin(fimPrazo.value)}`));
 const classeStatus = s => 'row-' + (s === 'atencao' || s === 'deficit' ? s : 'ok');
+const esc = t => String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const avisos = computed(() => {
+  const a = dim.resultado.avisos, out = [];
+  if (a.colabSemProducao && a.colabSemProducao.length) out.push(`<strong>Fora das contas (função sem produção):</strong> ${a.colabSemProducao.map(esc).join(', ')}.`);
+  if (a.colabSemUnidade.length) out.push(`<strong>Sem unidade (não entram no dimensionamento):</strong> ${a.colabSemUnidade.map(esc).join(', ')}. Em Colaboradores, marque onde cada um atua.`);
+  if (a.colabParcial && a.colabParcial.length) out.push(`<strong>Parte do tempo sem unidade:</strong> ${a.colabParcial.map(esc).join(', ')} — só a parte marcada conta.`);
+  if (a.unidadesSemColab.length) out.push(`<strong>Unidades com empresas e sem equipe:</strong> ${a.unidadesSemColab.map(esc).join(', ')}.`);
+  if (a.unidadesSemFuncao && a.unidadesSemFuncao.length) out.push(`<strong>Unidades sem alguém da função:</strong> ${a.unidadesSemFuncao.map(x => `${esc(x.unidade)} (sem ${x.funcao === 'tecnico' ? 'técnicos' : 'administrativos'})`).join(', ')}.`);
+  return out;
+});
 /** No total, a sobra de uma unidade não cobre a falta de outra. */
 const notaDistribuicao = a => {
   if (!dim.varias || (a.faltam <= 0 && a.sobram <= 0)) return '';
@@ -34,6 +48,7 @@ const notaDistribuicao = a => {
   </header>
 
   <BarraOpcoes />
+  <ChefiaLinha v-if="cad.unidades.length" :chefia="dim.alvo.chefia" />
 
   <section v-if="cad.unidades.length === 0" class="card"><p class="muted">Cadastre unidades, empresas por unidade e colaboradores para ver o dimensionamento.</p></section>
   <template v-else>
@@ -60,9 +75,11 @@ const notaDistribuicao = a => {
       </div>
     </div>
 
-    <section class="card">
-      <div class="card-head"><h2>{{ dim.titulo }} · mês a mês · {{ pref.ano }}</h2></div>
-      <p class="muted">A tabela dos 12 meses, a linha por unidade e o "E se…?" entram na Etapa 4 como componentes (<code>TabelaMeses</code>, <code>PorUnidade</code>, <code>Simulacao</code>). Os dados já estão na store: <code>dim.alvo.meses</code> e <code>dim.filaAlvo</code>.</p>
-    </section>
+    <TabelaMeses />
+    <PorUnidade />
+    <Simulacao />
+    <div v-if="avisos.length" class="card border-[#f0d9a8] bg-warn-bg text-[13px] text-warn">
+      <ul class="list-disc pl-5"><li v-for="(a, i) in avisos" :key="i" v-html="a"></li></ul>
+    </div>
   </template>
 </template>

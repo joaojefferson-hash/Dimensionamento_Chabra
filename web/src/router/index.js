@@ -7,13 +7,13 @@ import { useAuthStore } from '../stores/auth.js';
 
 export const TELAS = [
   { path: '/dimensionamento', name: 'dimensionamento', titulo: 'Dimensionamento', secao: 'Dimensionamento', papeis: ['admin', 'leitura'], component: () => import('../views/DimensionamentoView.vue') },
-  { path: '/unidades',        name: 'unidades',        titulo: 'Unidades',            secao: 'Cadastros', component: () => import('../views/EmConstrucaoView.vue') },
-  { path: '/empresas',        name: 'empresas',        titulo: 'Empresas por Unidade', secao: 'Cadastros', component: () => import('../views/EmConstrucaoView.vue') },
-  { path: '/colaboradores',   name: 'colaboradores',   titulo: 'Colaboradores',       secao: 'Cadastros', component: () => import('../views/EmConstrucaoView.vue') },
-  { path: '/funcoes',         name: 'funcoes',         titulo: 'Funções',             secao: 'Cadastros', component: () => import('../views/EmConstrucaoView.vue') },
-  { path: '/calendario',      name: 'calendario',      titulo: 'Calendário',          secao: 'Cadastros', component: () => import('../views/EmConstrucaoView.vue') },
-  { path: '/historico',       name: 'historico',       titulo: 'Histórico',           secao: 'Acompanhamento', component: () => import('../views/EmConstrucaoView.vue') },
-  { path: '/usuarios',        name: 'usuarios',        titulo: 'Usuários',            secao: 'Administração', papeis: ['admin'], component: () => import('../views/EmConstrucaoView.vue') },
+  { path: '/unidades',        name: 'unidades',        titulo: 'Unidades',            secao: 'Cadastros', component: () => import('../views/UnidadesView.vue') },
+  { path: '/empresas',        name: 'empresas',        titulo: 'Empresas por Unidade', secao: 'Cadastros', component: () => import('../views/EmpresasView.vue') },
+  { path: '/colaboradores',   name: 'colaboradores',   titulo: 'Colaboradores',       secao: 'Cadastros', component: () => import('../views/ColaboradoresView.vue') },
+  { path: '/funcoes',         name: 'funcoes',         titulo: 'Funções',             secao: 'Cadastros', component: () => import('../views/FuncoesView.vue') },
+  { path: '/calendario',      name: 'calendario',      titulo: 'Calendário',          secao: 'Cadastros', component: () => import('../views/CalendarioView.vue') },
+  { path: '/historico',       name: 'historico',       titulo: 'Histórico',           secao: 'Acompanhamento', component: () => import('../views/HistoricoView.vue') },
+  { path: '/usuarios',        name: 'usuarios',        titulo: 'Usuários',            secao: 'Administração', papeis: ['admin'], component: () => import('../views/UsuariosView.vue') },
 ];
 
 export const podeVer = (tela, papel) => !tela.papeis || tela.papeis.includes(papel);

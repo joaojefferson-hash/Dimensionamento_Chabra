@@ -4,6 +4,7 @@
 import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import Sidebar from './components/layout/Sidebar.vue';
+import Avisos from './components/ui/Avisos.vue';
 import { useAuthStore } from './stores/auth.js';
 import { useCadastrosStore } from './stores/cadastros.js';
 
@@ -23,6 +24,7 @@ onUnmounted(() => document.removeEventListener('visibilitychange', aoVoltar));
 </script>
 
 <template>
+  <Avisos />
   <div v-if="!auth.pronto" class="grid min-h-screen place-items-center text-muted">Carregando…</div>
   <router-view v-else-if="publica" />
   <div v-else class="flex min-h-screen">
