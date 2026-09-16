@@ -58,7 +58,12 @@ async function salvar() {
   if (cad.colaboradores.some(c => c.id !== editando.value && c.nome.trim().toLocaleLowerCase('pt-BR') === nome.toLocaleLowerCase('pt-BR'))) { ui.toast('Já existe um colaborador com este nome.', 'error'); return; }
   if (form.dataAdmissao && form.dataDesligamento && form.dataDesligamento < form.dataAdmissao) { ui.toast('A data de desligamento não pode ser anterior à admissão.', 'error'); return; }
   let alocacoes = Object.entries(form.alocacoes).filter(([, a]) => a.marcada).map(([unidadeId, a]) => ({ unidadeId, percentual: Math.max(0, Math.min(100, Number(a.percentual) || 0)) })).filter(a => a.percentual > 0);
-  if (tipoSel.value === 'nenhuma') { const n = alocacoes.length; alocacoes = alocacoes.map(a => ({ ...a, percentual: Math.round((100 / n) * 100) / 100 })); }
+  if (tipoSel.value === 'nenhuma' && alocacoes.length) {
+    // função sem produção: divide 100% em partes iguais sem estourar por arredondamento
+    // (os centésimos que sobram vão para as primeiras unidades, somando exatamente 100%)
+    const n = alocacoes.length, base = Math.floor(10000 / n), resto = 10000 - base * n;
+    alocacoes = alocacoes.map((a, i) => ({ ...a, percentual: (base + (i < resto ? 1 : 0)) / 100 }));
+  }
   if (alocacoes.reduce((s, a) => s + a.percentual, 0) > 100.0001) { ui.toast('A soma da alocação nas unidades não pode exceder 100%.', 'error'); return; }
   const dados = {
     nome, funcaoId: funcaoSel.value.id,
