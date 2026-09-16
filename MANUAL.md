@@ -13,7 +13,7 @@ O Chabra Dimensiona responde a três perguntas, com a equipe que a Chabra tem ho
 
 1. **Quanto a equipe produz?** Cada colaborador declara o seu ritmo por dia (inspeções, relatórios ou empresas finalizadas). O programa transforma isso em produção por mês, unidade por unidade.
 2. **Quanto trabalho existe?** Em cada unidade, mês a mês, quantos clientes têm documentos vencendo naquele mês — separados em **Mensal** e **Exclusiva TST**.
-3. **A equipe dá conta? Qual o quadro ideal? Quanto fica pendente? Quantos contratar, e em qual área?** A tela **Dimensionamento** responde mês a mês, com sinais verde / amarelo / vermelho: o que já passou diz "deveria ter contratado…"; daqui para a frente, "contratar…"; e o pendente acumulado, com quantas pessoas a mais zeram tudo dentro do prazo.
+3. **A equipe dá conta? Qual o quadro ideal? Quanto fica pendente? Quantos contratar, e em qual área?** A tela **Projeção** responde mês a mês, com sinais verde / amarelo / vermelho: o que já passou diz "deveria ter contratado…"; daqui para a frente, "contratar…"; e o pendente acumulado, com quantas pessoas a mais zeram tudo dentro do prazo.
 
 Tudo fica na nuvem, compartilhado pela equipe. Cada alteração de cadastro é registrada no **Histórico** (quem, quando, o que mudou).
 
@@ -41,7 +41,7 @@ Qualquer usuário troca a própria senha em **Senha** (rodapé do menu). Não h�
 
 | Seção | Tela | Para quê |
 |---|---|---|
-| Dimensionamento | **Dimensionamento** | A tela de resultado, uma unidade por vez: pendências atuais, equipe → quadro ideal, mês a mês (contratação necessária?), simulação de cenários. |
+| Dimensionamento | **Projeção** | A tela de resultado, uma unidade por vez: pendências atuais, equipe → quadro ideal, mês a mês (contratação necessária?), simulação de cenários. |
 | Dimensionamento | **Dashboard** | Os mesmos números em gráficos: pendentes mês a mês, vencem × equipe consegue, equipe hoje × ideal, por unidade, R$. |
 | Cadastros | **Unidades** | As unidades/filiais. |
 | Cadastros | **Empresas por Unidade** | Por unidade e mês: clientes ativos (informativo), Mensal e Exclusiva TST com documentos vencidos. |
@@ -70,7 +70,7 @@ A base da demanda. Para cada unidade há três linhas por mês (janeiro a dezemb
 - **Clientes ativos** — total de clientes da unidade no mês. **Só informativo** (histórico da carteira); não entra em nenhuma conta.
 - **Mensal** — clientes com contrato mensal cujos documentos vencem naquele mês.
 - **Exclusiva TST** — clientes na condição Exclusiva TST cujos documentos vencem naquele mês.
-- **Total** = Mensal + Exclusiva TST (é o que o Dimensionamento usa, com cada cliente valendo o peso do seu porte).
+- **Total** = Mensal + Exclusiva TST (é o que a Projeção usa, com cada cliente valendo o peso do seu porte).
 
 **Porte.** O seletor **Porte** (Pequeno · Médio · Grande · Todos) define o que você está digitando: escolha um porte e lance os números daquele porte; troque e lance os de outro. Em **Todos**, as células mostram a soma dos portes (só leitura; passe o mouse para ver "P 20 · M 3 · G 2") e a linha Total mostra entre parênteses o **esforço equivalente** (cada cliente × o peso do porte: P 1,0 · M 1,5 · G 2,0, editáveis no Calendário). Ex.: 75 pequenos + 2 grandes = 77 clientes, esforço 79.
 
@@ -78,11 +78,11 @@ Cada cliente do Total precisa, naquele mês, de **uma inspeção e um relatório
 
 **Importar do SGG.** Em vez de digitar, exporte do SGG o relatório *Vencimento(s) de PGR(s)* (.xlsx) e use o card *Importar do SGG* no topo da tela. O sistema reconhece as colunas do relatório: **Região** (unidade), **Data Validade** (o mês), **Empresa** e **Código Empresa** (cada estabelecimento conta uma vez por mês, mesmo com vários documentos), **Situação** (por padrão entram os "Vencido"; renovados/em dia ficam de fora) e **Informações adicionais da Empresa** ("Mensal…" → Mensal; texto com "Exclusiva"/"TST" → Exclusiva TST). Porte: o relatório não traz; abra **"Ver as N empresas do arquivo"** e escolha o porte de cada empresa na coluna Porte — a prévia muda na hora (o mês passa a mostrar o esforço equivalente entre parênteses) e a escolha **fica guardada pelo Código Empresa**: na próxima importação as empresas já vêm classificadas, só as novas precisam de atenção. Empresas sem escolha entram com o porte padrão do seletor (Pequeno). A lista também mostra, para cada empresa, o vencimento, o mês, a condição, a situação e se entra ou não (e por quê). Confira o **ano** (o relatório de vencidos costuma trazer o ano anterior) e a prévia por unidade × mês, com o número que está hoje ("era N"); unidades que não casarem com o cadastro aparecem em vermelho. Só ao clicar em **Importar** os números daquele ano, nas unidades presentes no arquivo, são substituídos — e **apenas da condição selecionada**: com Condição = Exclusiva TST, só os lançamentos Exclusiva TST são substituídos e os Mensal ficam como estão (e vice-versa); com a condição lida da coluna do arquivo, as duas são substituídas. Clientes ativos nunca mudam. Fica registrado no Histórico.
 
-**O que ficou em aberto no ano anterior passa para janeiro.** Se 2025 tem 65 clientes vencidos e ainda em aberto, o Dimensionamento de 2026 começa janeiro com esses 65 — o cartão "Pendentes hoje" mostra "(inclui 65 de 2025)". Por isso vale importar o relatório de vencidos do ano anterior.
+**O que ficou em aberto no ano anterior passa para janeiro.** Se 2025 tem 65 clientes vencidos e ainda em aberto, a Projeção de 2026 começa janeiro com esses 65 — o cartão "Pendentes hoje" mostra "(inclui 65 de 2025)". Por isso vale importar o relatório de vencidos do ano anterior.
 
-Como usar: digite o número em cada mês; célula vazia conta como zero; tudo salva automaticamente. O seletor **Mostrar** filtra por condição; o seletor **Ano** troca o ano (os números são por ano; dá para preencher 2027 sem mexer em 2026). "limpar 2026" apaga todos os números daquela unidade no ano. À direita, **Acumulado até [mês atual]** (soma de janeiro até o mês atual: o que venceu e ainda está em aberto + o que vence neste mês — são os "Pendentes hoje" do Dimensionamento; o mês atual é o escolhido lá), **Total do ano** (soma dos 12 meses) e **Média** mensal; no rodapé, as somas de todas as unidades.
+Como usar: digite o número em cada mês; célula vazia conta como zero; tudo salva automaticamente. O seletor **Mostrar** filtra por condição; o seletor **Ano** troca o ano (os números são por ano; dá para preencher 2027 sem mexer em 2026). "limpar 2026" apaga todos os números daquela unidade no ano. À direita, **Acumulado até [mês atual]** (soma de janeiro até o mês atual: o que venceu e ainda está em aberto + o que vence neste mês — são as "Pendências atuais" da Projeção; o mês atual é o escolhido lá), **Total do ano** (soma dos 12 meses) e **Média** mensal; no rodapé, as somas de todas as unidades.
 
-> Preencha em cada mês **só os documentos que vencem naquele mês** — nos meses que já passaram, os que venceram ali e **ainda estão em aberto**. Não precisa somar o que veio de meses anteriores: o sistema acumula isso sozinho no Dimensionamento (ver 6.2).
+> Preencha em cada mês **só os documentos que vencem naquele mês** — nos meses que já passaram, os que venceram ali e **ainda estão em aberto**. Não precisa somar o que veio de meses anteriores: o sistema acumula isso sozinho na Projeção (ver 6.2).
 
 ### 4.3 Funções
 
@@ -94,7 +94,7 @@ Cada função diz o que a pessoa entrega:
 
 Uma função pode ser **chefia de equipe**. Nesse caso informa-se **quem coordena** (toda a equipe / só os técnicos / só os administrativos) e **para quem responde** (outra chefia; vazio = topo). Isso monta o organograma e a linha "Chefia:" das programações. Hoje: Gerente de Segurança do Trabalho (topo, coordena todos) → Supervisor Geral (coordena todos) → Supervisor ADM (só administrativos); Supervisor TST Externo (só técnicos) responde ao Gerente.
 
-**Custo mensal de uma pessoa** (R$, salário + encargos, em média): opcional. Com ele o Dimensionamento mostra quanto custa contratar quem falta e quanto custa a sobra. Vazio = sem valores em R$.
+**Custo mensal de uma pessoa** (R$, salário + encargos, em média): opcional. Com ele a Projeção mostra quanto custa contratar quem falta e quanto custa a sobra. Vazio = sem valores em R$.
 
 Uma função em uso não pode ser excluída; a ordem da lista (▲▼) é a ordem de exibição.
 
@@ -106,7 +106,7 @@ Para cada pessoa: nome, função e o **ritmo por dia**, que é dela — não há
 - Administrativo: quantas **empresas finalizadas por dia**.
 - Sem produção: não há ritmo; se for chefia, só se marcam as unidades que ela lidera.
 
-**Data de admissão** (opcional): a pessoa só conta a partir dela (o mês de entrada conta proporcional aos dias) e entra em **ramp-up** — produz menos nos primeiros meses de casa (padrão: 1º mês 50%, 2º mês 80%, depois 100%; a curva fica no Calendário). Sem data = veterano, 100% desde sempre. **Data de desligamento** (opcional): a partir dela a pessoa sai das contas; o cadastro fica para o histórico. Com as datas, o Dimensionamento passa a usar a equipe real de cada mês. **Custo mensal** (opcional): sobrepõe o custo médio da função.
+**Data de admissão** (opcional): a pessoa só conta a partir dela (o mês de entrada conta proporcional aos dias) e entra em **ramp-up** — produz menos nos primeiros meses de casa (padrão: 1º mês 50%, 2º mês 80%, depois 100%; a curva fica no Calendário). Sem data = veterano, 100% desde sempre. **Data de desligamento** (opcional): a partir dela a pessoa sai das contas; o cadastro fica para o histórico. Com as datas, a Projeção passa a usar a equipe real de cada mês. **Custo mensal** (opcional): sobrepõe o custo médio da função.
 
 **Unidades onde atua**: marque as unidades e divida o tempo em percentuais (a soma pode ficar abaixo de 100% — o resto não entra na programação — mas não acima). Quem divide o tempo conta proporcionalmente em cada unidade.
 
@@ -157,11 +157,11 @@ Cada cliente exige uma inspeção, um relatório e uma finalização naquele mê
 
 ### 5.4 Simulação "E se…?"
 
-Bloco fechado no fim do Dimensionamento. Cada linha: unidade, grupo, pessoas (+ contratar / − desligar), **a partir de** um mês **até** outro (padrão dezembro — quem entra em setembro conta em outubro, novembro e dezembro) e ritmo por dia (sugerido pela média do grupo na unidade). Tudo recalcula na hora; as contagens mostram "(+2 simulados)". Fica só no navegador; não altera o cadastro nem o backup. Um desligamento maior que a equipe leva o grupo a zero, sem ficar negativo.
+Bloco fechado no fim da Projeção. Cada linha: unidade, grupo, pessoas (+ contratar / − desligar), **a partir de** um mês **até** outro (padrão dezembro — quem entra em setembro conta em outubro, novembro e dezembro) e ritmo por dia (sugerido pela média do grupo na unidade). Tudo recalcula na hora; as contagens mostram "(+2 simulados)". Fica só no navegador; não altera o cadastro nem o backup. Um desligamento maior que a equipe leva o grupo a zero, sem ficar negativo.
 
 ---
 
-## 6. Dimensionamento (a tela de resultado)
+## 6. Projeção (a tela de resultado)
 
 > Terminologia da tela (linguagem formal): "Pendências" = empresas em aberto; "Equipe suficiente / margem reduzida / contratação necessária" = os sinais verde / amarelo / vermelho; "período de adaptação" = ramp-up; "margem para imprevistos" = folga; "Simulação de cenários" = o antigo "E se…?".
 
@@ -197,7 +197,7 @@ No fim da tela aparecem avisos de cadastro (pessoas sem unidade, tempo parcial, 
 
 ### 6.4 Dashboard
 
-A mesma barra (ano · mês atual · unidade) e os mesmos números do Dimensionamento, em gráficos, **sempre de uma unidade por vez** (sem o total de todas, para não confundir) — passe o mouse para ver os valores:
+A mesma barra (ano · mês atual · unidade) e os mesmos números da Projeção, em gráficos, **sempre de uma unidade por vez** (sem o total de todas, para não confundir) — passe o mouse para ver os valores:
 
 - **Pendências ao fim de cada mês** — barras claras nos meses passados (o lançado vai somando), escura no mês atual, laranja no plano.
 - **Vencimentos × produção da equipe** — barras com o que vence (cada cliente valendo o peso do porte) e linhas com quanto técnicos e administrativos dão conta.
@@ -222,7 +222,7 @@ Tela Usuários (admin) → **Backup dos dados**: **Exportar JSON** baixa tudo (f
 
 1. **Todo mês**: em Empresas por Unidade, lançar em cada unidade os clientes ativos e quantos Mensal e Exclusiva TST **vencem no mês** (só o do mês; o acumulado o programa calcula) — e, se souber, o que vence nos próximos meses.
 2. Manter Colaboradores em dia: quem entrou/saiu, ritmo por dia, unidades e percentuais.
-3. Conferir no **Dimensionamento**: pendentes hoje, quadro ideal por área, quantos contratar para zerar no prazo e em qual unidade.
+3. Conferir na **Projeção**: pendências atuais, quadro ideal por área, quantos contratar para zerar no prazo e em qual unidade.
 4. Para a diretoria: a mesma tela, com a simulação "E se…?" para testar contratações antes de decidir.
 5. De tempos em tempos, exportar um backup.
 
@@ -242,7 +242,7 @@ Tela Usuários (admin) → **Backup dos dados**: **Exportar JSON** baixa tudo (f
 | Pessoa inteira | Uma pessoa 100% do tempo. Quem divide o tempo conta proporcionalmente (ex.: 2,8 pessoas). |
 | Fila / pendentes | O que vence no mês + o que sobrou dos meses anteriores sem atender. |
 | Prazo para atender | Dias que uma empresa tem para receber os documentos depois de vencer (padrão 60). |
-| Chefia | Função que lidera pessoas; aparece no Dimensionamento e no organograma. |
+| Chefia | Função que lidera pessoas; aparece na Projeção e no organograma. |
 | Simulação | Pessoas a mais/menos só para testar; não altera o cadastro. |
 | Porte | Tamanho/complexidade do cliente (P/M/G); o peso multiplica o esforço de cada cliente. |
 | Ramp-up | Produção reduzida de quem acabou de entrar (50% no 1º mês, 80% no 2º, depois 100%). |

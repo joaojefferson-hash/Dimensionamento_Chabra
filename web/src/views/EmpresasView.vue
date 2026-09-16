@@ -71,7 +71,7 @@ async function limpar(u) {
 
 <template>
   <header class="page-header"><h1>Empresas por Unidade</h1>
-    <p>Quantidade de clientes de cada unidade com <strong>documentos a vencer em cada mês</strong>, por condição (Mensal e Exclusiva TST) e por porte ({{ cad.portes.map(p => `${p.nome} = peso ${num(p.peso, 1)}`).join(', ') }} — o porte multiplica a demanda). <strong>Informe em cada mês apenas os vencimentos daquele mês</strong>; nos meses já decorridos, o que venceu e permanece em aberto. O acumulado é calculado pelo Dimensionamento. Célula em branco equivale a zero; os dados são salvos automaticamente.</p>
+    <p>Quantidade de clientes de cada unidade com <strong>documentos a vencer em cada mês</strong>, por condição (Mensal e Exclusiva TST) e por porte ({{ cad.portes.map(p => `${p.nome} = peso ${num(p.peso, 1)}`).join(', ') }} — o porte multiplica a demanda). <strong>Informe em cada mês apenas os vencimentos daquele mês</strong>; nos meses já decorridos, o que venceu e permanece em aberto. O acumulado é calculado pela Projeção. Célula em branco equivale a zero; os dados são salvos automaticamente.</p>
   </header>
 
   <form class="card flex flex-wrap items-end gap-5 !py-4" @submit.prevent>
@@ -79,7 +79,7 @@ async function limpar(u) {
       <span class="mb-1 block font-semibold uppercase tracking-wider text-muted">Ano</span>
       <select class="input input-sm" :value="pref.ano" @change="pref.definirAno($event.target.value)"><option v-for="a in anos" :key="a" :value="a">{{ a }}</option></select>
     </label>
-    <span class="muted pb-1 text-[12.5px]">Aplica-se à tabela e à importação. Mesmo ano do Dimensionamento.</span>
+    <span class="muted pb-1 text-[12.5px]">Aplica-se à tabela e à importação. Mesmo ano da Projeção.</span>
   </form>
 
   <section v-if="!cad.unidades.length" class="card"><p class="muted">É necessário cadastrar as unidades previamente.</p></section>
@@ -110,7 +110,7 @@ async function limpar(u) {
           <tr>
             <th class="text-left">Unidade</th><th class="text-left">Condição</th>
             <th v-for="(m, i) in MESES" :key="m" :class="i < pref.mesAtual ? 'text-muted/70' : i === pref.mesAtual ? 'text-primary-dark underline underline-offset-4' : ''" :title="i < pref.mesAtual ? 'Mês decorrido: vencimentos que permanecem em aberto' : i === pref.mesAtual ? 'Mês atual' : ''">{{ m }}</th>
-            <th class="bg-warn-bg text-warn" :title="`Soma de janeiro a ${MESES_LONGO[pref.mesAtual].toLowerCase()}: corresponde às Pendências atuais do Dimensionamento`">Acumulado até {{ MESES[pref.mesAtual].toLowerCase() }}</th>
+            <th class="bg-warn-bg text-warn" :title="`Soma de janeiro a ${MESES_LONGO[pref.mesAtual].toLowerCase()}: corresponde às Pendências atuais da Projeção`">Acumulado até {{ MESES[pref.mesAtual].toLowerCase() }}</th>
             <th class="bg-page">Total {{ pref.ano }}</th><th class="bg-page">Média</th>
           </tr>
         </thead>
@@ -145,6 +145,6 @@ async function limpar(u) {
         </tfoot>
       </table>
     </div>
-    <p class="note">O Dimensionamento considera a soma das duas condições em cada mês, com cada cliente ponderado pelo porte ({{ cad.portes.map(p => `${p.codigo} ${num(p.peso, 1)}`).join(' · ') }}; os pesos são definidos no Calendário). As pendências são acumuladas mês a mês: a coluna <strong>Acumulado</strong> corresponde à soma de janeiro até o mês atual (as "Pendências atuais" do Dimensionamento).</p>
+    <p class="note">A Projeção considera a soma das duas condições em cada mês, com cada cliente ponderado pelo porte ({{ cad.portes.map(p => `${p.codigo} ${num(p.peso, 1)}`).join(' · ') }}; os pesos são definidos no Calendário). As pendências são acumuladas mês a mês: a coluna <strong>Acumulado</strong> corresponde à soma de janeiro até o mês atual (as "Pendências atuais" da Projeção).</p>
   </section>
 </template>

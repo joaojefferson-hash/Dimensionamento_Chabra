@@ -62,7 +62,7 @@ async function mover(f, delta) {
 </script>
 
 <template>
-  <header class="page-header"><h1>Funções</h1><p>Cada função define o tipo de produção do colaborador e, no caso de chefia, a equipe coordenada e a subordinação hierárquica. O custo mensal é utilizado nos valores em R$ do Dimensionamento.</p></header>
+  <header class="page-header"><h1>Funções</h1><p>Cada função define o tipo de produção do colaborador e, no caso de chefia, a equipe coordenada e a subordinação hierárquica. O custo mensal é utilizado nos valores em R$ da Projeção.</p></header>
 
   <section v-if="auth.podeEditar" class="card">
     <div class="card-head"><h2>{{ editando ? 'Editar função' : 'Nova função' }}</h2></div>

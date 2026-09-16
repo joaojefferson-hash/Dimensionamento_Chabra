@@ -1,5 +1,5 @@
 <script setup>
-/* Dashboard — os mesmos números do Dimensionamento, em gráficos, sempre de UMA unidade
+/* Dashboard — os mesmos números da Projeção, em gráficos, sempre de UMA unidade
    (sem o total "Todas as unidades", para não confundir): pendentes mês a mês · vencem × equipe
    consegue · equipe hoje × ideal · custo. */
 import { computed, watch } from 'vue';
@@ -81,7 +81,7 @@ const p = computed(() => cad.parametros);
 <template>
   <header class="page-header">
     <h1>Dashboard</h1>
-    <p>Indicadores do Dimensionamento em gráficos, por unidade — {{ dim.titulo }}, {{ pref.ano }}. Posicione o cursor sobre o gráfico para ver os valores; a tabela completa está no Dimensionamento.</p>
+    <p>Indicadores da Projeção em gráficos, por unidade — {{ dim.titulo }}, {{ pref.ano }}. Posicione o cursor sobre o gráfico para ver os valores; a tabela completa está na Projeção.</p>
   </header>
 
   <BarraOpcoes sem-todas />

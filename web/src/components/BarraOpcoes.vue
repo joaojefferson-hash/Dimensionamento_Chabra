@@ -1,5 +1,5 @@
 <script setup>
-/* Barra de opções do Dimensionamento: ano · mês atual · unidade (tudo fica no navegador, via store de preferências). */
+/* Barra de opções da Projeção: ano · mês atual · unidade (tudo fica no navegador, via store de preferências). */
 import { computed } from 'vue';
 import { useCadastrosStore } from '../stores/cadastros.js';
 import { usePreferenciasStore } from '../stores/preferencias.js';

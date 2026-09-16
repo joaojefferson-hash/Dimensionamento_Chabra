@@ -92,7 +92,7 @@ const totalAlocado = c => c.alocacoes.reduce((s, a) => s + a.percentual, 0);
 </script>
 
 <template>
-  <header class="page-header"><h1>Colaboradores</h1><p>Cadastro da equipe: função, produção diária, período de vigência e unidades de atuação. Estes dados determinam a produção considerada no Dimensionamento.</p></header>
+  <header class="page-header"><h1>Colaboradores</h1><p>Cadastro da equipe: função, produção diária, período de vigência e unidades de atuação. Estes dados determinam a produção considerada na Projeção.</p></header>
 
   <section v-if="auth.podeEditar" class="card">
     <div class="card-head"><h2>{{ editando ? 'Editar colaborador' : 'Novo colaborador' }}</h2></div>

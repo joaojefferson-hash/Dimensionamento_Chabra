@@ -54,7 +54,7 @@ async function escolher(ev) {
     aplicarDeteccao();
     // porte já conhecido de cada cliente (pelo código do SGG)
     if (mapa.clienteId != null) abas.value[abaSel.value].linhas.forEach(l => { const c = String(l[mapa.clienteId] ?? '').trim(); const p = cad.clientesPorte[c]; if (c && p && !porteCliente[c]) porteCliente[c] = p.porte; });
-    // unidade: a que está filtrada no Dimensionamento; senão, a única do cadastro; senão, pela coluna do arquivo
+    // unidade: a que está filtrada na Projeção; senão, a única do cadastro; senão, pela coluna do arquivo
     if (!opcoes.unidadeId) opcoes.unidadeId = cad.unidades.some(u => u.id === pref.unidadeSel) ? pref.unidadeSel : (cad.unidades.length === 1 ? cad.unidades[0].id : '');
   } catch (e) { ui.toast('Não foi possível ler o arquivo: ' + e.message, 'error'); }
 }

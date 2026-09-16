@@ -1,5 +1,5 @@
 <script setup>
-/* Dimensionamento — a tela de resultado, sempre de UMA unidade (sem o total "Todas as unidades",
+/* Projeção — a tela de resultado, sempre de UMA unidade (sem o total "Todas as unidades",
    para não confundir): barra (ano · mês atual · unidade), chefia, bloco "Hoje", tabela dos 12 meses,
    "E se…?" e avisos de cadastro. */
 import { computed, watch } from 'vue';
@@ -48,14 +48,14 @@ const notaDistribuicao = a => {
 
 <template>
   <header class="page-header">
-    <h1>Dimensionamento</h1>
+    <h1>Projeção</h1>
     <p>Comparação entre os documentos que vencem em cada mês e a equipe atual: atendimento da demanda, quadro ideal, pendências acumuladas e necessidade de contratação por área.</p>
   </header>
 
   <BarraOpcoes sem-todas />
   <ChefiaLinha v-if="cad.unidades.length" :chefia="dim.alvo.chefia" />
 
-  <section v-if="cad.unidades.length === 0" class="card"><p class="muted">Cadastre unidades, empresas por unidade e colaboradores para ver o dimensionamento.</p></section>
+  <section v-if="cad.unidades.length === 0" class="card"><p class="muted">Cadastre unidades, empresas por unidade e colaboradores para ver a projeção.</p></section>
   <template v-else>
     <div class="mb-5 grid gap-3 md:grid-cols-3">
       <div class="stat" :class="dim.hoje.pendentes > 0.5 ? 'row-deficit' : 'row-ok'">
