@@ -1,8 +1,10 @@
 <script setup>
-/* Colaboradores — nome, função, ritmo por dia, admissão/desligamento, custo e unidades onde atua (% do tempo).
-   Lista com busca e filtros. (O modo Organograma fica para a próxima rodada.) */
-import { computed, reactive, ref } from 'vue';
+/* Colaboradores — dois modos: Cadastro (nome, função, produção diária, admissão/desligamento,
+   custo e unidades de atuação, com lista, busca e filtros) e Organograma (hierarquia das chefias
+   e equipes por unidade, com impressão). O modo escolhido fica neste navegador. */
+import { computed, reactive, ref, watch } from 'vue';
 import Calculo from '../engine/calculo.js';
+import Organograma from '../components/colaboradores/Organograma.vue';
 import { useAuthStore } from '../stores/auth.js';
 import { useCadastrosStore } from '../stores/cadastros.js';
 import { useUiStore } from '../stores/ui.js';
@@ -20,6 +22,17 @@ const ocupado = ref(false);
 const busca = ref('');
 const filtroFuncao = ref('');
 const filtroUnidade = ref('');
+
+/* ---- modo de exibição (fica neste navegador) ---- */
+const CHAVE_MODO = 'chabra-dimensiona:colaboradores-modo';
+const modo = ref((() => { try { return localStorage.getItem(CHAVE_MODO) === 'organograma' ? 'organograma' : 'cadastro'; } catch (_) { return 'cadastro'; } })());
+watch(modo, v => { try { localStorage.setItem(CHAVE_MODO, v); } catch (_) { /* sem localStorage: apenas não memoriza */ } });
+/** Clique em um nome do organograma: volta ao Cadastro e abre a edição de quem pode editar. */
+function editarDoOrganograma(c) {
+  modo.value = 'cadastro';
+  if (auth.podeEditar) editar(c);
+  else window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
 const funcaoSel = computed(() => cad.funcaoPorId[form.funcaoId] || null);
 const tipoSel = computed(() => (funcaoSel.value ? funcaoSel.value.tipoProducao : 'nenhuma'));
@@ -92,8 +105,21 @@ const totalAlocado = c => c.alocacoes.reduce((s, a) => s + a.percentual, 0);
 </script>
 
 <template>
-  <header class="page-header"><h1>Colaboradores</h1><p>Cadastro da equipe: função, produção diária, período de vigência e unidades de atuação. Estes dados determinam a produção considerada na Projeção.</p></header>
+  <header class="page-header flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1>Colaboradores</h1>
+      <p v-if="modo === 'organograma'">Hierarquia das chefias e equipes de cada unidade. O organograma é montado pelas funções de chefia e pelas unidades informadas em cada colaborador — clique em um nome para editá-lo.</p>
+      <p v-else>Cadastro da equipe: função, produção diária, período de vigência e unidades de atuação. Estes dados determinam a produção considerada na Projeção.</p>
+    </div>
+    <div class="segmented" role="tablist" aria-label="Modo de exibição">
+      <button type="button" role="tab" :aria-selected="modo === 'cadastro'" :class="modo === 'cadastro' ? 'ativo' : ''" @click="modo = 'cadastro'">Cadastro</button>
+      <button type="button" role="tab" :aria-selected="modo === 'organograma'" :class="modo === 'organograma' ? 'ativo' : ''" @click="modo = 'organograma'">Organograma</button>
+    </div>
+  </header>
 
+  <Organograma v-if="modo === 'organograma'" @editar="editarDoOrganograma" />
+
+  <template v-else>
   <section v-if="auth.podeEditar" class="card">
     <div class="card-head"><h2>{{ editando ? 'Editar colaborador' : 'Novo colaborador' }}</h2></div>
     <form class="grid gap-4 md:grid-cols-4" @submit.prevent="salvar">
@@ -156,4 +182,5 @@ const totalAlocado = c => c.alocacoes.reduce((s, a) => s + a.percentual, 0);
       </table>
     </div>
   </section>
+  </template>
 </template>

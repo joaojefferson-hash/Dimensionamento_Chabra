@@ -43,12 +43,15 @@ web/
     components/
       layout/Sidebar.vue    menu por seção, filtrado pelo papel; usuário e Sair
       BarraOpcoes.vue       ano · mês atual · unidade (liga na store de preferências)
+      colaboradores/        Organograma.vue (indicadores + barras + árvore + impressão),
+                            OrgChefe.vue (nó recursivo), OrgEquipe.vue, OrgPessoa.vue
     views/
       LoginView.vue
       DimensionamentoView.vue   tela "Projeção" (rota /projecao): barra + Hoje + TabelaMeses + Simulacao + avisos
       DashboardView.vue         gráficos (Chart.js via components/ui/Grafico.vue) sobre a store de dimensionamento
       Unidades/Empresas/Colaboradores/Funcoes/Calendario/Historico/UsuariosView.vue
-  src/style.css             Tailwind v4 + tokens da marca (@theme) + peças (.card, .stat, .table, .status…)
+  src/composables/organograma.js  árvore do organograma (pura): chefias pela hierarquia das funções + equipes por unidade
+  src/style.css             Tailwind v4 + tokens da marca (@theme) + peças (.card, .stat, .table, .status, .org-*…) + impressão do organograma
 ```
 
 ### Fluxo de dados

@@ -112,7 +112,7 @@ Para cada pessoa: nome, função e o **ritmo por dia**, que é dela — não há
 
 Lista com busca, filtro por função/unidade e colunas Vigência (desde mês/ano, "adaptação 50%", "até dd/mm/aaaa (desligado)"), Unidades e Alocação. Pessoas sem unidade aparecem com aviso e não entram na programação.
 
-**Modo Organograma** (alternância no topo): números da equipe, barras de pessoas por unidade e a árvore de chefias — cada pessoa fica embaixo da chefia mais próxima que coordena o grupo dela na unidade; "Sem chefia definida" e "Sem unidade" ficam à parte. Clicar num nome abre a edição. Botão **Imprimir** (ou salvar em PDF) com escolha da folha (automática / retrato / paisagem).
+**Modo Organograma** (alternância no topo da tela): indicadores da equipe, barras de colaboradores por unidade e a árvore de chefias — cada colaborador fica sob a chefia mais próxima que coordena a sua área naquela unidade; "Sem chefia definida" (nenhuma chefia coordena essa área na unidade) e "Sem unidade" ficam à parte. A hierarquia vem das funções: chefia e "Subordinada a" (tela Funções). Clicar em um nome abre a edição do colaborador. O botão **Imprimir** gera somente o organograma (ou salva em PDF pelo diálogo do navegador), com escolha da folha — automática, retrato ou paisagem — e redução automática para caber na página.
 
 ### 4.5 Calendário
 

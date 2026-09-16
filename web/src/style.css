@@ -77,4 +77,89 @@
   .stat.row-atencao { border-left-color: #e0a800; background: #fff; }
   .stat.row-deficit { border-left-color: #c0392b; background: #fff; }
   .seta { color: var(--color-muted); font-weight: 400; padding: 0 2px; }
+
+  /* alternância Cadastro | Organograma */
+  .segmented { display: inline-flex; border: 1px solid var(--color-line); border-radius: 8px; overflow: hidden; background: #fff; }
+  .segmented button { border: 0; background: transparent; padding: 6px 14px; font: inherit; font-size: 13px; font-weight: 600; color: var(--color-primary-dark); cursor: pointer; }
+  .segmented button:hover { background: var(--color-primary-light); }
+  .segmented button.ativo { background: var(--color-primary); color: #fff; }
+
+  /* organograma: árvore */
+  .org-wrap { overflow-x: auto; padding: 4px 0 12px; }
+  .org-tree, .org-tree ul { list-style: none; margin: 0; padding: 0; display: flex; justify-content: center; position: relative; }
+  .org-tree { width: max-content; min-width: 100%; }
+  .org-tree ul { padding-top: 24px; }
+  .org-tree ul::before { content: ''; position: absolute; top: 0; left: 50%; height: 24px; border-left: 2px solid var(--color-primary-soft); }
+  .org-tree li { display: flex; flex-direction: column; align-items: center; position: relative; padding: 24px 8px 0; }
+  .org-tree > li { padding-top: 0; }
+  .org-tree li::before, .org-tree li::after { content: ''; position: absolute; top: 0; right: 50%; width: 50%; height: 24px; border-top: 2px solid var(--color-primary-soft); }
+  .org-tree li::after { right: auto; left: 50%; border-left: 2px solid var(--color-primary-soft); }
+  .org-tree > li::before, .org-tree > li::after, .org-tree li:only-child::before, .org-tree li:only-child::after { display: none; }
+  .org-tree li:only-child { padding-top: 24px; }
+  .org-tree > li:only-child { padding-top: 0; }
+  .org-tree li:first-child::before, .org-tree li:last-child::after { border: 0 none; }
+  .org-tree li:last-child::before { border-right: 2px solid var(--color-primary-soft); border-radius: 0 8px 0 0; }
+  .org-tree li:first-child::after { border-radius: 8px 0 0 0; }
+
+  /* organograma: caixas */
+  .org-node { width: 236px; background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 10px 12px; text-align: left; }
+  .org-root { border-color: var(--color-primary); border-top: 4px solid var(--color-primary); }
+  .org-chefe { border-top: 4px solid #4a2c80; }
+  .org-chefe .org-pessoa { margin: -4px -6px 0; }
+  .org-sem-unidade { border: 1px dashed #d9b64a; border-top: 4px solid #d9b64a; background: #fffdf5; }
+  .org-sem-chefia { border: 1px dashed #d9b64a; border-top: 4px solid #d9b64a; background: #fffdf5; }
+  .org-sem-chefia .org-node-head { margin-bottom: 2px; }
+  .org-node-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+  .org-node-head strong { font-size: 14px; color: var(--color-primary-dark); }
+  .org-secao { border-top: 1px solid var(--color-line); padding: 8px 0 4px; }
+  .org-meta { font-size: 11.5px; color: var(--color-muted); margin-top: 4px; border-top: 1px solid var(--color-line); padding-top: 6px; }
+  .org-meta .org-alerta { color: var(--color-warn); font-weight: 600; }
+  .org-equipes { width: 224px; padding: 6px 12px 8px; }
+  .org-equipe { padding: 8px 0 4px; }
+  .org-equipe + .org-equipe { border-top: 1px solid var(--color-line); }
+  .org-equipe-titulo { font-size: 12.5px; margin-bottom: 2px; }
+  .org-equipe-titulo strong { color: var(--color-primary-dark); }
+  .org-grupo-rotulo { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--color-muted); margin: 4px 0 2px; }
+  .org-vazio { display: block; font-size: 12px; color: var(--color-muted); font-style: italic; padding: 2px 0; }
+
+  /* organograma: pessoa */
+  .org-pessoa { display: flex; flex-direction: column; text-align: left; background: transparent; border: 0; border-radius: 6px; padding: 5px 6px; margin: 0 -6px; width: calc(100% + 12px); cursor: pointer; font: inherit; color: var(--color-ink); }
+  .org-pessoa:hover { background: var(--color-primary-light); }
+  .org-nome { font-size: 13px; font-weight: 500; }
+  .org-funcao { font-size: 11.5px; color: var(--color-muted); }
+  .org-estrela { color: #4a2c80; font-size: 11px; }
+
+  /* organograma: barras por unidade */
+  .org-barras { display: grid; gap: 8px; }
+  .org-barra-linha { display: grid; grid-template-columns: minmax(120px, 200px) 1fr 64px; align-items: center; gap: 12px; }
+  .org-barra-nome { font-size: 13px; font-weight: 500; }
+  .org-barra { display: flex; height: 18px; background: var(--color-page); border-radius: 4px; overflow: hidden; }
+  .org-barra-seg { display: block; height: 100%; }
+  .seg-tec { background: var(--color-primary); }
+  .seg-adm { background: #274b8f; }
+  .org-barra-total { text-align: right; font-variant-numeric: tabular-nums; }
+  .org-barra-total small { color: #4a2c80; font-size: 11px; margin-left: 4px; }
+  .org-legenda { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 4px; font-size: 12px; }
+  .org-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+  .org-legenda i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  .print-only { display: none; }
+}
+
+/* Impressão do organograma: apenas a árvore, com o cabeçalho do documento. */
+@media print {
+  body.imprimindo-organograma aside,
+  body.imprimindo-organograma .page-header,
+  body.imprimindo-organograma .nao-imprimir { display: none !important; }
+  body.imprimindo-organograma main { padding: 0 !important; }
+  body.imprimindo-organograma .card-organograma { border: 0; box-shadow: none; padding: 0; margin: 0; }
+  body.imprimindo-organograma .print-only { display: block; }
+  body.imprimindo-organograma .print-cabecalho { margin-bottom: 10px; }
+  body.imprimindo-organograma .print-cabecalho strong { display: block; font-size: 15px; color: var(--color-primary-dark); }
+  body.imprimindo-organograma .print-cabecalho span { font-size: 11px; color: var(--color-muted); }
+  body.imprimindo-organograma .org-wrap { overflow: visible; margin: 0; padding: 0; }
+  body.imprimindo-organograma .org-tree { min-width: 0; width: max-content; margin: 0 auto; }
+  body.imprimindo-organograma .org-node { box-shadow: none; break-inside: avoid; }
+  body.imprimindo-organograma .org-pessoa { cursor: default; }
+  body.imprimindo-organograma .org-tree li::before, body.imprimindo-organograma .org-tree li::after, body.imprimindo-organograma .org-tree ul::before { border-color: #9bb8ad; }
 }
