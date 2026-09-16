@@ -12,7 +12,7 @@ Este documento descreve o programa inteiro: para que serve, quem acessa o quê, 
 O Chabra Dimensiona responde a três perguntas, com a equipe que a Chabra tem hoje:
 
 1. **Quanto a equipe produz?** Cada colaborador declara o seu ritmo por dia (inspeções, relatórios ou empresas finalizadas). O programa transforma isso em produção por mês, unidade por unidade.
-2. **Quanto trabalho existe?** Em cada unidade, mês a mês, quantos clientes têm documentos vencendo naquele mês — separados em **Mensal** e **Exclusiva TST**.
+2. **Quanto trabalho existe?** Em cada unidade, mês a mês, quantos clientes têm documentos vencendo naquele mês — separados por condição: **Mensal**, **Exclusiva TST**, **Empresa sem avaliação** e **Contratos novos**.
 3. **A equipe dá conta? Qual o quadro ideal? Quanto fica pendente? Quantos contratar, e em qual área?** A tela **Projeção** responde mês a mês, com sinais verde / amarelo / vermelho: o que já passou diz "deveria ter contratado…"; daqui para a frente, "contratar…"; e o pendente acumulado, com quantas pessoas a mais zeram tudo dentro do prazo.
 
 Tudo fica na nuvem, compartilhado pela equipe. Cada alteração de cadastro é registrada no **Histórico** (quem, quando, o que mudou).
@@ -44,7 +44,7 @@ Qualquer usuário troca a própria senha em **Senha** (rodapé do menu). Não h�
 | Dimensionamento | **Projeção** | A tela de resultado, uma unidade por vez: pendências atuais, equipe → quadro ideal, mês a mês (contratação necessária?), simulação de cenários. |
 | Dimensionamento | **Dashboard** | Os mesmos números em gráficos: pendentes mês a mês, vencem × equipe consegue, equipe hoje × ideal, por unidade, R$. |
 | Cadastros | **Unidades** | As unidades/filiais. |
-| Cadastros | **Empresas por Unidade** | Por unidade e mês: clientes ativos (informativo), Mensal e Exclusiva TST com documentos vencidos. |
+| Cadastros | **Empresas por Unidade** | Por unidade e mês: clientes ativos (informativo) e os clientes com documentos a vencer, por condição (Mensal, Exclusiva TST, Empresa sem avaliação, Contratos novos). |
 | Cadastros | **Colaboradores** | A equipe, com função, ritmo por dia e unidades onde atua. Modo **Organograma**. |
 | Cadastros | **Funções** | As funções (técnico, administrativo, supervisões, gerência), o que cada uma entrega e a hierarquia de chefia. |
 | Cadastros | **Calendário** | Dias úteis de cada mês; margem para imprevistos, prazo de atendimento, período de adaptação e pesos dos portes. |
@@ -70,13 +70,15 @@ A base da demanda. Para cada unidade há três linhas por mês (janeiro a dezemb
 - **Clientes ativos** — total de clientes da unidade no mês. **Só informativo** (histórico da carteira); não entra em nenhuma conta.
 - **Mensal** — clientes com contrato mensal cujos documentos vencem naquele mês.
 - **Exclusiva TST** — clientes na condição Exclusiva TST cujos documentos vencem naquele mês.
-- **Total** = Mensal + Exclusiva TST (é o que a Projeção usa, com cada cliente valendo o peso do seu porte).
+- **Empresa sem avaliação** — clientes ainda sem avaliação realizada naquele mês.
+- **Contratos novos** — clientes de contratos firmados naquele mês.
+- **Total** = soma das quatro condições (é o que a Projeção usa, com cada cliente valendo o peso do seu porte). As condições servem para organizar a origem da demanda: todas exigem o mesmo atendimento e pesam igual, variando apenas pelo porte do cliente.
 
 **Porte.** O seletor **Porte** (Pequeno · Médio · Grande · Todos) define o que você está digitando: escolha um porte e lance os números daquele porte; troque e lance os de outro. Em **Todos**, as células mostram a soma dos portes (só leitura; passe o mouse para ver "P 20 · M 3 · G 2") e a linha Total mostra entre parênteses o **esforço equivalente** (cada cliente × o peso do porte: P 1,0 · M 1,5 · G 2,0, editáveis no Calendário). Ex.: 75 pequenos + 2 grandes = 77 clientes, esforço 79.
 
 Cada cliente do Total precisa, naquele mês, de **uma inspeção e um relatório** (técnicos) e **uma finalização** (administrativos).
 
-**Importar do SGG.** Em vez de digitar, exporte do SGG o relatório *Vencimento(s) de PGR(s)* (.xlsx) e use o card *Importar do SGG* no topo da tela. O sistema reconhece as colunas do relatório: **Região** (unidade), **Data Validade** (o mês), **Empresa** e **Código Empresa** (cada estabelecimento conta uma vez por mês, mesmo com vários documentos), **Situação** (por padrão entram os "Vencido"; renovados/em dia ficam de fora) e **Informações adicionais da Empresa** ("Mensal…" → Mensal; texto com "Exclusiva"/"TST" → Exclusiva TST). Porte: o relatório não traz; abra **"Ver as N empresas do arquivo"** e escolha o porte de cada empresa na coluna Porte — a prévia muda na hora (o mês passa a mostrar o esforço equivalente entre parênteses) e a escolha **fica guardada pelo Código Empresa**: na próxima importação as empresas já vêm classificadas, só as novas precisam de atenção. Empresas sem escolha entram com o porte padrão do seletor (Pequeno). A lista também mostra, para cada empresa, o vencimento, o mês, a condição, a situação e se entra ou não (e por quê). Confira o **ano** (o relatório de vencidos costuma trazer o ano anterior) e a prévia por unidade × mês, com o número que está hoje ("era N"); unidades que não casarem com o cadastro aparecem em vermelho. Só ao clicar em **Importar** os números daquele ano, nas unidades presentes no arquivo, são substituídos — e **apenas da condição selecionada**: com Condição = Exclusiva TST, só os lançamentos Exclusiva TST são substituídos e os Mensal ficam como estão (e vice-versa); com a condição lida da coluna do arquivo, as duas são substituídas. Clientes ativos nunca mudam. Fica registrado no Histórico.
+**Importar do SGG.** Em vez de digitar, exporte do SGG o relatório *Vencimento(s) de PGR(s)* (.xlsx) e use o card *Importar do SGG* no topo da tela. O sistema reconhece as colunas do relatório: **Região** (unidade), **Data Validade** (o mês), **Empresa** e **Código Empresa** (cada estabelecimento conta uma vez por mês, mesmo com vários documentos), **Situação** (por padrão entram os "Vencido"; renovados/em dia ficam de fora) e **Informações adicionais da Empresa** ("Mensal…" → Mensal; texto com "Exclusiva"/"TST" → Exclusiva TST). Porte: o relatório não traz; abra **"Ver as N empresas do arquivo"** e escolha o porte de cada empresa na coluna Porte — a prévia muda na hora (o mês passa a mostrar o esforço equivalente entre parênteses) e a escolha **fica guardada pelo Código Empresa**: na próxima importação as empresas já vêm classificadas, só as novas precisam de atenção. Empresas sem escolha entram com o porte padrão do seletor (Pequeno). A lista também mostra, para cada empresa, o vencimento, o mês, a condição, a situação e se entra ou não (e por quê). Confira o **ano** (o relatório de vencidos costuma trazer o ano anterior) e a prévia por unidade × mês, com o número que está hoje ("era N"); unidades que não casarem com o cadastro aparecem em vermelho. Só ao clicar em **Importar** os números daquele ano, nas unidades presentes no arquivo, são substituídos — e **apenas da condição selecionada**: com Condição = Exclusiva TST, por exemplo, só os lançamentos Exclusiva TST são substituídos e as demais condições ficam como estão; com a condição lida da coluna do arquivo, todas são substituídas. Clientes ativos nunca mudam. Fica registrado no Histórico.
 
 **O que ficou em aberto no ano anterior passa para janeiro.** Se 2025 tem 65 clientes vencidos e ainda em aberto, a Projeção de 2026 começa janeiro com esses 65 — o cartão "Pendentes hoje" mostra "(inclui 65 de 2025)". Por isso vale importar o relatório de vencidos do ano anterior.
 
@@ -180,7 +182,7 @@ Uma tabela com os 12 meses do ano selecionado:
 
 | Coluna | O que é |
 |---|---|
-| Vencimentos | Clientes Mensal + Exclusiva TST que vencem no mês (Empresas por Unidade). |
+| Vencimentos | Clientes de todas as condições que vencem no mês (Empresas por Unidade). |
 | Pendências ao fim do mês | O que fica em aberto: o que veio de antes + o que vence − o que a equipe atende. Nos meses passados o número lançado já é o que ficou em aberto, então só soma. |
 | Técnicos / Administrativos (atual → ideal) | Equipe atual → quadro ideal do mês (pessoas inteiras para dar conta do que vence). Vermelho quando falta gente. Passe o mouse para ver inspeções, relatórios e dias úteis. |
 | Conclusão | Meses passados: "Contratação necessária (não realizada): 1 técnico e 2 administrativos" ou "Equipe suficiente". Mês atual e seguintes: "Contratação necessária: …" ou "Equipe suficiente" (· margem reduzida). Legenda: verde = equipe suficiente, amarelo = margem reduzida, vermelho = contratação necessária. |
@@ -220,7 +222,7 @@ Tela Usuários (admin) → **Backup dos dados**: **Exportar JSON** baixa tudo (f
 
 ## 9. Rotina sugerida
 
-1. **Todo mês**: em Empresas por Unidade, lançar em cada unidade os clientes ativos e quantos Mensal e Exclusiva TST **vencem no mês** (só o do mês; o acumulado o programa calcula) — e, se souber, o que vence nos próximos meses.
+1. **Todo mês**: em Empresas por Unidade, lançar em cada unidade os clientes ativos e, em cada condição (Mensal, Exclusiva TST, Empresa sem avaliação, Contratos novos), quantos **vencem no mês** (só o do mês; o acumulado o programa calcula) — e, se souber, o que vence nos próximos meses.
 2. Manter Colaboradores em dia: quem entrou/saiu, ritmo por dia, unidades e percentuais.
 3. Conferir na **Projeção**: pendências atuais, quadro ideal por área, quantos contratar para zerar no prazo e em qual unidade.
 4. Para a diretoria: a mesma tela, com a simulação "E se…?" para testar contratações antes de decidir.
@@ -236,7 +238,7 @@ Tela Usuários (admin) → **Backup dos dados**: **Exportar JSON** baixa tudo (f
 | Dias úteis | Dias de trabalho do mês (Calendário). |
 | Folga para imprevistos | % do tempo reservado; o programa conta que cada pessoa entrega (100 − folga)% do ritmo. |
 | Consegue | Quanto a equipe entrega no mês, já com a folga. |
-| Precisa | Clientes Mensal + Exclusiva TST que vencem no mês (cada um = 1 inspeção, 1 relatório, 1 finalização). |
+| Precisa | Clientes de todas as condições que vencem no mês (cada um = 1 inspeção, 1 relatório, 1 finalização). |
 | Faltam / sobram | Pessoas inteiras a mais ou a menos para o mês, em relação à equipe de hoje. |
 | Quadro ideal | Pessoas inteiras necessárias para dar conta do que vence no mês (o que precisa ÷ o que uma pessoa inteira faz no mês, arredondado para cima). |
 | Pessoa inteira | Uma pessoa 100% do tempo. Quem divide o tempo conta proporcionalmente (ex.: 2,8 pessoas). |

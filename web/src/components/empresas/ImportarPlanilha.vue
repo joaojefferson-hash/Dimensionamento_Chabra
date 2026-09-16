@@ -7,6 +7,7 @@ import { useCadastrosStore } from '../../stores/cadastros.js';
 import { usePreferenciasStore } from '../../stores/preferencias.js';
 import { useUiStore } from '../../stores/ui.js';
 import { lerPlanilha, detectarColunas, resumir, casarUnidades, montarLinhasRpc, valoresDistintos, situacaoExcluida } from '../../services/importacao.js';
+import { CONDICOES } from '../../services/api.js';
 import { MESES, num } from '../../composables/useFormat.js';
 
 const emit = defineEmits(['importado']);
@@ -89,13 +90,17 @@ const ponderadoMesUnidade = (nome, mes) => { const m = ((resumo.value || {}).por
 const atualMes = (nome, mes) => {
   const id = mapaUnidades[nome]; const u = id ? cad.unidadePorId[id] : null; const x = u ? ((u.mesesPorAno || {})[ano.value] || {})[mes] : null;
   if (!x) return 0;
-  return condicaoFixa.value === 'mensal' ? x.empresasVencidas : condicaoFixa.value === 'exclusiva_tst' ? x.empresasExclusivaTst : x.empresasVencidas + x.empresasExclusivaTst;
+  const c = CONDICOES.find(y => y.condicao === condicaoFixa.value);
+  return c ? x[c.campo] || 0 : CONDICOES.reduce((s, y) => s + (x[y.campo] || 0), 0);
 };
-const rotuloCond = c => (c === 'exclusiva_tst' ? 'Exclusiva TST' : c === 'mensal' ? 'Mensal' : '—');
+const rotuloCond = c => (CONDICOES.find(x => x.condicao === c) || {}).rotulo || '—';
 /** O que a importação substitui: só a condição fixa, ou as duas quando a condição vem da coluna. */
 const rotuloCondFixa = computed(() => (condicaoFixa.value ? rotuloCond(condicaoFixa.value) : null));
-const escopoTxt = computed(() => (rotuloCondFixa.value ? `os lançamentos ${rotuloCondFixa.value}` : 'os lançamentos Mensal e Exclusiva TST'));
-const preservaTxt = computed(() => (condicaoFixa.value === 'mensal' ? 'Exclusiva TST e Clientes ativos não são alterados.' : condicaoFixa.value === 'exclusiva_tst' ? 'Mensal e Clientes ativos não são alterados.' : 'Clientes ativos não são alterados.'));
+const escopoTxt = computed(() => (rotuloCondFixa.value ? `os lançamentos ${rotuloCondFixa.value}` : 'os lançamentos de todas as condições'));
+const preservaTxt = computed(() => {
+  const outras = CONDICOES.filter(c => c.condicao !== condicaoFixa.value).map(c => c.rotulo);
+  return condicaoFixa.value ? `${outras.join(', ')} e Clientes ativos não são alterados.` : 'Clientes ativos não são alterados.';
+});
 const semUnidade = computed(() => nomesArquivo.value.filter(n => !mapaUnidades[n]));
 const linhasRpc = computed(() => (resumo.value ? montarLinhasRpc(resumo.value.porUnidade, mapaUnidades) : []));
 const totalImportar = computed(() => linhasRpc.value.reduce((s, l) => s + l.quantidade, 0));
@@ -176,8 +181,7 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
         <label><span class="mb-1 block font-medium">Condição</span>
           <select v-model="opcoes.condicao" class="input input-sm w-full">
             <option v-if="mapa.condicao != null" value="">— pela coluna "{{ cabecalhos[mapa.condicao] }}" —</option>
-            <option value="mensal">Mensal</option>
-            <option value="exclusiva_tst">Exclusiva TST</option>
+            <option v-for="c in CONDICOES" :key="c.condicao" :value="c.condicao">{{ c.rotulo }}</option>
           </select>
           <small class="muted block">{{ opcoes.condicao === '' && mapa.condicao != null ? 'Texto contendo "Exclusiva"/"TST" é classificado como Exclusiva TST; os demais, como Mensal.' : 'Todas as linhas são atribuídas a esta condição.' }}</small></label>
         <label><span class="mb-1 block font-medium">Critério de contagem</span><select v-model="opcoes.contarPor" class="input input-sm w-full"><option value="cliente">cada cliente uma única vez por mês</option><option value="linha">cada linha (documento)</option></select>

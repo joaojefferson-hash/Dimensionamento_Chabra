@@ -71,7 +71,7 @@ async function limpar(u) {
 
 <template>
   <header class="page-header"><h1>Empresas por Unidade</h1>
-    <p>Quantidade de clientes de cada unidade com <strong>documentos a vencer em cada mês</strong>, por condição (Mensal e Exclusiva TST) e por porte ({{ cad.portes.map(p => `${p.nome} = peso ${num(p.peso, 1)}`).join(', ') }} — o porte multiplica a demanda). <strong>Informe em cada mês apenas os vencimentos daquele mês</strong>; nos meses já decorridos, o que venceu e permanece em aberto. O acumulado é calculado pela Projeção. Célula em branco equivale a zero; os dados são salvos automaticamente.</p>
+    <p>Quantidade de clientes de cada unidade com <strong>documentos a vencer em cada mês</strong>, por condição ({{ CONDICOES.map(c => c.rotulo).join(', ') }}) e por porte ({{ cad.portes.map(p => `${p.nome} = peso ${num(p.peso, 1)}`).join(', ') }} — o porte multiplica a demanda). <strong>Informe em cada mês apenas os vencimentos daquele mês</strong>; nos meses já decorridos, o que venceu e permanece em aberto. O acumulado é calculado pela Projeção. Célula em branco equivale a zero; os dados são salvos automaticamente.</p>
   </header>
 
   <form class="card flex flex-wrap items-end gap-5 !py-4" @submit.prevent>
@@ -117,8 +117,8 @@ async function limpar(u) {
         <tbody>
           <template v-for="u in cad.unidades" :key="u.id">
             <tr v-for="(c, ci) in (mostrarTotal ? [ATIVOS, ...CONDICOES] : conds)" :key="c.campo" :class="[ci === 0 ? 'border-t-[6px]! border-t-page!' : '', c === ATIVOS ? 'text-muted' : '']">
-              <td v-if="ci === 0" class="bg-white text-left align-top font-semibold" :rowspan="(mostrarTotal ? 3 : conds.length) + (mostrarTotal ? 1 : 0)">{{ u.nome }}<div v-if="auth.podeEditar && temNumeros(u)"><button class="btn-link text-[12px] font-normal" type="button" @click="limpar(u)">excluir lançamentos de {{ pref.ano }}</button></div></td>
-              <td class="whitespace-nowrap text-left"><span class="chip" :class="c === ATIVOS ? 'bg-page text-muted' : c.campo === 'empresasVencidas' ? 'bg-ok-bg text-ok' : 'chip-blue'" :title="c.ajuda">{{ c.rotulo }}</span></td>
+              <td v-if="ci === 0" class="bg-white text-left align-top font-semibold" :rowspan="mostrarTotal ? CONDICOES.length + 2 : conds.length">{{ u.nome }}<div v-if="auth.podeEditar && temNumeros(u)"><button class="btn-link text-[12px] font-normal" type="button" @click="limpar(u)">excluir lançamentos de {{ pref.ano }}</button></div></td>
+              <td class="whitespace-nowrap text-left"><span class="chip" :class="c === ATIVOS ? 'bg-page text-muted' : c.cor" :title="c.ajuda">{{ c.rotulo }}</span></td>
               <td v-for="mes in 12" :key="mes" :class="valor(u, mes, c.campo) ? 'bg-[#eef4fb]' : ''">
                 <span v-if="c !== ATIVOS && somaPortes" class="font-semibold" :title="detalhe(u, mes, c.campo) || 'sem clientes'">{{ valor(u, mes, c.campo) || '–' }}</span>
                 <input v-else class="input input-sm w-12 !px-1 text-center" type="number" min="0" step="1" :value="valor(u, mes, c.campo) || ''" placeholder="–" :disabled="!auth.podeEditar || salvando[`${u.id}-${mes}-${c.campo}`]" :title="c !== ATIVOS ? detalhe(u, mes, c.campo) : ''" @change="mudar(u, mes, c.campo, $event)">
@@ -145,6 +145,6 @@ async function limpar(u) {
         </tfoot>
       </table>
     </div>
-    <p class="note">A Projeção considera a soma das duas condições em cada mês, com cada cliente ponderado pelo porte ({{ cad.portes.map(p => `${p.codigo} ${num(p.peso, 1)}`).join(' · ') }}; os pesos são definidos no Calendário). As pendências são acumuladas mês a mês: a coluna <strong>Acumulado</strong> corresponde à soma de janeiro até o mês atual (as "Pendências atuais" da Projeção).</p>
+    <p class="note">A Projeção considera a soma de todas as condições em cada mês, com cada cliente ponderado pelo porte ({{ cad.portes.map(p => `${p.codigo} ${num(p.peso, 1)}`).join(' · ') }}; os pesos são definidos no Calendário). As pendências são acumuladas mês a mês: a coluna <strong>Acumulado</strong> corresponde à soma de janeiro até o mês atual (as "Pendências atuais" da Projeção).</p>
   </section>
 </template>

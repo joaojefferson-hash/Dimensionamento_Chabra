@@ -97,6 +97,8 @@ export function lerData(v) {
 /** Condição a partir de um texto (só a primeira linha: "Mensal desde 04/04/2022" + "Reativado…" -> Mensal). */
 export function lerCondicao(v) {
   const s = semAcento(String(v).split(/\r?\n/)[0]);
+  if (s.includes('sem avalia') || s.includes('nao avaliad')) return 'sem_avaliacao';
+  if (s.includes('contrato novo') || s.includes('novo contrato') || s.includes('contratos novos')) return 'contrato_novo';
   return s.includes('exclus') || /\btst\b/.test(s) ? 'exclusiva_tst' : 'mensal';
 }
 export function lerPorte(v, faixas = null, codigos = ['P', 'M', 'G']) {

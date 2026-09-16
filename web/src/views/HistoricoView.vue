@@ -3,6 +3,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { carregarHistorico } from '../services/api.js';
 import { useCadastrosStore } from '../stores/cadastros.js';
+import { CONDICOES } from '../services/api.js';
 import { useUiStore } from '../stores/ui.js';
 import { MESES_LONGO, moeda, num } from '../composables/useFormat.js';
 
@@ -30,7 +31,7 @@ const CAMPOS = {
   funcoes: { nome: 'nome', tipo_producao: 'tipo de produção', chefia: 'chefia de equipe', coordena: 'coordena', responde_para: 'subordinada a', ordem: 'ordem', custo_mensal: 'custo mensal' },
   demanda_mensal: { quantidade: 'quantidade' },
   unidade_mes: { clientes_ativos: 'clientes ativos' },
-  unidade_empresas_mes: { empresas_vencidas: 'clientes Mensal', empresas_exclusiva_tst: 'clientes Exclusiva TST', clientes_ativos: 'clientes ativos' },
+  unidade_empresas_mes: { empresas_vencidas: 'clientes Mensal', empresas_exclusiva_tst: 'clientes Exclusiva TST', clientes_ativos: 'clientes ativos' }, // formato antigo
   portes: { nome: 'nome', peso: 'peso' },
   colaborador_unidades: { percentual: '% do tempo' },
   parametros: { ocupacao_alvo: 'margem para imprevistos', dias_uteis: 'dias úteis', prazo_dias: 'prazo de atendimento (dias)', rampup: 'período de adaptação (%)' },
@@ -64,7 +65,7 @@ function frase(h) {
     case 'funcoes': return op === 'insert' ? `Cadastrou a função ${r.nome}` : op === 'delete' ? `Excluiu a função ${r.nome}` : `Alterou a função ${r.nome}${mud()}`;
     case 'colaboradores': return op === 'insert' ? `Cadastrou o colaborador ${r.nome}` : op === 'delete' ? `Excluiu o colaborador ${r.nome}` : `Alterou o colaborador ${r.nome}${mud()}`;
     case 'colaborador_unidades': return op === 'insert' ? `Alocou ${col} em ${uni} com ${fmtVal('percentual', r.percentual)} do tempo` : op === 'delete' ? `Removeu ${col} de ${uni}` : `Alterou a alocação de ${col} em ${uni}${mud()}`;
-    case 'demanda_mensal': { const cond = r.condicao === 'exclusiva_tst' ? 'Exclusiva TST' : 'Mensal'; const pt = cad.portes.find(p => p.codigo === r.porte); const porte = pt ? pt.nome.toLowerCase() : r.porte;
+    case 'demanda_mensal': { const cond = (CONDICOES.find(c => c.condicao === r.condicao) || { rotulo: 'Mensal' }).rotulo; const pt = cad.portes.find(p => p.codigo === r.porte); const porte = pt ? pt.nome.toLowerCase() : r.porte;
       return op === 'insert' ? `Lançou ${d.quantidade} clientes ${cond} (${porte}) em ${mesDe(r)} de ${uni}` : op === 'delete' ? `Apagou os ${a.quantidade} clientes ${cond} (${porte}) de ${mesDe(r)} de ${uni}` : `Alterou ${cond} (${porte}) de ${mesDe(r)} de ${uni}${mud()}`; }
     case 'unidade_mes': return op === 'insert' ? `Registrou ${d.clientes_ativos} clientes ativos em ${mesDe(r)} de ${uni}` : op === 'delete' ? `Apagou os clientes ativos de ${mesDe(r)} de ${uni}` : `Alterou os clientes ativos de ${mesDe(r)} de ${uni}${mud()}`;
     case 'unidade_empresas_mes': return `${op === 'insert' ? 'Definiu' : op === 'delete' ? 'Apagou' : 'Alterou'} os números de ${mesDe(r)} de ${uni} (formato antigo)${op === 'update' ? mud() : ''}`;

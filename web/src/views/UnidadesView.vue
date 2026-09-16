@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/auth.js';
 import { useCadastrosStore } from '../stores/cadastros.js';
 import { usePreferenciasStore } from '../stores/preferencias.js';
 import { useUiStore } from '../stores/ui.js';
+import { CONDICOES } from '../services/api.js';
 import { useFormat } from '../composables/useFormat.js';
 
 const auth = useAuthStore();
@@ -17,7 +18,7 @@ const nome = ref('');
 const editando = ref(null);
 const ocupado = ref(false);
 
-const mediaMes = u => { const meses = (u.mesesPorAno || {})[pref.ano] || {}; let s = 0; for (let m = 1; m <= 12; m++) { const x = meses[m]; s += x ? x.empresasVencidas + x.empresasExclusivaTst : 0; } return s / 12; };
+const mediaMes = u => { const meses = (u.mesesPorAno || {})[pref.ano] || {}; let s = 0; for (let m = 1; m <= 12; m++) { const x = meses[m]; if (x) CONDICOES.forEach(c => { s += x[c.campo] || 0; }); } return s / 12; };
 const pessoasEm = id => cad.colaboradoresCompletos.filter(c => c.alocacoes.some(a => a.unidadeId === id)).length;
 const duplicado = computed(() => cad.unidades.some(u => u.id !== editando.value && u.nome.trim().toLocaleLowerCase('pt-BR') === nome.value.trim().toLocaleLowerCase('pt-BR')));
 
@@ -58,7 +59,7 @@ async function remover(u) {
     <p v-if="!cad.unidades.length" class="muted">Nenhuma unidade cadastrada.</p>
     <div v-else class="table-wrap">
       <table class="table">
-        <thead><tr><th>Unidade</th><th class="num" :title="`Média mensal de clientes (Mensal + Exclusiva TST) em ${pref.ano}`">Clientes/mês ({{ pref.ano }})</th><th class="num">Colaboradores</th><th v-if="auth.podeEditar"></th></tr></thead>
+        <thead><tr><th>Unidade</th><th class="num" :title="`Média mensal de clientes de todas as condições em ${pref.ano}`">Clientes/mês ({{ pref.ano }})</th><th class="num">Colaboradores</th><th v-if="auth.podeEditar"></th></tr></thead>
         <tbody>
           <tr v-for="u in cad.unidades" :key="u.id" :class="u.id === editando ? 'bg-primary-light' : ''">
             <td class="font-medium">{{ u.nome }}</td>

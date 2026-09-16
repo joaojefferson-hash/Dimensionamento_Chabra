@@ -128,7 +128,7 @@ export const useCadastrosStore = defineStore('cadastros', () => {
   function mesDaUnidade(u, ano, mes) { return ((u.mesesPorAno || {})[ano] || {})[mes] || api.montarMes({}, 0); }
   function guardarMes(u, ano, mes, valorMes) {
     const doAno = { ...((u.mesesPorAno || {})[ano] || {}) };
-    const vazio = valorMes.empresasVencidas === 0 && valorMes.empresasExclusivaTst === 0 && valorMes.clientesAtivos === 0;
+    const vazio = valorMes.clientesAtivos === 0 && api.CONDICOES.every(x => (valorMes[x.campo] || 0) === 0);
     if (vazio) delete doAno[mes]; else doAno[mes] = valorMes;
     u.mesesPorAno = { ...(u.mesesPorAno || {}), [ano]: doAno };
   }

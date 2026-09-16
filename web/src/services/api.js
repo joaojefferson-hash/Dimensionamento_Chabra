@@ -15,8 +15,10 @@
 import { supabase, erroAmigavel } from './supabase.js';
 
 export const CONDICOES = [
-  { condicao: 'mensal',        campo: 'empresasVencidas',     rotulo: 'Mensal',        ajuda: 'clientes com contrato mensal cujos documentos vencem no mês' },
-  { condicao: 'exclusiva_tst', campo: 'empresasExclusivaTst', rotulo: 'Exclusiva TST', ajuda: 'clientes na condição Exclusiva TST (atendimento completo)' },
+  { condicao: 'mensal',        campo: 'empresasVencidas',      rotulo: 'Mensal',                cor: 'bg-ok-bg text-ok',   ajuda: 'clientes com contrato mensal cujos documentos vencem no mês' },
+  { condicao: 'exclusiva_tst', campo: 'empresasExclusivaTst',  rotulo: 'Exclusiva TST',         cor: 'chip-blue',          ajuda: 'clientes na condição Exclusiva TST (atendimento completo)' },
+  { condicao: 'sem_avaliacao', campo: 'empresasSemAvaliacao',  rotulo: 'Empresa sem avaliação', cor: 'bg-warn-bg text-warn', ajuda: 'clientes ainda sem avaliação realizada no mês' },
+  { condicao: 'contrato_novo', campo: 'empresasContratoNovo',  rotulo: 'Contratos novos',       cor: 'chip-roxo',          ajuda: 'clientes de contratos firmados no mês' },
 ];
 export const TIPOS_PRODUCAO = [
   { id: 'tecnico',        rotulo: 'Técnico',        descricao: 'realiza inspeções e relatórios — considerado no dimensionamento como técnico' },
@@ -57,7 +59,8 @@ export function montarMes(demanda = {}, clientesAtivos = 0) {
     Object.entries(demanda[c.condicao] || {}).forEach(([porte, q]) => { const n = Math.max(0, Math.round(num(q))); if (n > 0) d[c.condicao][porte] = n; });
   });
   const soma = cond => Object.values(d[cond]).reduce((s, q) => s + q, 0);
-  return { demanda: d, empresasVencidas: soma('mensal'), empresasExclusivaTst: soma('exclusiva_tst'), clientesAtivos: Math.max(0, Math.round(num(clientesAtivos))) };
+  const contagens = Object.fromEntries(CONDICOES.map(c => [c.campo, soma(c.condicao)]));
+  return { demanda: d, ...contagens, clientesAtivos: Math.max(0, Math.round(num(clientesAtivos))) };
 }
 
 /** Linhas de demanda_mensal + unidade_mes → mesesPorAno de cada unidade. */
