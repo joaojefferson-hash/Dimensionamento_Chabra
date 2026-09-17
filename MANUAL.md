@@ -23,6 +23,8 @@ Tudo fica na nuvem, compartilhado pela equipe. Cada alteração de cadastro é r
 
 O administrador cria os usuários (nome, sobrenome, e-mail, senha inicial) e escolhe o papel de cada um na tela **Usuários**. O papel vale no próximo login da pessoa.
 
+> **Versões novas.** Quem deixa a aba aberta continua com a versão carregada no primeiro acesso. Quando uma atualização é publicada, aparece a faixa **"Nova versão disponível"** no topo da tela, com o botão **Atualizar agora**; a verificação ocorre ao voltar para a aba e a cada 10 minutos. Recarregar a página (F5) tem o mesmo efeito.
+
 | Papel | Vê | Altera |
 |---|---|---|
 | **Administrador** | tudo | tudo; gerencia usuários; exporta/importa backup |
