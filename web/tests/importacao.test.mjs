@@ -109,4 +109,31 @@ teste('formato real do SGG (VENCIMENTO(s) DE PGR(s)): Região, Data Validade, Em
   assert.ok(r.avisos.some(a => /não selecionada/.test(a)));
 });
 
+/* Relatório sem coluna de data (empresas sem avaliação de risco): mês de referência escolhido. */
+teste('planilha sem data: todas as linhas contam no mês de referência', () => {
+  const cab = ['Código Empresa', 'Empresa', 'CNPJ/CPF', 'Região', 'Email', 'Telefone', 'Situação da Empresa'];
+  const rows = [
+    [585, 'A5 CONSULTORIA', '42.129.224/0001-48', 'Teresópolis', '', '', 'Ativa'],
+    [588, 'ABDU NEME BUFFET', '25.080.168/0001-85', 'Teresópolis', '', '', 'Ativa'],
+    [588, 'ABDU NEME BUFFET', '25.080.168/0001-85', 'Teresópolis', '', '', 'Ativa'], // repetido: conta uma vez
+    [675, 'ATOS CONTABIL', '11.915.309/0001-28', 'Teresópolis', '', '', 'Inativa'],
+  ];
+  const m = detectarColunas(cab);
+  assert.strictEqual(m.vencimento, null);
+  assert.strictEqual(cab[m.unidade], 'Região');
+
+  // sem data e sem mês de referência: nada entra e o aviso orienta
+  const semMes = resumir(rows, m, { ano: 2026, condicaoFixa: 'sem_avaliacao' });
+  assert.strictEqual(semMes.linhasUsadas, 0);
+  assert.ok(semMes.avisos.some(a => /mês de referência/.test(a)));
+
+  // com mês de referência: tudo cai em setembro do ano escolhido, na condição escolhida
+  const r = resumir(rows, m, { ano: 2026, condicaoFixa: 'sem_avaliacao', mesFixo: 9, situacoes: ['Ativa'] });
+  assert.strictEqual(r.linhasUsadas, 2);
+  assert.deepStrictEqual(r.porUnidade['Teresópolis'][9], { sem_avaliacao: { P: 2 } });
+  assert.deepStrictEqual(r.anosEncontrados, []);
+  assert.strictEqual(r.detalhes[0].ano, 2026);
+  assert.strictEqual(r.detalhes[0].mes, 9);
+});
+
 console.log(`\n${passaram} testes passaram.`);

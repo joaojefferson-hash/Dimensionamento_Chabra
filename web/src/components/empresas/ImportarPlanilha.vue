@@ -8,7 +8,7 @@ import { usePreferenciasStore } from '../../stores/preferencias.js';
 import { useUiStore } from '../../stores/ui.js';
 import { lerPlanilha, detectarColunas, resumir, casarUnidades, montarLinhasRpc, valoresDistintos, situacaoExcluida } from '../../services/importacao.js';
 import { CONDICOES } from '../../services/api.js';
-import { MESES, num } from '../../composables/useFormat.js';
+import { MESES, MESES_LONGO, num } from '../../composables/useFormat.js';
 
 const emit = defineEmits(['importado']);
 const cad = useCadastrosStore();
@@ -21,10 +21,11 @@ const abas = ref([]);
 const abaSel = ref(0);
 const mapa = reactive({ unidade: null, vencimento: null, cliente: null, clienteId: null, condicao: null, porte: null, situacao: null });
 const situacoesSel = ref(null); // valores da coluna Situação que entram (null = sem filtro)
-const opcoes = reactive({ unidadeId: '', condicao: 'mensal', contarPor: 'cliente', portePadrao: 'P', usarFaixas: false, faixaP: 19, faixaM: 99 });
+const opcoes = reactive({ unidadeId: '', condicao: 'mensal', contarPor: 'cliente', portePadrao: 'P', usarFaixas: false, faixaP: 19, faixaM: 99, mesFixo: pref.mesAtual + 1 });
 const ano = computed(() => pref.ano); // o ano da página (seletor no topo da tela) vale para a importação
 // condição: '' = pela coluna do arquivo (quando há), 'mensal' ou 'exclusiva_tst' para o arquivo inteiro
 const condicaoFixa = computed(() => (opcoes.condicao === '' && mapa.condicao != null ? null : (opcoes.condicao || 'mensal')));
+const semColunaData = computed(() => mapa.vencimento == null);
 const unidadeFixa = computed(() => (cad.unidadePorId[opcoes.unidadeId] || null));
 const mapaUnidades = reactive({});
 const porteCliente = reactive({}); // { [codigo|nome]: porte } escolhido nesta importação (pré-preenchido pelo cadastro)
@@ -35,7 +36,7 @@ const aba = computed(() => abas.value[abaSel.value] || null);
 const cabecalhos = computed(() => (aba.value ? aba.value.cabecalhos : []));
 const CAMPOS = [
   { id: 'unidade', rotulo: 'Unidade (coluna)', obrig: false, ajuda: 'apenas quando o arquivo contém várias unidades; ignorada quando há unidade selecionada acima' },
-  { id: 'vencimento', rotulo: 'Data de vencimento', obrig: true, ajuda: 'data que define o mês de referência' },
+  { id: 'vencimento', rotulo: 'Data de vencimento', obrig: false, ajuda: 'data que define o mês; sem esta coluna, escolha o mês de referência abaixo' },
   { id: 'cliente', rotulo: 'Cliente (nome)', obrig: false, ajuda: 'permite contar cada cliente uma única vez por mês' },
   { id: 'clienteId', rotulo: 'Código do cliente', obrig: false, ajuda: 'identifica cada estabelecimento (dois códigos = dois atendimentos); sem código, utiliza-se o nome' },
   { id: 'condicao', rotulo: 'Condição', obrig: false, ajuda: 'Mensal / Exclusiva TST (sem coluna, utiliza-se a condição selecionada abaixo)' },
@@ -72,7 +73,7 @@ function alternarSituacao(valor, on) { const s = new Set(situacoesSel.value || [
 const resumo = computed(() => {
   if (!aba.value) return null;
   const faixas = opcoes.usarFaixas ? { pequeno: Number(opcoes.faixaP), medio: Number(opcoes.faixaM) } : null;
-  return resumir(aba.value.linhas, mapa, { contarPor: opcoes.contarPor, ano: ano.value, portePadrao: opcoes.portePadrao, porteFaixas: faixas, codigosPorte: cad.portes.map(p => p.codigo), situacoes: mapa.situacao != null ? situacoesSel.value : null, unidadeFixa: unidadeFixa.value ? unidadeFixa.value.nome : null, condicaoFixa: condicaoFixa.value, porteCliente });
+  return resumir(aba.value.linhas, mapa, { contarPor: opcoes.contarPor, ano: ano.value, portePadrao: opcoes.portePadrao, porteFaixas: faixas, codigosPorte: cad.portes.map(p => p.codigo), situacoes: mapa.situacao != null ? situacoesSel.value : null, unidadeFixa: unidadeFixa.value ? unidadeFixa.value.nome : null, condicaoFixa: condicaoFixa.value, porteCliente, mesFixo: semColunaData.value ? opcoes.mesFixo : null });
 });
 const nomesArquivo = computed(() => (resumo.value ? Object.keys(resumo.value.porUnidade) : []));
 watch([nomesArquivo, unidadeFixa], ([nomes, fixa]) => {
@@ -104,7 +105,11 @@ const preservaTxt = computed(() => {
 const semUnidade = computed(() => nomesArquivo.value.filter(n => !mapaUnidades[n]));
 const linhasRpc = computed(() => (resumo.value ? montarLinhasRpc(resumo.value.porUnidade, mapaUnidades) : []));
 const totalImportar = computed(() => linhasRpc.value.reduce((s, l) => s + l.quantidade, 0));
-const porCondicao = computed(() => { const o = { mensal: 0, exclusiva_tst: 0 }; linhasRpc.value.forEach(l => { o[l.condicao] += l.quantidade; }); return o; });
+const porCondicao = computed(() => {
+  const o = Object.fromEntries(CONDICOES.map(c => [c.condicao, 0]));
+  linhasRpc.value.forEach(l => { o[l.condicao] = (o[l.condicao] || 0) + l.quantidade; });
+  return CONDICOES.filter(c => o[c.condicao] > 0).map(c => `${c.rotulo} ${num(o[c.condicao])}`).join(' · ');
+});
 /* lista de empresas: o que entra, em que mês, e o que ficou de fora (e por quê) */
 const mostrarEmpresas = ref(false);
 const filtroEmpresas = ref('');
@@ -184,6 +189,9 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
             <option v-for="c in CONDICOES" :key="c.condicao" :value="c.condicao">{{ c.rotulo }}</option>
           </select>
           <small class="muted block">{{ opcoes.condicao === '' && mapa.condicao != null ? 'Texto contendo "Exclusiva"/"TST" é classificado como Exclusiva TST; os demais, como Mensal.' : 'Todas as linhas são atribuídas a esta condição.' }}</small></label>
+        <label v-if="semColunaData"><span class="mb-1 block font-medium">Mês de referência</span>
+          <select v-model.number="opcoes.mesFixo" class="input input-sm w-full"><option v-for="(m, i) in MESES_LONGO" :key="i" :value="i + 1">{{ m }}</option></select>
+          <small class="muted block">O arquivo não tem coluna de data: todas as linhas contam neste mês de {{ ano }}.</small></label>
         <label><span class="mb-1 block font-medium">Critério de contagem</span><select v-model="opcoes.contarPor" class="input input-sm w-full"><option value="cliente">cada cliente uma única vez por mês</option><option value="linha">cada linha (documento)</option></select>
           <small v-if="opcoes.contarPor === 'cliente' && mapa.cliente == null && mapa.clienteId == null" class="block text-warn">Sem coluna de cliente, cada linha é contada uma vez.</small>
           <small v-else-if="opcoes.contarPor === 'cliente'" class="muted block">Identificação pelo {{ mapa.clienteId != null ? 'código' : 'nome' }}.</small></label>
@@ -203,7 +211,7 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
       <div v-if="resumo && resumo.avisos.length" class="mt-3 rounded-lg bg-warn-bg px-3 py-2 text-[12.5px] text-warn"><div v-for="(a, i) in resumo.avisos" :key="i">{{ a }}</div></div>
 
       <template v-if="resumo && nomesArquivo.length">
-        <h3 class="mt-4 mb-2 text-[14px] font-semibold">Prévia — vencimentos por mês em {{ ano }} <span class="muted font-normal">({{ num(resumo.linhasUsadas) }} de {{ num(resumo.totalLinhas) }} linhas consideradas · Mensal {{ num(porCondicao.mensal) }} · Exclusiva TST {{ num(porCondicao.exclusiva_tst) }})</span></h3>
+        <h3 class="mt-4 mb-2 text-[14px] font-semibold">Prévia — vencimentos por mês em {{ ano }} <span class="muted font-normal">({{ num(resumo.linhasUsadas) }} de {{ num(resumo.totalLinhas) }} linhas consideradas<template v-if="porCondicao"> · {{ porCondicao }}</template>)</span></h3>
         <div class="table-wrap">
           <table class="table table-grade text-center [&_td]:px-1.5 [&_th]:px-1.5">
             <thead><tr><th class="text-left">{{ unidadeFixa ? 'Unidade' : 'No arquivo' }}</th><th v-if="!unidadeFixa" class="text-left">Unidade do cadastro</th><th v-for="m in MESES" :key="m">{{ m }}</th><th class="bg-page">Total</th></tr></thead>
@@ -255,6 +263,6 @@ function fechar() { aberto.value = false; abas.value = []; arquivoNome.value = '
           </div>
         </div>
     </template>
-    <p v-else class="muted text-[13px]">Cada linha da planilha deve conter a <strong>unidade</strong>, a <strong>data de vencimento</strong> e, preferencialmente, o <strong>cliente</strong> (para contar cada cliente uma única vez por mês), a <strong>condição</strong> (Mensal / Exclusiva TST) e o <strong>porte</strong>. O sistema identifica as colunas pelos títulos e apresenta uma prévia para conferência. Nenhum dado é alterado até a confirmação em Importar.</p>
+    <p v-else class="muted text-[13px]">Cada linha da planilha deve conter a <strong>unidade</strong> e a <strong>data de vencimento</strong> (sem coluna de data, escolhe-se um <strong>mês de referência</strong> para todo o arquivo) e, preferencialmente, o <strong>cliente</strong> (para contar cada cliente uma única vez por mês), a <strong>condição</strong> (Mensal / Exclusiva TST) e o <strong>porte</strong>. O sistema identifica as colunas pelos títulos e apresenta uma prévia para conferência. Nenhum dado é alterado até a confirmação em Importar.</p>
   </section>
 </template>

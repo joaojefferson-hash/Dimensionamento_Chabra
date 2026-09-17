@@ -115,7 +115,9 @@ export function lerPorte(v, faixas = null, codigos = ['P', 'M', 'G']) {
 /* ---------- resumo por unidade × mês ---------- */
 
 export function resumir(linhas, mapa, opcoes = {}) {
-  const { contarPor = 'cliente', ano = null, condicaoPadrao = 'mensal', portePadrao = 'P', porteFaixas = null, codigosPorte = ['P', 'M', 'G'], situacoes = null, unidadeFixa = null, condicaoFixa = null, porteCliente = null } = opcoes;
+  const { contarPor = 'cliente', ano = null, condicaoPadrao = 'mensal', portePadrao = 'P', porteFaixas = null, codigosPorte = ['P', 'M', 'G'], situacoes = null, unidadeFixa = null, condicaoFixa = null, porteCliente = null, mesFixo = null } = opcoes;
+  // sem coluna de data, todas as linhas contam no mês de referência escolhido (1..12)
+  const mesReferencia = Number(mesFixo) >= 1 && Number(mesFixo) <= 12 ? Number(mesFixo) : null;
   let foraSituacao = 0;
   const avisos = [];
   const anos = {};
@@ -125,7 +127,7 @@ export function resumir(linhas, mapa, opcoes = {}) {
   let usadas = 0, semData = 0, semUnidade = 0, outroAno = 0;
   const texto = (i) => (i == null ? '' : String(linhas_atual[i] ?? '').trim());
   let linhas_atual = null;
-  if (mapa.vencimento == null) return { ano, porUnidade, avisos: ['Escolha a coluna de data de vencimento.'], totalLinhas: linhas.length, linhasUsadas: 0, anosEncontrados: [], detalhes };
+  if (mapa.vencimento == null && !mesReferencia) return { ano, porUnidade, avisos: ['Escolha a coluna de data de vencimento ou o mês de referência.'], totalLinhas: linhas.length, linhasUsadas: 0, anosEncontrados: [], detalhes };
   if (mapa.unidade == null && !unidadeFixa) return { ano, porUnidade, avisos: ['Escolha a unidade do cadastro (o arquivo não tem coluna de unidade).'], totalLinhas: linhas.length, linhasUsadas: 0, anosEncontrados: [], detalhes };
 
   linhas.forEach(l => {
@@ -134,15 +136,15 @@ export function resumir(linhas, mapa, opcoes = {}) {
     detalhes.push(det);
     const fora = motivo => { det.motivo = motivo; };
     if (mapa.situacao != null && situacoes) { const sv = det.situacao || '(vazio)'; if (!situacoes.includes(sv)) { foraSituacao++; fora('situação não selecionada'); return; } }
-    const data = lerData(l[mapa.vencimento]);
-    if (!data) { semData++; fora('sem data de vencimento'); return; }
-    det.data = data; det.ano = data.getFullYear(); det.mes = data.getMonth() + 1;
+    const data = mapa.vencimento != null ? lerData(l[mapa.vencimento]) : null;
+    if (!data && !mesReferencia) { semData++; fora('sem data de vencimento'); return; }
+    const y = data ? data.getFullYear() : ano;
+    const mes = data ? data.getMonth() + 1 : mesReferencia;
+    det.data = data; det.ano = y; det.mes = mes;
     const unidade = det.unidade;
     if (!unidade) { semUnidade++; fora('sem unidade'); return; }
-    const y = data.getFullYear();
-    anos[y] = (anos[y] || 0) + 1;
+    if (data) anos[y] = (anos[y] || 0) + 1;
     if (ano != null && y !== ano) { outroAno++; fora(`vencimento em ${y}, não em ${ano}`); return; }
-    const mes = data.getMonth() + 1;
     const cond = condicaoFixa || (mapa.condicao != null ? lerCondicao(l[mapa.condicao]) : condicaoPadrao);
     // porte: o escolhido para o cliente (pelo código; sem código, pelo nome) > coluna do arquivo > padrão
     const chaveCliente = det.codigo || det.cliente;
