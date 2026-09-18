@@ -61,9 +61,6 @@ async function apiTodos(caminho: string, params: Record<string, string>): Promis
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return json({}, 204);
   if (req.method !== 'POST') return json({ message: 'Use POST.' }, 405);
-  if (!CF_ID || !CF_SECRET || !JWT) {
-    return json({ message: 'Credenciais da API não configuradas. Defina CHABRA_CF_ID, CHABRA_CF_SECRET e CHABRA_JWT nos segredos da função.' }, 503);
-  }
 
   const corpo = await req.json().catch(() => ({}));
   const ano = Number(corpo.ano) || new Date().getFullYear();
@@ -81,6 +78,11 @@ Deno.serve(async (req) => {
     const meta = (usuario.user.app_metadata ?? {}) as Record<string, unknown>;
     const papel = meta.papel ?? (meta.admin === true ? 'admin' : null);
     if (papel !== 'admin') return json({ message: 'Só administradores podem sincronizar.' }, 403);
+  }
+
+  // só depois de identificar quem chamou: o estado das credenciais da API não é informação pública
+  if (!CF_ID || !CF_SECRET || !JWT) {
+    return json({ message: 'Credenciais da API não configuradas. Defina CHABRA_CF_ID, CHABRA_CF_SECRET e CHABRA_JWT nos segredos da função.' }, 503);
   }
 
   try {
