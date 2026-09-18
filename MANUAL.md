@@ -44,6 +44,7 @@ Qualquer usuário troca a própria senha em **Senha** (rodapé do menu). Não h�
 | Seção | Tela | Para quê |
 |---|---|---|
 | Dimensionamento | **Projeção** | A tela de resultado, uma unidade por vez: pendências atuais, equipe → quadro ideal, mês a mês (contratação necessária?), simulação de cenários. |
+| Dimensionamento | **Resumo do mês** | A foto de um mês: acumulado dos meses anteriores, vencimentos do mês, equipe, pendências ao fim do mês e projeção. Com impressão. |
 | Dimensionamento | **Dashboard** | Os mesmos números em gráficos: pendentes mês a mês, vencem × equipe consegue, equipe hoje × ideal, por unidade, R$. |
 | Dimensionamento | **Evolução** | Controle histórico mês a mês: fila, capacidade, quadro real × necessário e as admissões que seriam necessárias, com impressão. |
 | Cadastros | **Unidades** | As unidades/filiais. |
@@ -213,7 +214,18 @@ A mesma barra (ano · mês atual · unidade) e os mesmos números da Projeção,
 - **Impacto financeiro mensal** (quando há custo nas Funções): contratações necessárias × excedente de pessoal, mês a mês.
 
 
-### 6.5 Evolução (controle histórico)
+### 6.5 Resumo do mês
+
+A foto de **um único mês** — o escolhido no seletor **Mês atual** da barra —, para levar a uma reunião ou anexar a um e-mail (botão **Imprimir**, que também salva em PDF):
+
+- **Cartões**: acumulado até aquele mês (o que veio em aberto dos meses anteriores, com a parcela do ano anterior), o que vence no mês, o total a atender (acumulado + vencimentos) com o que a equipe consegue atender, e as pendências ao fim do mês.
+- **Equipe do mês**: por área, quadro atual → quadro ideal para os vencimentos, quantas pessoas eliminariam as pendências no prazo, capacidade do mês e produção diária.
+- **De onde vem o acumulado**: uma linha por mês anterior — o que venceu, o que foi atendido (quando informado) e o que permaneceu em aberto — até o total que chega no mês escolhido.
+- **Projeção com a equipe atual**: os três meses seguintes, em que mês as pendências zeram (ou o aviso de que não zeram no ano) e quanto sobra em dezembro.
+
+Trocar o mês na barra muda toda a página: o acumulado passa a considerar apenas os meses anteriores ao escolhido.
+
+### 6.6 Evolução (controle histórico)
 
 Responde à pergunta da diretoria: **mês a mês, o quadro estava suficiente? Quantas admissões seriam necessárias?** Uma unidade por vez, com a barra ano · mês atual · unidade e um botão **Imprimir** (ou salvar em PDF).
 
