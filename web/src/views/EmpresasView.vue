@@ -9,6 +9,7 @@ import { usePreferenciasStore } from '../stores/preferencias.js';
 import { useUiStore } from '../stores/ui.js';
 import { CONDICOES } from '../services/api.js';
 import ImportarPlanilha from '../components/empresas/ImportarPlanilha.vue';
+import SincronizarApi from '../components/empresas/SincronizarApi.vue';
 import { MESES, MESES_LONGO, num } from '../composables/useFormat.js';
 
 const auth = useAuthStore();
@@ -89,6 +90,7 @@ async function limpar(u) {
   </form>
 
   <section v-if="!cad.unidades.length" class="card"><p class="muted">É necessário cadastrar as unidades previamente.</p></section>
+  <SincronizarApi v-if="cad.unidades.length && auth.isAdmin" />
   <ImportarPlanilha v-if="cad.unidades.length && auth.podeEditar" />
   <section v-if="cad.unidades.length" class="card">
     <div class="card-head">

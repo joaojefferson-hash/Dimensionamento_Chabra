@@ -99,7 +99,7 @@ export async function carregarTudo() {
   alocacoes.forEach(a => { (porColab[a.colaborador_id] = porColab[a.colaborador_id] || []).push({ unidadeId: a.unidade_id, percentual: num(a.percentual) }); });
   return {
     funcoes: funcoes.map(funcaoDeLinha),
-    unidades: unidades.map(r => ({ id: r.id, nome: r.nome, mesesPorAno: porUnidade[r.id] || {} })),
+    unidades: unidades.map(r => ({ id: r.id, nome: r.nome, codigoApi: r.codigo_api || null, mesesPorAno: porUnidade[r.id] || {} })),
     colaboradores: colaboradores.map(r => ({ ...colaboradorDeLinha(r), alocacoes: porColab[r.id] || [] })),
     portes: portes.map(porteDeLinha),
     parametros: parametrosDeLinha(parametros),

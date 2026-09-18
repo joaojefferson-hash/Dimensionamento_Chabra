@@ -10,7 +10,7 @@
     "prebuild": "npm run sync-engine",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node ../tests/calculo.test.js && node ../tests/dimensionamento.test.js && node tests/importacao.test.mjs"
+    "test": "node ../tests/calculo.test.js && node ../tests/dimensionamento.test.js && node ../tests/sincronizacao.test.mjs && node tests/importacao.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
