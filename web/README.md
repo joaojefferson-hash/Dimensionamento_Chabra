@@ -49,6 +49,7 @@ web/
       LoginView.vue
       DimensionamentoView.vue   tela "Projeção" (rota /projecao): barra + Hoje + TabelaMeses + Simulacao + avisos
       DashboardView.vue         gráficos (Chart.js via components/ui/Grafico.vue) sobre a store de dimensionamento
+      EvolucaoView.vue          controle histórico (Calculo.evolucao): fila, capacidade, quadro real × necessário, impressão
       Unidades/Empresas/Colaboradores/Funcoes/Calendario/Historico/UsuariosView.vue
   src/composables/organograma.js  árvore do organograma (pura): chefias pela hierarquia das funções + equipes por unidade
   src/composables/useVersao.js    avisa quando uma nova versão é publicada (compara o script do index.html) → faixa em App.vue

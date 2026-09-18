@@ -45,6 +45,7 @@ Qualquer usuário troca a própria senha em **Senha** (rodapé do menu). Não h�
 |---|---|---|
 | Dimensionamento | **Projeção** | A tela de resultado, uma unidade por vez: pendências atuais, equipe → quadro ideal, mês a mês (contratação necessária?), simulação de cenários. |
 | Dimensionamento | **Dashboard** | Os mesmos números em gráficos: pendentes mês a mês, vencem × equipe consegue, equipe hoje × ideal, por unidade, R$. |
+| Dimensionamento | **Evolução** | Controle histórico mês a mês: fila, capacidade, quadro real × necessário e as admissões que seriam necessárias, com impressão. |
 | Cadastros | **Unidades** | As unidades/filiais. |
 | Cadastros | **Empresas por Unidade** | Por unidade e mês: clientes ativos (informativo) e os clientes com documentos a vencer, por condição (Mensal, Exclusiva TST, Empresa sem avaliação, Contratos novos). |
 | Cadastros | **Colaboradores** | A equipe, com função, ritmo por dia e unidades onde atua. Modo **Organograma**. |
@@ -72,6 +73,7 @@ A base da demanda. Para cada unidade há três linhas por mês (janeiro a dezemb
 - **Clientes ativos** — total de clientes da unidade no mês. **Só informativo** (histórico da carteira); não entra em nenhuma conta.
 - **Mensal** — clientes com contrato mensal cujos documentos vencem naquele mês.
 - **Exclusiva TST** — clientes na condição Exclusiva TST cujos documentos vencem naquele mês.
+- **Atendidas no mês** — empresas efetivamente concluídas no mês. Diferente de Clientes ativos, **entra no cálculo**: é o que sai da fila na tela Evolução. Em branco, o mês decorrido acumula tudo o que venceu.
 - **Empresa sem avaliação** — clientes ainda sem avaliação realizada naquele mês.
 - **Contratos novos** — clientes de contratos firmados naquele mês.
 - **Total** = soma das quatro condições (é o que a Projeção usa, com cada cliente valendo o peso do seu porte). As condições servem para organizar a origem da demanda: todas exigem o mesmo atendimento e pesam igual, variando apenas pelo porte do cliente.
@@ -209,6 +211,35 @@ A mesma barra (ano · mês atual · unidade) e os mesmos números da Projeção,
 - **Vencimentos × produção da equipe** — barras com o que vence (cada cliente valendo o peso do porte) e linhas com quanto técnicos e administrativos dão conta.
 - **Equipe atual × quadro ideal** — um gráfico por área; o ideal fica vermelho no mês em que falta gente.
 - **Impacto financeiro mensal** (quando há custo nas Funções): contratações necessárias × excedente de pessoal, mês a mês.
+
+
+### 6.5 Evolução (controle histórico)
+
+Responde à pergunta da diretoria: **mês a mês, o quadro estava suficiente? Quantas admissões seriam necessárias?** Uma unidade por vez, com a barra ano · mês atual · unidade e um botão **Imprimir** (ou salvar em PDF).
+
+A recorrência é simples e sempre olha para frente:
+
+```
+fila inicial (janeiro) = fila do fim do ano anterior
+fila final (mês)       = fila inicial + o que venceu no mês − atendidas
+```
+
+As **atendidas** são as informadas em Empresas por Unidade (convertidas em demanda equivalente pelo peso médio dos portes do mês). Sem informação, os meses já decorridos acumulam tudo (nada é descontado) e, do mês atual em diante, a equipe atende o que consegue.
+
+O quadro necessário aparece em duas colunas por área:
+
+| Coluna | Pergunta que responde |
+|---|---|
+| **vazão** | Quantas pessoas para dar conta do que entra no mês (não deixar a fila crescer)? |
+| **recup.** | Quantas pessoas para dar conta da entrada **e** diluir a fila dentro do prazo (padrão 60 dias)? |
+
+A conclusão de cada mês compara o quadro real com a vazão: "Quadro insuficiente: faltavam 1 técnico e 2 administrativos", "Quadro suficiente para a entrada do mês, mas sem folga para reduzir a fila" ou "Quadro suficiente". As **admissões sugeridas** são acumulativas (quem entra permanece) e produzem menos nos primeiros meses (período de adaptação), como uma contratação real.
+
+Os gráficos mostram a fila mês a mês **com e sem** essas admissões, a entrada × a capacidade de cada área e o quadro real × necessário. Os cartões do topo resumem: meses com quadro insuficiente, admissões necessárias, pendências em dezembro (real e no cenário) e o custo médio do déficit.
+
+> **Dois avisos aparecem quando faltam dados.** Sem a linha *Atendidas no mês*, o histórico só acumula; sem datas de admissão nos colaboradores, o sistema considera a equipe de hoje em todos os meses — e o passado parece melhor do que foi.
+
+Alterar um lançamento recalcula **daquele mês em diante**: os meses anteriores não mudam, e a fila de dezembro de um ano entra em janeiro do seguinte.
 
 ---
 

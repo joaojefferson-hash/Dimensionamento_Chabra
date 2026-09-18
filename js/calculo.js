@@ -64,6 +64,20 @@ const Calculo = (() => {
       : { empresasVencidas: n(u.empresasVencidas), empresasExclusivaTst: n(u.empresasExclusivaTst), demanda: u.demanda || null, excecao: false };
   }
 
+  /** Quantos clientes vencem no mês, em contagem simples (todas as condições). */
+  function clientesDoMes(u, mes) {
+    const q = empresasDoMes(u, mes);
+    const d = q.demanda;
+    if (d && typeof d === 'object') {
+      let total = 0;
+      Object.values(d).forEach(porPorte => {
+        if (porPorte && typeof porPorte === 'object') Object.values(porPorte).forEach(qtd => { total += Math.max(0, n(qtd)); });
+      });
+      return total;
+    }
+    return n(q.empresasVencidas) + n(q.empresasExclusivaTst);
+  }
+
   /** Peso de um porte (P 1,0 · M 1,5 · G 2,0…); porte desconhecido ou sem tabela de pesos = 1. */
   function pesoPorte(p, porte) {
     const pesos = p && p.pesosPorte;
@@ -313,7 +327,7 @@ const Calculo = (() => {
         });
         return {
           mes, nome: MESES[mes], nomeLongo: MESES_LONGO[mes], diasUteis: n(p.diasUteis[mes]),
-          empresas: q.empresasVencidas + q.empresasExclusivaTst, precisa, excecao: q.excecao,
+          empresas: clientesDoMes(u, mes), precisa, excecao: q.excecao,
           pessoas: pessoasMes,
           entregas, funcoes, status: piorStatus(FUNCOES.map(f => funcoes[f].status)),
         };
@@ -651,10 +665,160 @@ const Calculo = (() => {
     return { mesAtual: t, prazoMeses: pm, periodo: per, unidades, total: { grupos }, filaInicial: filaInicialTotal };
   }
 
+  /* ---------- evolução mês a mês (controle histórico) ----------
+     Responde, mês a mês e por área: com a carteira daquele mês e a equipe daquele mês, o quadro
+     estava insuficiente, adequado ou excedente? Quantas pessoas deveriam ter sido admitidas?
+
+       fila_inicial(jan) = fila do fim do ano anterior (`filaInicial[unidadeId][grupo]`)
+       entram(mês)       = clientes que vencem no mês × peso do porte
+       atendidas(mês)    = o que foi informado em Empresas por Unidade (contagem convertida em
+                           demanda equivalente pelo peso médio do mês); sem informação, 0 nos meses
+                           passados e o que a equipe consegue do mês atual em diante
+       fila_final(mês)   = fila_inicial + entram − atendidas      → fila_inicial do mês seguinte
+
+     Quadro necessário em duas leituras:
+       vazão       = dar conta do que entra no mês (não deixa a fila crescer)
+       recuperação = dar conta do que entra + a fila diluída no prazo (elimina o passivo)
+
+     Cenário "se tivéssemos contratado": repete a recorrência admitindo as pessoas sugeridas
+     (acumulativas — quem entra permanece), com o período de adaptação, para comparar a fila real
+     com a fila que teríamos.
+     ---------------------------------------------------- */
+
+  function evolucao(resultado, { mesAtual = 0, prazoMeses = 2, filaInicial = null, atendidas = null, parametros = null } = {}) {
+    const p = normalizarParametros(parametros);
+    const t = Number(mesAtual) === 12 ? 12 : clampMes(mesAtual, 0);
+    const pm = Math.max(1, Math.round(n(prazoMeses)) || 1);
+    const inicialDe = (id, f) => Math.max(0, n(filaInicial && filaInicial[id] && filaInicial[id][f]));
+
+    /** Uma área (técnicos ou administrativos) de uma unidade (ou do total), mês a mês. */
+    function areaDeItem(meses12, f, informadasDoMes, filaInicialArea) {
+      const entregas = ENTREGAS_DA_FUNCAO[f];
+      let fila = Math.max(0, n(filaInicialArea));
+      let filaCenario = fila;
+      const admissoes = []; // [{ mes, quantidade }] — acumulativas: quem entra permanece
+
+      const meses = meses12.map((m, i) => {
+        const gargaloEntrega = entregas.reduce((x, y) => (m.entregas[y.id].consegue < m.entregas[x.id].consegue ? y : x));
+        const gargalo = m.entregas[gargaloEntrega.id];
+        const capacidade = Math.max(0, n(gargalo.consegue));           // o que a equipe do mês entrega, já com a margem
+        const producaoPessoa = Math.max(0, n(gargalo.producaoPessoa)); // uma pessoa inteira no mês
+        const pessoas = v => (v > 1e-9 && producaoPessoa > 0 ? Math.ceil(v / producaoPessoa - 1e-9) : 0);
+        const quadro = n(m.pessoas[f]);
+        const entram = Math.max(0, n(m.precisa));
+        const clientes = Math.max(0, n(m.empresas));
+        const pesoMedio = clientes > 0 ? entram / clientes : 1;
+        const custoPessoa = m.funcoes[f].custo ? n(m.funcoes[f].custo.pessoa) : 0;
+
+        // fila real
+        const informadas = informadasDoMes(m.mes);
+        const filaInicio = fila;
+        const pendentes = filaInicio + entram;
+        const atendidasMes = informadas != null
+          ? Math.min(pendentes, informadas * pesoMedio)
+          : i < t ? 0 : Math.min(pendentes, capacidade);
+        const filaFim = Math.max(0, pendentes - atendidasMes);
+        fila = filaFim;
+
+        // quadro necessário
+        const alvoVazao = entram;
+        const alvoRecuperacao = entram + filaInicio / pm;
+        const faltaVazao = Math.max(0, alvoVazao - capacidade);
+        const faltaRecuperacao = Math.max(0, alvoRecuperacao - capacidade);
+        const sobra = Math.max(0, capacidade - alvoVazao);
+        const faltamVazao = pessoas(faltaVazao);
+        const status = faltamVazao > 0 ? 'deficit'
+          : faltaRecuperacao > 1e-9 || (capacidade > 0 && sobra < capacidade * MARGEM_ATENCAO) ? 'atencao' : 'ok';
+
+        // cenário com as admissões sugeridas
+        const capacidadeExtra = admissoes.reduce((acc, a) => acc + a.quantidade * producaoPessoa * fatorRampup(i - a.mes, p.rampup), 0);
+        const filaInicioCenario = filaCenario;
+        const novas = pessoas(Math.max(0, (entram + filaInicioCenario / pm) - (capacidade + capacidadeExtra)));
+        if (novas > 0) admissoes.push({ mes: i, quantidade: novas });
+        const capacidadeCenario = capacidade + capacidadeExtra + novas * producaoPessoa * fatorRampup(0, p.rampup);
+        const pendentesCenario = filaInicioCenario + entram;
+        const atendidasCenario = Math.min(pendentesCenario, capacidadeCenario);
+        filaCenario = Math.max(0, pendentesCenario - atendidasCenario);
+        const quadroCenario = quadro + admissoes.reduce((acc, a) => acc + a.quantidade, 0);
+
+        return {
+          mes: m.mes, nome: m.nome, nomeLongo: m.nomeLongo, diasUteis: m.diasUteis,
+          passado: i < t, hoje: i === t,
+          clientes, entram, pesoMedio,
+          informadas, informado: informadas != null,
+          filaInicio, pendentes, capacidade, atendidas: atendidasMes, filaFim,
+          quadro, producaoPessoa, custoPessoa,
+          necessarioVazao: pessoas(alvoVazao),
+          necessarioRecuperacao: pessoas(alvoRecuperacao),
+          faltamVazao,
+          faltamRecuperacao: pessoas(faltaRecuperacao),
+          sobramPessoas: sobra > 1e-9 && producaoPessoa > 0 ? Math.floor(sobra / producaoPessoa + 1e-9) : 0,
+          custoDeficit: pessoas(faltaRecuperacao) * custoPessoa,
+          status,
+          cenario: {
+            filaInicio: filaInicioCenario, capacidade: capacidadeCenario, atendidas: atendidasCenario,
+            filaFim: filaCenario, admissoes: novas, quadro: quadroCenario,
+          },
+        };
+      });
+
+      const soma = campo => meses.reduce((acc, m) => acc + m[campo], 0);
+      const ultimo = meses[meses.length - 1];
+      const primeiroDeficit = meses.findIndex(m => m.faltamVazao > 0);
+      return {
+        funcao: f,
+        meses,
+        resumo: {
+          funcao: f,
+          entram: soma('entram'), atendidas: soma('atendidas'), capacidade: soma('capacidade'),
+          filaDezembro: ultimo ? ultimo.filaFim : 0,
+          filaDezembroCenario: ultimo ? ultimo.cenario.filaFim : 0,
+          admissoes: admissoes.map(a => ({ mes: a.mes, quantidade: a.quantidade })),
+          admissoesTotal: admissoes.reduce((acc, a) => acc + a.quantidade, 0),
+          mesesInsuficientes: meses.filter(m => m.status === 'deficit').length,
+          mesesInformados: meses.filter(m => m.informado).length,
+          custoDeficitMes: meses.length ? soma('custoDeficit') / meses.length : 0,
+          primeiroDeficit: primeiroDeficit >= 0 ? primeiroDeficit : null,
+          status: piorStatus(meses.map(m => m.status)),
+        },
+      };
+    }
+
+    const informadasDe = id => mes => {
+      const porMes = atendidas && atendidas[id];
+      const v = porMes ? porMes[mes + 1] : null;
+      return v == null || v === '' ? null : Math.max(0, n(v));
+    };
+    /** No total, o mês só é considerado informado quando alguma unidade informou. */
+    const informadasTotal = mes => {
+      if (!atendidas) return null;
+      let total = null;
+      resultado.unidades.forEach(u => {
+        const v = (atendidas[u.id] || {})[mes + 1];
+        if (v != null && v !== '') total = n(total) + Math.max(0, n(v));
+      });
+      return total;
+    };
+
+    const unidades = resultado.unidades.map(u => {
+      const areas = {};
+      FUNCOES.forEach(f => { areas[f] = areaDeItem(u.meses, f, informadasDe(u.id), inicialDe(u.id, f)); });
+      return { id: u.id, nome: u.nome, areas };
+    });
+
+    const areasTotal = {};
+    FUNCOES.forEach(f => {
+      const inicial = resultado.unidades.reduce((acc, u) => acc + inicialDe(u.id, f), 0);
+      areasTotal[f] = areaDeItem(resultado.total.meses, f, informadasTotal, inicial);
+    });
+
+    return { mesAtual: t, prazoMeses: pm, unidades, total: { areas: areasTotal } };
+  }
+
   return {
     MESES, MESES_LONGO, TEC, ADM, FUNCOES, FUNCAO_CURTA, FUNCAO_SINGULAR, ENTREGAS, ENTREGAS_DA_FUNCAO, COLAB_PADRAO, MARGEM_ATENCAO, colaboradoresSimulados,
     empresasDoMes, empresasPonderadas, pesoPorte, presencaNoMes, fatorRampup, custoFuncao,
-    producaoMes, precisaMes, calcular, fila, normalizarParametros, ritmoTexto, piorStatus,
+    producaoMes, precisaMes, calcular, fila, evolucao, normalizarParametros, ritmoTexto, piorStatus,
   };
 })();
 

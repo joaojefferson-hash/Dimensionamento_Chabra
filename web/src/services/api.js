@@ -52,7 +52,7 @@ const parametrosDeLinha = r => ({
 });
 
 /** Monta um mês: demanda por condição × porte + contagens derivadas + clientes ativos. */
-export function montarMes(demanda = {}, clientesAtivos = 0) {
+export function montarMes(demanda = {}, clientesAtivos = 0, atendidas = 0) {
   const d = {};
   CONDICOES.forEach(c => {
     d[c.condicao] = {};
@@ -60,16 +60,16 @@ export function montarMes(demanda = {}, clientesAtivos = 0) {
   });
   const soma = cond => Object.values(d[cond]).reduce((s, q) => s + q, 0);
   const contagens = Object.fromEntries(CONDICOES.map(c => [c.campo, soma(c.condicao)]));
-  return { demanda: d, ...contagens, clientesAtivos: Math.max(0, Math.round(num(clientesAtivos))) };
+  return { demanda: d, ...contagens, clientesAtivos: Math.max(0, Math.round(num(clientesAtivos))), atendidas: Math.max(0, Math.round(num(atendidas))) };
 }
 
 /** Linhas de demanda_mensal + unidade_mes → mesesPorAno de cada unidade. */
 function mesesPorUnidade(demanda, ativos) {
   const por = {};
-  const slot = (uid, ano, mes) => { const u = (por[uid] = por[uid] || {}); const a = (u[ano] = u[ano] || {}); return (a[mes] = a[mes] || { demanda: {}, clientesAtivos: 0 }); };
+  const slot = (uid, ano, mes) => { const u = (por[uid] = por[uid] || {}); const a = (u[ano] = u[ano] || {}); return (a[mes] = a[mes] || { demanda: {}, clientesAtivos: 0, atendidas: 0 }); };
   demanda.forEach(d => { const s = slot(d.unidade_id, d.ano, d.mes); (s.demanda[d.condicao] = s.demanda[d.condicao] || {})[d.porte] = num(d.quantidade); });
-  ativos.forEach(a => { slot(a.unidade_id, a.ano, a.mes).clientesAtivos = num(a.clientes_ativos); });
-  Object.values(por).forEach(anos => Object.values(anos).forEach(meses => Object.keys(meses).forEach(m => { meses[m] = montarMes(meses[m].demanda, meses[m].clientesAtivos); })));
+  ativos.forEach(a => { const s = slot(a.unidade_id, a.ano, a.mes); s.clientesAtivos = num(a.clientes_ativos); s.atendidas = num(a.atendidas); });
+  Object.values(por).forEach(anos => Object.values(anos).forEach(meses => Object.keys(meses).forEach(m => { meses[m] = montarMes(meses[m].demanda, meses[m].clientesAtivos, meses[m].atendidas); })));
   return por;
 }
 
@@ -84,7 +84,7 @@ export async function carregarTudo() {
     q(supabase.from('colaboradores').select('*').order('created_at').order('id'), 'os colaboradores'),
     q(supabase.from('colaborador_unidades').select('colaborador_id, unidade_id, percentual'), 'as alocações'),
     q(supabase.from('demanda_mensal').select('unidade_id, ano, mes, condicao, porte, quantidade'), 'as empresas por mês'),
-    q(supabase.from('unidade_mes').select('unidade_id, ano, mes, clientes_ativos'), 'os clientes ativos'),
+    q(supabase.from('unidade_mes').select('unidade_id, ano, mes, clientes_ativos, atendidas'), 'os clientes ativos e atendimentos'),
     q(supabase.from('portes').select('*').order('ordem').order('codigo'), 'os portes'),
     q(supabase.from('parametros').select('*').eq('id', 1).single(), 'os parâmetros'),
     q(supabase.from('clientes_porte').select('codigo, nome, porte'), 'o porte dos clientes'),
@@ -149,13 +149,15 @@ export const demanda = {
     if (r.error) lancar(r.error, 'Não foi possível salvar o número do mês.');
     return q;
   },
-  async definirClientesAtivos(unidadeId, ano, mes, quantidade) {
-    const q = Math.max(0, Math.round(num(quantidade)));
-    const r = q > 0
-      ? await supabase.from('unidade_mes').upsert({ unidade_id: unidadeId, ano, mes, clientes_ativos: q }, { onConflict: 'unidade_id,ano,mes' })
+  /** Clientes ativos (informativo) e atendidas (entram na fila) de um mês; zerando os dois, a linha é apagada. */
+  async definirUnidadeMes(unidadeId, ano, mes, { clientesAtivos = 0, atendidas = 0 } = {}) {
+    const ativos = Math.max(0, Math.round(num(clientesAtivos)));
+    const feitas = Math.max(0, Math.round(num(atendidas)));
+    const r = ativos > 0 || feitas > 0
+      ? await supabase.from('unidade_mes').upsert({ unidade_id: unidadeId, ano, mes, clientes_ativos: ativos, atendidas: feitas }, { onConflict: 'unidade_id,ano,mes' })
       : await supabase.from('unidade_mes').delete().match({ unidade_id: unidadeId, ano, mes });
-    if (r.error) lancar(r.error, 'Não foi possível salvar os clientes ativos.');
-    return q;
+    if (r.error) lancar(r.error, 'Não foi possível salvar os números do mês.');
+    return { clientesAtivos: ativos, atendidas: feitas };
   },
   /** Importação: substitui a demanda de um ano das unidades presentes nas linhas (RPC, uma transação).
    *  Com `condicao` ('mensal' | 'exclusiva_tst'), substitui somente essa condição; sem, as duas. */

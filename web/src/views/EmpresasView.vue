@@ -16,15 +16,18 @@ const cad = useCadastrosStore();
 const pref = usePreferenciasStore();
 const ui = useUiStore();
 
-const ATIVOS = { campo: 'clientesAtivos', rotulo: 'Clientes ativos', ajuda: 'total de clientes da unidade no mês — apenas informativo, não é considerado no cálculo' };
+const ATIVOS = { campo: 'clientesAtivos', rotulo: 'Clientes ativos', cor: 'bg-page text-muted', ajuda: 'total de clientes da unidade no mês — apenas informativo, não é considerado no cálculo' };
+const ATENDIDAS = { campo: 'atendidas', rotulo: 'Atendidas no mês', cor: 'bg-ok-bg text-ok', ajuda: 'empresas efetivamente concluídas no mês — saem da fila na tela Evolução' };
+const ESPECIAIS = [ATIVOS, ATENDIDAS];
 const condSel = ref('todas');
 const porteSel = ref((() => { try { return localStorage.getItem('chabra-dimensiona:empresas-porte') || 'P'; } catch (_) { return 'P'; } })());
 const escolherPorte = v => { porteSel.value = v; try { localStorage.setItem('chabra-dimensiona:empresas-porte', v); } catch (_) { /* ignora */ } };
 const somaPortes = computed(() => porteSel.value === 'todos');
 const porteObj = computed(() => cad.portes.find(p => p.codigo === porteSel.value) || null);
-const conds = computed(() => (condSel.value === 'todas' ? CONDICOES : condSel.value === ATIVOS.campo ? [ATIVOS] : CONDICOES.filter(c => c.campo === condSel.value)));
+const conds = computed(() => (condSel.value === 'todas' ? CONDICOES : ESPECIAIS.some(e => e.campo === condSel.value) ? ESPECIAIS.filter(e => e.campo === condSel.value) : CONDICOES.filter(c => c.campo === condSel.value)));
 const mostrarTotal = computed(() => condSel.value === 'todas');
-const soAtivos = computed(() => condSel.value === ATIVOS.campo);
+const soEspecial = computed(() => ESPECIAIS.some(e => e.campo === condSel.value));
+const rotuloEspecial = computed(() => (ESPECIAIS.find(e => e.campo === condSel.value) || {}).rotulo || '');
 const anos = computed(() => cad.anosDisponiveis(pref.ano));
 
 /* ---- valores ---- */
@@ -59,6 +62,7 @@ async function mudar(u, mes, campo, ev) {
   try {
     const cond = condicaoDe(campo);
     if (cond) await cad.definirDemanda(u.id, pref.ano, mes, cond, porteSel.value, novo);
+    else if (campo === ATENDIDAS.campo) await cad.definirAtendidas(u.id, pref.ano, mes, novo);
     else await cad.definirClientesAtivos(u.id, pref.ano, mes, novo);
   } catch (e) { ui.erro(e); ev.target.value = antes || ''; } finally { delete salvando.value[chave]; }
 }
@@ -90,7 +94,7 @@ async function limpar(u) {
       <div class="flex flex-wrap items-center gap-2 text-[12px]">
         <span class="muted">Exibir:</span>
         <div class="flex overflow-hidden rounded-lg border border-line">
-          <button v-for="o in [{ v: 'todas', t: 'Todas' }, ...CONDICOES.map(c => ({ v: c.campo, t: 'Somente ' + c.rotulo })), { v: ATIVOS.campo, t: 'Somente Clientes ativos' }]" :key="o.v" type="button" class="px-3 py-1" :class="condSel === o.v ? 'bg-primary text-white' : 'bg-white hover:bg-primary-light'" @click="condSel = o.v">{{ o.t }}</button>
+          <button v-for="o in [{ v: 'todas', t: 'Todas' }, ...CONDICOES.map(c => ({ v: c.campo, t: 'Somente ' + c.rotulo })), ...ESPECIAIS.map(e => ({ v: e.campo, t: 'Somente ' + e.rotulo }))]" :key="o.v" type="button" class="px-3 py-1" :class="condSel === o.v ? 'bg-primary text-white' : 'bg-white hover:bg-primary-light'" @click="condSel = o.v">{{ o.t }}</button>
         </div>
         <span class="muted ml-2">Porte:</span>
         <div class="flex overflow-hidden rounded-lg border border-line" title="Os lançamentos são feitos por porte. Em Todos, as células exibem a soma dos portes.">
@@ -102,7 +106,7 @@ async function limpar(u) {
     <p class="muted mb-3 text-[13px]">
       <template v-if="somaPortes">Exibindo a <strong>soma dos portes</strong> (somente leitura). Para lançar valores, selecione um porte acima. A linha Total exibe entre parênteses a demanda equivalente quando há clientes de porte médio ou grande.</template>
       <template v-else>Lançamento do porte <strong>{{ porteObj ? porteObj.nome : porteSel }}</strong> (peso {{ porteObj ? num(porteObj.peso, 1) : 1 }}). Para clientes de outro porte, altere a seleção acima.</template>
-      A linha <strong>Clientes ativos</strong> é apenas informativa.
+      A linha <strong>Clientes ativos</strong> é apenas informativa; a linha <strong>Atendidas no mês</strong> registra as empresas concluídas e é o que sai da fila na tela Evolução.
     </p>
     <div class="table-wrap">
       <table class="table table-grade text-center [&_td]:px-1 [&_th]:px-1 [&_th]:text-center">
@@ -117,13 +121,13 @@ async function limpar(u) {
         <tbody>
           <template v-for="u in cad.unidades" :key="u.id">
             <tr v-for="(c, ci) in (mostrarTotal ? [ATIVOS, ...CONDICOES] : conds)" :key="c.campo" :class="[ci === 0 ? 'border-t-[6px]! border-t-page!' : '', c === ATIVOS ? 'text-muted' : '']">
-              <td v-if="ci === 0" class="bg-white text-left align-top font-semibold" :rowspan="mostrarTotal ? CONDICOES.length + 2 : conds.length">{{ u.nome }}<div v-if="auth.podeEditar && temNumeros(u)"><button class="btn-link text-[12px] font-normal" type="button" @click="limpar(u)">excluir lançamentos de {{ pref.ano }}</button></div></td>
-              <td class="whitespace-nowrap text-left"><span class="chip" :class="c === ATIVOS ? 'bg-page text-muted' : c.cor" :title="c.ajuda">{{ c.rotulo }}</span></td>
+              <td v-if="ci === 0" class="bg-white text-left align-top font-semibold" :rowspan="mostrarTotal ? CONDICOES.length + 3 : conds.length">{{ u.nome }}<div v-if="auth.podeEditar && temNumeros(u)"><button class="btn-link text-[12px] font-normal" type="button" @click="limpar(u)">excluir lançamentos de {{ pref.ano }}</button></div></td>
+              <td class="whitespace-nowrap text-left"><span class="chip" :class="c.cor" :title="c.ajuda">{{ c.rotulo }}</span></td>
               <td v-for="mes in 12" :key="mes" :class="valor(u, mes, c.campo) ? 'bg-[#eef4fb]' : ''">
-                <span v-if="c !== ATIVOS && somaPortes" class="font-semibold" :title="detalhe(u, mes, c.campo) || 'sem clientes'">{{ valor(u, mes, c.campo) || '–' }}</span>
-                <input v-else class="input input-sm w-12 !px-1 text-center" type="number" min="0" step="1" :value="valor(u, mes, c.campo) || ''" placeholder="–" :disabled="!auth.podeEditar || salvando[`${u.id}-${mes}-${c.campo}`]" :title="c !== ATIVOS ? detalhe(u, mes, c.campo) : ''" @change="mudar(u, mes, c.campo, $event)">
+                <span v-if="!ESPECIAIS.includes(c) && somaPortes" class="font-semibold" :title="detalhe(u, mes, c.campo) || 'sem clientes'">{{ valor(u, mes, c.campo) || '–' }}</span>
+                <input v-else class="input input-sm w-12 !px-1 text-center" type="number" min="0" step="1" :value="valor(u, mes, c.campo) || ''" placeholder="–" :disabled="!auth.podeEditar || salvando[`${u.id}-${mes}-${c.campo}`]" :title="!ESPECIAIS.includes(c) ? detalhe(u, mes, c.campo) : ''" @change="mudar(u, mes, c.campo, $event)">
               </td>
-              <td class="bg-warn-bg font-semibold">{{ c === ATIVOS ? '—' : fmt(acumulado(u, c.campo)) }}</td>
+              <td class="bg-warn-bg font-semibold">{{ ESPECIAIS.includes(c) ? '—' : fmt(acumulado(u, c.campo)) }}</td>
               <td class="bg-page font-semibold">{{ fmt(somaAno(u, c.campo)) }}</td>
               <td class="bg-page text-muted">{{ fmt(somaAno(u, c.campo) / 12) }}</td>
             </tr>
@@ -132,13 +136,20 @@ async function limpar(u) {
               <td v-for="mes in 12" :key="mes">{{ totalMes(u, mes) }}<small v-if="somaPortes && Math.abs(ponderado(u, mes) - totalMes(u, mes)) > 0.05" class="muted font-normal" title="Demanda equivalente: cada cliente ponderado pelo porte"> ({{ num(ponderado(u, mes), 1) }})</small></td>
               <td class="bg-warn-bg">{{ fmt(acumulado(u, null)) }}</td><td class="bg-page">{{ fmt(somaAno(u, null)) }}</td><td class="bg-page">{{ fmt(somaAno(u, null) / 12) }}</td>
             </tr>
+            <tr v-if="mostrarTotal" :key="u.id + '-atendidas'">
+              <td class="whitespace-nowrap text-left"><span class="chip" :class="ATENDIDAS.cor" :title="ATENDIDAS.ajuda">{{ ATENDIDAS.rotulo }}</span></td>
+              <td v-for="mes in 12" :key="mes" :class="valor(u, mes, ATENDIDAS.campo) ? 'bg-ok-bg' : ''">
+                <input class="input input-sm w-12 !px-1 text-center" type="number" min="0" step="1" :value="valor(u, mes, ATENDIDAS.campo) || ''" placeholder="–" :disabled="!auth.podeEditar || salvando[`${u.id}-${mes}-${ATENDIDAS.campo}`]" @change="mudar(u, mes, ATENDIDAS.campo, $event)">
+              </td>
+              <td class="bg-warn-bg">—</td><td class="bg-page font-semibold">{{ fmt(somaAno(u, ATENDIDAS.campo)) }}</td><td class="bg-page text-muted">{{ fmt(somaAno(u, ATENDIDAS.campo) / 12) }}</td>
+            </tr>
           </template>
         </tbody>
         <tfoot class="font-semibold">
           <tr v-if="mostrarTotal" class="text-muted"><th colspan="2" class="text-left">Clientes ativos (todas)</th><th v-for="mes in 12" :key="mes">{{ fmt(somaUnidades(u => valor(u, mes, ATIVOS.campo))) }}</th><th class="bg-warn-bg">—</th><th class="bg-page">{{ fmt(somaUnidades(u => somaAno(u, ATIVOS.campo))) }}</th><th class="bg-page">{{ fmt(somaUnidades(u => somaAno(u, ATIVOS.campo)) / 12) }}</th></tr>
-          <tr><th colspan="2" class="text-left">{{ soAtivos ? 'Clientes ativos (todas)' : 'Total das unidades' }}</th>
+          <tr><th colspan="2" class="text-left">{{ soEspecial ? rotuloEspecial + ' (todas)' : 'Total das unidades' }}</th>
             <th v-for="mes in 12" :key="mes">{{ fmt(somaUnidades(u => conds.reduce((s, c) => s + valor(u, mes, c.campo), 0))) }}</th>
-            <th class="bg-warn-bg">{{ soAtivos ? '—' : fmt(somaUnidades(u => conds.reduce((s, c) => s + acumulado(u, c.campo), 0))) }}</th>
+            <th class="bg-warn-bg">{{ soEspecial ? '—' : fmt(somaUnidades(u => conds.reduce((s, c) => s + acumulado(u, c.campo), 0))) }}</th>
             <th class="bg-page">{{ fmt(somaUnidades(u => conds.reduce((s, c) => s + somaAno(u, c.campo), 0))) }}</th>
             <th class="bg-page">{{ fmt(somaUnidades(u => conds.reduce((s, c) => s + somaAno(u, c.campo), 0)) / 12) }}</th>
           </tr>

@@ -128,7 +128,7 @@ export const useCadastrosStore = defineStore('cadastros', () => {
   function mesDaUnidade(u, ano, mes) { return ((u.mesesPorAno || {})[ano] || {})[mes] || api.montarMes({}, 0); }
   function guardarMes(u, ano, mes, valorMes) {
     const doAno = { ...((u.mesesPorAno || {})[ano] || {}) };
-    const vazio = valorMes.clientesAtivos === 0 && api.CONDICOES.every(x => (valorMes[x.campo] || 0) === 0);
+    const vazio = valorMes.clientesAtivos === 0 && valorMes.atendidas === 0 && api.CONDICOES.every(x => (valorMes[x.campo] || 0) === 0);
     if (vazio) delete doAno[mes]; else doAno[mes] = valorMes;
     u.mesesPorAno = { ...(u.mesesPorAno || {}), [ano]: doAno };
   }
@@ -138,13 +138,22 @@ export const useCadastrosStore = defineStore('cadastros', () => {
     const atual = mesDaUnidade(u, ano, mes);
     const demanda = { ...atual.demanda, [condicao]: { ...(atual.demanda[condicao] || {}) } };
     if (q > 0) demanda[condicao][porte] = q; else delete demanda[condicao][porte];
-    guardarMes(u, ano, mes, api.montarMes(demanda, atual.clientesAtivos));
+    guardarMes(u, ano, mes, api.montarMes(demanda, atual.clientesAtivos, atual.atendidas));
   }
   async function definirClientesAtivos(unidadeId, ano, mes, quantidade) {
+    return definirUnidadeMes(unidadeId, ano, mes, { clientesAtivos: quantidade });
+  }
+  /** Empresas concluídas no mês: saem da fila na tela Evolução. */
+  async function definirAtendidas(unidadeId, ano, mes, quantidade) {
+    return definirUnidadeMes(unidadeId, ano, mes, { atendidas: quantidade });
+  }
+  async function definirUnidadeMes(unidadeId, ano, mes, patch) {
     const u = unidadePorId.value[unidadeId]; if (!u) throw new Error('Unidade não encontrada.');
-    const q = await api.demanda.definirClientesAtivos(unidadeId, ano, mes, quantidade);
     const atual = mesDaUnidade(u, ano, mes);
-    guardarMes(u, ano, mes, api.montarMes(atual.demanda, q));
+    const valores = { clientesAtivos: atual.clientesAtivos, atendidas: atual.atendidas, ...patch };
+    const salvo = await api.demanda.definirUnidadeMes(unidadeId, ano, mes, valores);
+    guardarMes(u, ano, mes, api.montarMes(atual.demanda, salvo.clientesAtivos, salvo.atendidas));
+    return salvo;
   }
   async function substituirDemandaAno(ano, linhas, condicao = null) { const r = await api.demanda.substituirAno(ano, linhas, condicao); await carregar(); return r; }
   /** Grava o porte de clientes (lista de { codigo, nome, porte }) e atualiza o cache. */
@@ -176,9 +185,10 @@ export const useCadastrosStore = defineStore('cadastros', () => {
       api.CONDICOES.flatMap(c => Object.entries((v.demanda || {})[c.condicao] || {}).filter(([, q]) => q > 0)
         .map(([porte, quantidade]) => ({ ano: Number(ano), mes: Number(mes), condicao: c.condicao, porte, quantidade })))));
     const listaAtivos = u => Object.entries(u.mesesPorAno || {}).flatMap(([ano, meses]) => Object.entries(meses)
-      .filter(([, v]) => v.clientesAtivos > 0).map(([mes, v]) => ({ ano: Number(ano), mes: Number(mes), clientesAtivos: v.clientesAtivos })));
+      .filter(([, v]) => v.clientesAtivos > 0 || v.atendidas > 0)
+      .map(([mes, v]) => ({ ano: Number(ano), mes: Number(mes), clientesAtivos: v.clientesAtivos, atendidas: v.atendidas || 0 })));
     return {
-      app: 'chabra-dimensiona', version: 12, exportedAt: new Date().toISOString(),
+      app: 'chabra-dimensiona', version: 13, exportedAt: new Date().toISOString(),
       portes: portes.value,
       funcoes: funcoes.value.map(f => ({ ...f, respondePara: f.respondeParaId ? (funcaoPorId.value[f.respondeParaId] || {}).nome || null : null })),
       unidades: unidades.value.map(u => ({ id: u.id, nome: u.nome, demandaPorMes: listaDemanda(u), clientesAtivosPorMes: listaAtivos(u) })),
@@ -195,7 +205,7 @@ export const useCadastrosStore = defineStore('cadastros', () => {
     adicionarFuncao, atualizarFuncao, removerFuncao,
     adicionarUnidade, atualizarUnidade, removerUnidade,
     adicionarColaborador, atualizarColaborador, removerColaborador,
-    definirDemanda, definirClientesAtivos, limparAno, substituirDemandaAno, salvarClientesPorte,
+    definirDemanda, definirClientesAtivos, definirAtendidas, limparAno, substituirDemandaAno, salvarClientesPorte,
     atualizarParametros, atualizarPorte,
     exportarBackup, importarBackup,
   };

@@ -131,4 +131,62 @@ teste('ano anterior: mesAtual = 12 deixa tudo em aberto; filaInicial entra em ja
   assert.strictEqual(seguinte.total.grupos.tecnico.resumo.deMesesAnteriores, 112 + 25 + 30 + 20 + 22);
 });
 
+/* ---------- evolução (controle histórico mês a mês) ---------- */
+
+teste('evolução: sem atendidas informadas, a fila acumula e o quadro necessário aparece nas duas leituras', () => {
+  // 40 clientes/mês, um técnico (2 inspeções e 1 relatório por dia → o relatório é o gargalo)
+  const r = rodar([unidade(mesesConst(40))], [tecnico()]);
+  const e = Calculo.evolucao(r, { mesAtual: 12, prazoMeses: 2, parametros: PARAM }).total.areas.tecnico;
+  const jan = e.meses[0];
+  perto(jan.entram, 40);
+  perto(jan.capacidade, 1 * 1 * 21 * 0.85);                 // 1 relatório/dia × 21 dias × 85%
+  assert.strictEqual(jan.atendidas, 0);                      // mês passado sem informação: nada é descontado
+  perto(jan.filaFim, 40);
+  assert.strictEqual(jan.necessarioVazao, 3);                // 40 ÷ 17,85 por pessoa
+  assert.strictEqual(jan.faltamVazao, 2);                    // já existe 1 pessoa
+  assert.strictEqual(jan.status, 'deficit');
+  const fev = e.meses[1];
+  perto(fev.filaInicio, 40);                                 // a fila de janeiro entra em fevereiro
+  assert.ok(fev.necessarioRecuperacao > fev.necessarioVazao); // recuperação inclui a fila
+  perto(e.meses[11].filaFim, 40 * 12);
+  assert.ok(e.resumo.admissoesTotal > 0);
+  assert.ok(e.resumo.filaDezembroCenario < e.resumo.filaDezembro); // contratando, a fila termina menor
+});
+
+teste('evolução: atendidas informadas mandam na fila (e valem para meses passados e futuros)', () => {
+  const r = rodar([unidade(mesesConst(40))], [tecnico()]);
+  const informadas = { u: { 1: 40, 2: 10 } };                 // janeiro zerado, fevereiro parcial
+  const e = Calculo.evolucao(r, { mesAtual: 12, prazoMeses: 2, atendidas: informadas, parametros: PARAM }).unidades[0].areas.tecnico;
+  perto(e.meses[0].atendidas, 40);
+  perto(e.meses[0].filaFim, 0);
+  assert.strictEqual(e.meses[0].informado, true);
+  perto(e.meses[1].filaInicio, 0);
+  perto(e.meses[1].atendidas, 10);
+  perto(e.meses[1].filaFim, 30);
+  assert.strictEqual(e.meses[2].informado, false);            // sem informação: mês passado não desconta
+  perto(e.meses[2].filaFim, 30 + 40);
+  assert.strictEqual(e.resumo.mesesInformados, 2);
+});
+
+teste('evolução: alterar um mês só afeta dali para a frente', () => {
+  const base = mesesConst(40);
+  const antes = Calculo.evolucao(rodar([unidade(base)], [tecnico()]), { mesAtual: 12, parametros: PARAM }).total.areas.tecnico;
+  const mudado = { ...base, 6: { empresasVencidas: 10, empresasExclusivaTst: 0 } }; // junho: 40 → 10
+  const depois = Calculo.evolucao(rodar([unidade(mudado)], [tecnico()]), { mesAtual: 12, parametros: PARAM }).total.areas.tecnico;
+  for (let i = 0; i < 5; i++) perto(depois.meses[i].filaFim, antes.meses[i].filaFim);   // janeiro a maio: idênticos
+  perto(depois.meses[5].filaFim, antes.meses[5].filaFim - 30);                          // junho e os seguintes: -30
+  perto(depois.meses[11].filaFim, antes.meses[11].filaFim - 30);
+});
+
+teste('evolução: o peso do porte converte as atendidas informadas em demanda equivalente', () => {
+  const meses = {}; for (let i = 1; i <= 12; i++) meses[i] = { demanda: { mensal: { G: 10 } } }; // 10 grandes = 20 equivalentes
+  const r = rodar([unidade(meses)], [tecnico()]);
+  const e = Calculo.evolucao(r, { mesAtual: 12, atendidas: { u: { 1: 5 } }, parametros: PARAM }).unidades[0].areas.tecnico;
+  perto(e.meses[0].clientes, 10);
+  perto(e.meses[0].entram, 20);
+  perto(e.meses[0].pesoMedio, 2);
+  perto(e.meses[0].atendidas, 10);   // 5 clientes grandes = 10 de demanda equivalente
+  perto(e.meses[0].filaFim, 10);
+});
+
 console.log(`\n${passaram} testes passaram.`);

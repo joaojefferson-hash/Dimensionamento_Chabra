@@ -52,6 +52,32 @@ export const useDimensionamentoStore = defineStore('dimensionamento', () => {
   const varias = computed(() => !unidadeSelValida.value && resultado.value.unidades.length > 1);
   const temCusto = computed(() => Calculo.FUNCOES.some(f => resultado.value.total.meses.some(m => m.funcoes[f].custo && m.funcoes[f].custo.pessoa > 0)));
 
+  /** Empresas concluídas informadas por unidade e mês: { [unidadeId]: { 1..12: n } }. */
+  const atendidasInformadas = computed(() => {
+    const out = {};
+    cad.unidades.forEach(u => {
+      const meses = (u.mesesPorAno || {})[pref.ano] || {};
+      Object.entries(meses).forEach(([mes, v]) => {
+        if (v && v.atendidas > 0) { out[u.id] = out[u.id] || {}; out[u.id][Number(mes)] = v.atendidas; }
+      });
+    });
+    return out;
+  });
+  /** Evolução mês a mês (controle histórico): fila, capacidade, quadro necessário e admissões sugeridas. */
+  const evolucao = computed(() => Calculo.evolucao(resultado.value, {
+    mesAtual: pref.mesAtual,
+    prazoMeses: prazoMeses.value,
+    filaInicial: filaInicial.value,
+    atendidas: atendidasInformadas.value,
+    parametros: parametrosMotor.value,
+  }));
+  /** Evolução da unidade escolhida (ou o total). */
+  const evolucaoAlvo = computed(() => (unidadeSelValida.value
+    ? evolucao.value.unidades.find(u => u.id === unidadeSelValida.value).areas
+    : evolucao.value.total.areas));
+  /** Há atendimentos informados no ano? (sem eles, o histórico só acumula) */
+  const temAtendidas = computed(() => Object.keys(atendidasInformadas.value).length > 0);
+
   /** "Hoje": pendentes e, por área, equipe → ideal, contratar para zerar no prazo, produção por dia. */
   const hoje = computed(() => {
     const t = pref.mesAtual;
@@ -74,5 +100,5 @@ export const useDimensionamentoStore = defineStore('dimensionamento', () => {
     return { mes: t, pendentes: pend.pendentes, deAntes: pend.filaInicio, vencem: pend.informado, deAnoAnterior, anoAnterior: pref.ano - 1, areas };
   });
 
-  return { resultado, fila, filaInicial, alvo, filaAlvo, titulo, varias, temCusto, hoje, prazoMeses, unidadeSelValida };
+  return { resultado, fila, filaInicial, alvo, filaAlvo, titulo, varias, temCusto, hoje, prazoMeses, unidadeSelValida, evolucao, evolucaoAlvo, atendidasInformadas, temAtendidas };
 });

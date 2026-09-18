@@ -147,8 +147,15 @@
   .print-only { display: none; }
 }
 
-/* Impressão do organograma: apenas a árvore, com o cabeçalho do documento. */
+/* Impressão: organograma (apenas a árvore) e Evolução (tabela e gráficos). */
 @media print {
+  aside, .nao-imprimir { display: none !important; }
+  main { padding: 0 !important; }
+  .print-only { display: block; }
+  .print-cabecalho { margin-bottom: 10px; }
+  .print-cabecalho strong { display: block; font-size: 15px; color: var(--color-primary-dark); }
+  .print-cabecalho span { font-size: 11px; color: var(--color-muted); }
+  .card { box-shadow: none; break-inside: avoid; }
   body.imprimindo-organograma aside,
   body.imprimindo-organograma .page-header,
   body.imprimindo-organograma .nao-imprimir { display: none !important; }
