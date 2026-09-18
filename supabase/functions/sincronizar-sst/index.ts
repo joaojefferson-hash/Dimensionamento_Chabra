@@ -15,7 +15,13 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { montarLote } from './transformar.js';
 
-const API = Deno.env.get('CHABRA_API_BASE') ?? 'https://api.chabra.com.br/v1';
+const API_PADRAO = 'https://api.chabra.com.br/v1';
+/** Aceita o segredo com texto em volta (ex.: "opcional; padrão https://…") e cai no padrão se não houver URL. */
+function baseDaApi(valor: string | undefined): string {
+  const achado = /https?:\/\/[^\s"']+/i.exec(valor ?? '');
+  return (achado ? achado[0] : API_PADRAO).replace(/\/+$/, '');
+}
+const API = baseDaApi(Deno.env.get('CHABRA_API_BASE'));
 const CF_ID = Deno.env.get('CHABRA_CF_ID') ?? '';
 const CF_SECRET = Deno.env.get('CHABRA_CF_SECRET') ?? '';
 const JWT = Deno.env.get('CHABRA_JWT') ?? '';
