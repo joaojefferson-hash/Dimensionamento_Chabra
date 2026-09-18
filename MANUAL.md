@@ -1,6 +1,7 @@
 # Chabra Dimensiona — Manual do programa
 
 > Dimensionamento de quadro para a consultoria de Segurança e Saúde do Trabalho (SST) da Chabra.
+> Visão geral de todas as funcionalidades: [FUNCIONALIDADES.md](FUNCIONALIDADES.md).
 > Endereço: https://dimensionamento-chabra.vercel.app · Acesso com e-mail e senha fornecidos pelo administrador.
 
 Este documento descreve o programa inteiro: para que serve, quem acessa o quê, cada tela, como as contas são feitas e o que fazer no dia a dia. A parte técnica (código, banco, publicação) está no final.
@@ -35,7 +36,7 @@ No acesso de **Leitura**, os formulários e botões que gravam ficam desligados 
 
 A proteção não é só visual: o banco de dados recusa gravações de quem não pode editar.
 
-Qualquer usuário troca a própria senha em **Senha** (rodapé do menu). Não há "esqueci a senha": o administrador redefine na tela Usuários.
+Não há "esqueci a senha" nem troca de senha pelo próprio usuário: o administrador redefine na tela **Usuários** e informa a nova senha à pessoa.
 
 ---
 
