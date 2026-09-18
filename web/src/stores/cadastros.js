@@ -138,21 +138,26 @@ export const useCadastrosStore = defineStore('cadastros', () => {
     const atual = mesDaUnidade(u, ano, mes);
     const demanda = { ...atual.demanda, [condicao]: { ...(atual.demanda[condicao] || {}) } };
     if (q > 0) demanda[condicao][porte] = q; else delete demanda[condicao][porte];
-    guardarMes(u, ano, mes, api.montarMes(demanda, atual.clientesAtivos, atual.atendidas));
+    guardarMes(u, ano, mes, api.montarMes(demanda, atual.clientesAtivos, atual.atendidas, atual.atendidasPorte));
   }
   async function definirClientesAtivos(unidadeId, ano, mes, quantidade) {
     return definirUnidadeMes(unidadeId, ano, mes, { clientesAtivos: quantidade });
   }
-  /** Empresas concluídas no mês: saem da fila na tela Evolução. */
-  async function definirAtendidas(unidadeId, ano, mes, quantidade) {
-    return definirUnidadeMes(unidadeId, ano, mes, { atendidas: quantidade });
+  /** Empresas concluídas no mês, por porte (a mesma unidade da demanda): saem da fila. */
+  async function definirAtendidas(unidadeId, ano, mes, porte, quantidade) {
+    const u = unidadePorId.value[unidadeId]; if (!u) throw new Error('Unidade não encontrada.');
+    const atual = mesDaUnidade(u, ano, mes);
+    const porteAtual = { ...(atual.atendidasPorte || {}) };
+    const q = Math.max(0, Math.round(Number(quantidade) || 0));
+    if (q > 0) porteAtual[porte] = q; else delete porteAtual[porte];
+    return definirUnidadeMes(unidadeId, ano, mes, { atendidasPorte: porteAtual });
   }
   async function definirUnidadeMes(unidadeId, ano, mes, patch) {
     const u = unidadePorId.value[unidadeId]; if (!u) throw new Error('Unidade não encontrada.');
     const atual = mesDaUnidade(u, ano, mes);
-    const valores = { clientesAtivos: atual.clientesAtivos, atendidas: atual.atendidas, ...patch };
+    const valores = { clientesAtivos: atual.clientesAtivos, atendidasPorte: atual.atendidasPorte || {}, ...patch };
     const salvo = await api.demanda.definirUnidadeMes(unidadeId, ano, mes, valores);
-    guardarMes(u, ano, mes, api.montarMes(atual.demanda, salvo.clientesAtivos, salvo.atendidas));
+    guardarMes(u, ano, mes, api.montarMes(atual.demanda, salvo.clientesAtivos, salvo.atendidas, salvo.atendidasPorte));
     return salvo;
   }
   async function substituirDemandaAno(ano, linhas, condicao = null) { const r = await api.demanda.substituirAno(ano, linhas, condicao); await carregar(); return r; }
@@ -186,9 +191,9 @@ export const useCadastrosStore = defineStore('cadastros', () => {
         .map(([porte, quantidade]) => ({ ano: Number(ano), mes: Number(mes), condicao: c.condicao, porte, quantidade })))));
     const listaAtivos = u => Object.entries(u.mesesPorAno || {}).flatMap(([ano, meses]) => Object.entries(meses)
       .filter(([, v]) => v.clientesAtivos > 0 || v.atendidas > 0)
-      .map(([mes, v]) => ({ ano: Number(ano), mes: Number(mes), clientesAtivos: v.clientesAtivos, atendidas: v.atendidas || 0 })));
+      .map(([mes, v]) => ({ ano: Number(ano), mes: Number(mes), clientesAtivos: v.clientesAtivos, atendidas: v.atendidas || 0, atendidasPorte: v.atendidasPorte || {} })));
     return {
-      app: 'chabra-dimensiona', version: 13, exportedAt: new Date().toISOString(),
+      app: 'chabra-dimensiona', version: 14, exportedAt: new Date().toISOString(),
       portes: portes.value,
       funcoes: funcoes.value.map(f => ({ ...f, respondePara: f.respondeParaId ? (funcaoPorId.value[f.respondeParaId] || {}).nome || null : null })),
       unidades: unidades.value.map(u => ({ id: u.id, nome: u.nome, demandaPorMes: listaDemanda(u), clientesAtivosPorMes: listaAtivos(u) })),

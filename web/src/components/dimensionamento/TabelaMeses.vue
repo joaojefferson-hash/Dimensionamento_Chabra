@@ -42,7 +42,7 @@ const tipArea = (m, f) => {
 };
 const pendente = mes => {
   const a = dim.filaAlvo[Calculo.TEC].meses[mes], b = dim.filaAlvo[Calculo.ADM].meses[mes];
-  const v = Math.max(a.filaFim, b.filaFim);
+  const v = dim.backlogMes(mes); // soma das filas das três etapas (núcleo do motor)
   const tip = Math.abs(a.filaFim - b.filaFim) > 0.5 ? `Técnicos: ${num(a.filaFim)} · Administrativos: ${num(b.filaFim)} (exibido o maior)`
     : mes < pref.mesAtual ? `${num(a.filaInicio)} pendências anteriores${mes === 0 && a.filaInicio > 0.5 ? ` (provenientes de ${pref.ano - 1})` : ''} + ${num(a.informado)} vencimentos do mês (nos meses passados o valor lançado já corresponde ao que permanece em aberto)`
     : `${num(a.filaInicio)} pendências anteriores + ${num(a.informado)} vencimentos − ${num(a.atendidas)} atendimentos`;
@@ -56,7 +56,7 @@ const ano = computed(() => {
   const custo = FUNCOES.reduce((s, f) => s + (j[f].custo ? j[f].custo.contratar : 0), 0);
   const sobra = FUNCOES.reduce((s, f) => s + (j[f].custo ? j[f].custo.sobra : 0), 0);
   const custos = [custo > 0 ? `custo das contratações ≈ ${moeda(custo)} no ano` : null, sobra > 0 ? `custo do excedente ≈ ${moeda(sobra)} no ano` : null].filter(Boolean);
-  return { partes, custos, pendenteDez: Math.max(dim.filaAlvo[Calculo.TEC].meses[11].filaFim, dim.filaAlvo[Calculo.ADM].meses[11].filaFim) };
+  return { partes, custos, pendenteDez: dim.backlogMes(11) };
 });
 const p = computed(() => cad.parametros);
 </script>

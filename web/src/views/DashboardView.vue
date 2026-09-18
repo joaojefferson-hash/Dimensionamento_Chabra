@@ -35,7 +35,7 @@ const barra = { borderRadius: 4, borderSkipped: false, maxBarThickness: 34 };
 const linha = cor => ({ type: 'line', borderColor: cor, backgroundColor: cor, borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#fff', pointBorderWidth: 2, tension: 0.25 });
 
 /* 1. Pendentes no fim de cada mês (o maior entre técnicos e administrativos) */
-const pendentes = computed(() => meses.value.map(m => Math.max(dim.filaAlvo[TEC].meses[m.mes].filaFim, dim.filaAlvo[ADM].meses[m.mes].filaFim)));
+const pendentes = computed(() => meses.value.map(m => dim.backlogMes(m.mes)));
 const gPendentes = computed(() => ({
   labels: rotulos,
   datasets: [{ label: 'Pendências ao fim do mês', data: pendentes.value, ...barra,

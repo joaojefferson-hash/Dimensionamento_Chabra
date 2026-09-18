@@ -50,13 +50,21 @@ teste('ramp-up: admitido em 1/mar produz 50% em março, 80% em abril, 100% de ma
   assert.strictEqual(r.total.meses[4].funcoes.tecnico.emRampup, 0);
 });
 
-teste('presença: admitido em 16/jan conta 16/31 do mês; desligado em 10/jun não conta em julho', () => {
+teste('presença: conta os DIAS ÚTEIS do período, não os dias corridos', () => {
+  // jan/2026: 22 dias de semana; de 16 a 31/01 há 11 dias de semana → 11/22 = 0,5
   const r = rodar([unidade(mesesConst(10))], [tecnico({ dataAdmissao: '2026-01-16', dataDesligamento: '2026-06-10' })]);
-  perto(Calculo.presencaNoMes({ dataAdmissao: '2026-01-16' }, 2026, 0), 16 / 31, 1e-9);
-  perto(r.total.meses[0].pessoas.tecnico, 16 / 31, 1e-9);
-  perto(r.total.meses[5].pessoas.tecnico, 10 / 30, 1e-9);
+  perto(Calculo.presencaNoMes({ dataAdmissao: '2026-01-16' }, 2026, 0), 11 / 22, 1e-9);
+  perto(r.total.meses[0].pessoas.tecnico, 11 / 22, 1e-9);
+  // jun/2026: 22 dias de semana; de 1 a 10/06 há 8 dias de semana
+  perto(Calculo.presencaNoMes({ dataDesligamento: '2026-06-10' }, 2026, 5), 8 / 22, 1e-9);
   perto(r.total.meses[6].pessoas.tecnico, 0);
   perto(r.total.meses[6].entregas.relatorios.consegue, 0);
+  // quem entra no último dia útil produz menos que quem entra na véspera
+  const ultimo = Calculo.presencaNoMes({ dataAdmissao: '2026-01-30' }, 2026, 0);
+  const vespera = Calculo.presencaNoMes({ dataAdmissao: '2026-01-29' }, 2026, 0);
+  assert.ok(ultimo < vespera && ultimo > 0, 'admissão mais tarde produz menos');
+  // sábado e domingo não acrescentam presença
+  perto(Calculo.presencaNoMes({ dataAdmissao: '2026-01-31' }, 2026, 0), 0, 1e-9);
 });
 
 teste('quadro ideal e faltam/sobram continuam iguais (2 técnicos, 71 empresas em fevereiro → ideal 5, faltam 3)', () => {

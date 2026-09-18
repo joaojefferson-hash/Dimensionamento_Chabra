@@ -44,6 +44,7 @@ Não há "esqueci a senha" nem troca de senha pelo próprio usuário: o administ
 
 | Seção | Tela | Para quê |
 |---|---|---|
+| Dimensionamento | **Diretoria** | Visão executiva: carteira, demanda, capacidade, backlog com idade, gargalo da cadeia, QLP em três leituras e custo. Com impressão. |
 | Dimensionamento | **Projeção** | A tela de resultado, uma unidade por vez: pendências atuais, equipe → quadro ideal, mês a mês (contratação necessária?), simulação de cenários. |
 | Dimensionamento | **Resumo do mês** | A foto de um mês: acumulado dos meses anteriores, vencimentos do mês, equipe, pendências ao fim do mês e projeção. Com impressão. |
 | Dimensionamento | **Dashboard** | Os mesmos números em gráficos: pendentes mês a mês, vencem × equipe consegue, equipe hoje × ideal, por unidade, R$. |
@@ -75,7 +76,7 @@ A base da demanda. Para cada unidade há três linhas por mês (janeiro a dezemb
 - **Clientes ativos** — total de clientes da unidade no mês. **Só informativo** (histórico da carteira); não entra em nenhuma conta.
 - **Mensal** — clientes com contrato mensal cujos documentos vencem naquele mês.
 - **Exclusiva TST** — clientes na condição Exclusiva TST cujos documentos vencem naquele mês.
-- **Atendidas no mês** — empresas efetivamente concluídas no mês. Diferente de Clientes ativos, **entra no cálculo**: é o que sai da fila na tela Evolução. Em branco, o mês decorrido acumula tudo o que venceu.
+- **Atendidas no mês** — empresas efetivamente concluídas no mês, **no porte selecionado** (como as demais linhas). Diferente de Clientes ativos, **entra no cálculo**: é o que sai da fila em todas as telas de dimensionamento. Em branco, o mês decorrido acumula tudo o que venceu.
 - **Empresa sem avaliação** — clientes ainda sem avaliação realizada naquele mês.
 - **Contratos novos** — clientes de contratos firmados naquele mês.
 - **Total** = soma das quatro condições (é o que a Projeção usa, com cada cliente valendo o peso do seu porte). As condições servem para organizar a origem da demanda: todas exigem o mesmo atendimento e pesam igual, variando apenas pelo porte do cliente.
@@ -133,6 +134,12 @@ Abaixo, os **parâmetros do dimensionamento**, compartilhados por todos: **marge
 ---
 
 ## 5. Como as contas são feitas
+
+> A matemática completa, com fórmulas e premissas, está em [docs/MODELO-DE-CALCULO.md](docs/MODELO-DE-CALCULO.md).
+> Em resumo: tudo é medido em **UEP** (clientes × peso do porte); as três etapas (inspeção → relatório →
+> finalização) formam uma **cadeia**, e cada uma só processa o que a anterior concluiu; o **backlog** é a soma
+> das filas das etapas, guarda o mês de origem e é consumido do mais antigo para o mais novo; o **quadro
+> necessário** aparece em três leituras (operacional, recuperação e estrutural).
 
 Linguagem da tela: nunca "capacidade", "fator" ou "gap" — sempre frases prontas ("A equipe consegue até 141 inspeções por mês; a carteira precisa de 55", "Faltam aproximadamente 2 técnicos…") e sinais de cor.
 

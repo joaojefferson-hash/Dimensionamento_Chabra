@@ -123,8 +123,12 @@ const Calculo = (() => {
     if (desl && desl < inicio) return 0;
     const de = adm && adm > inicio ? adm : inicio;
     const ate = desl && desl < fim ? desl : fim;
-    const dias = Math.round((ate - de) / 86400000) + 1;
-    return Math.max(0, Math.min(1, dias / diasNoMes(ano, mes)));
+    // proporção de DIAS ÚTEIS (segunda a sexta) do período, não de dias corridos:
+    // quem entra dia 25 não produz a mesma fração de quem entra dia 20 com um fim de semana no meio
+    const uteis = (d1, d2) => { let q = 0; const d = new Date(d1); while (d <= d2) { const s = d.getDay(); if (s !== 0 && s !== 6) q++; d.setDate(d.getDate() + 1); } return q; };
+    const noPeriodo = uteis(de, ate), noMes = uteis(inicio, fim);
+    if (noMes <= 0) return 0;
+    return Math.max(0, Math.min(1, noPeriodo / noMes));
   }
 
   /**
@@ -488,7 +492,7 @@ const Calculo = (() => {
     Object.entries(base.pesosPorte || {}).forEach(([k, v]) => { if (n(v) > 0) pesosPorte[k] = n(v); });
     return {
       diasUteis: dias,
-      ocupacaoAlvo: n(base.ocupacaoAlvo) || 85,
+      ocupacaoAlvo: Number.isFinite(Number(base.ocupacaoAlvo)) ? Math.max(0, Math.min(100, n(base.ocupacaoAlvo))) : 85,
       rampup,
       pesosPorte,
     };
@@ -507,318 +511,499 @@ const Calculo = (() => {
     return ENTREGAS_DA_FUNCAO[tipo].map(e => `${f(c[e.campo])} ${e.unidade}`).join(' · ') + ' por dia';
   }
 
-  /* ---------- fila de atendimento (backlog) ----------
-     O número lançado em Empresas por Unidade é SÓ o que VENCE naquele mês (nunca um
-     acumulado). Nos meses passados é o que venceu ali e AINDA ESTÁ EM ABERTO — a equipe
-     já trabalhou de verdade e o que sobrou é esse número. O programa acumula sozinho,
-     do primeiro mês em diante:
-       pendentes(mês) = sobra do mês anterior + lançado(mês)          (todos os meses)
-       meses passados : atendidas = 0 → tudo passa adiante (o lançado já é o que ficou em aberto;
-                        não se desconta a produção da equipe de novo)
-       mês atual e seguintes: atendidas = mínimo(pendentes, o que a equipe consegue no mês)
-       sobra(mês)     = pendentes − atendidas   (nunca negativa; passa para o mês seguinte)
-     Editar o lançado de um mês recalcula todos os seguintes.
-     O que ficou em aberto no ANO ANTERIOR entra em janeiro (`filaInicial[unidadeId][grupo]`, calculado
-     pelo chamador com a fila do ano anterior). `mesAtual = 12` = todos os meses já passaram (ano anterior
-     inteiro em aberto).
-     Roda em cima do resultado de calcular() para o ano inteiro (janela 0..11), por unidade e grupo.
-     Situação do mês: ok = zerado no fim; atenção = ficou menos de um mês de trabalho;
-     precisa contratar = ficou mais de um mês de trabalho (prazo em risco).
-     Resumo (a partir do mês atual, dentro do prazo em meses):
-       fila hoje    = pendentes do mês atual (o que vence no mês + o que sobrou dos anteriores)
-       faltaPrazo   = fila hoje + o que vence nos meses seguintes do prazo − o que a equipe consegue no prazo
-       pessoasPrazo = pessoas a contratar para zerar isso dentro do prazo
+  /* ---------- fluxo: o núcleo único do dimensionamento ----------
+
+     Toda a matemática de fila, quadro necessário, custo e cenário vive aqui. `fila()` e
+     `evolucao()` são adaptadores deste núcleo — não existem duas contas para a mesma pergunta.
+
+     UEP (Unidade Equivalente de Produção): tudo — demanda, capacidade, atendimento e fila —
+     é medido na mesma unidade: clientes × peso do porte (P 1,0 · M 1,5 · G 2,0, parametrizável).
+
+     CADEIA. As três etapas acontecem em série e cada uma só recebe o que a anterior concluiu:
+
+         demanda do mês → [inspeção] → [relatório] → [finalização] → concluído
+
+     Cada etapa tem a sua fila. O backlog da unidade é a soma das filas das três etapas — cada
+     UEP está em exatamente uma delas. A etapa com a maior fila é o gargalo; capacidade não
+     usada em uma etapa a jusante é ociosidade, não folga.
+
+     COORTES. Cada parcela da fila guarda o mês em que venceu, e o consumo é FIFO (o mais antigo
+     primeiro). Daí saem as faixas de idade (0–30, 31–60, 61–90, 91–120, +120 dias), em
+     aproximação de 30 dias por mês.
+
+     ATENDIMENTO. `atendidas[unidadeId][mes]` traz o que foi concluído, por porte
+     ({ P: 10, M: 2 }) ou como número único (convertido pelo peso médio do mês, com aviso).
+     Meses passados sem informação acumulam tudo (nada é descontado); do mês atual em diante,
+     cada etapa conclui o que a sua capacidade permite.
+
+     QUADRO (QLP), em três leituras por área:
+       operacional  = pessoas para dar conta do que entra no mês (a fila não cresce)
+       recuperação  = pessoas para dar conta da entrada e ainda diluir a fila no prazo
+       estrutural   = pessoas para a demanda média do ano, depois de normalizada a fila
      ---------------------------------------------------- */
 
-  function fila(resultado, { mesAtual = 0, prazoMeses = 2, periodo = null, filaInicial = null } = {}) {
-    const t = Number(mesAtual) === 12 ? 12 : clampMes(mesAtual, 0); // 12 = ano inteiro já passou
-    const inicialDe = (item, f) => Math.max(0, n(filaInicial && filaInicial[item.id] && filaInicial[item.id][f]));
-    const pm = Math.max(1, Math.round(n(prazoMeses)) || 1);
-    const nomeMes = i => MESES_LONGO[i];
-    const pDe = clampMes(periodo && periodo.de, 0), pAte = clampMes(periodo && periodo.ate, 11);
-    const per = { de: Math.min(pDe, pAte), ate: Math.max(pDe, pAte) };
+  const FAIXAS_IDADE = [
+    { id: 'ate30', rotulo: 'Até 30 dias', minMeses: 0, maxMeses: 0 },
+    { id: 'ate60', rotulo: '31 a 60 dias', minMeses: 1, maxMeses: 1 },
+    { id: 'ate90', rotulo: '61 a 90 dias', minMeses: 2, maxMeses: 2 },
+    { id: 'ate120', rotulo: '91 a 120 dias', minMeses: 3, maxMeses: 3 },
+    { id: 'mais120', rotulo: 'Mais de 120 dias', minMeses: 4, maxMeses: Infinity },
+  ];
 
-    /** Resumo de um trecho de meses (período escolhido): fila no início, entradas, o que a equipe consegue, fila no fim, pessoas. */
-    const resumoPeriodo = meses => {
-      const trecho = meses.slice(per.de, per.ate + 1);
-      const soma = campo => trecho.reduce((s, m) => s + m[campo], 0);
-      const filaInicio = trecho.length ? trecho[0].filaInicio : 0;
-      const filaFim = trecho.length ? trecho[trecho.length - 1].filaFim : 0;
-      const entram = soma('entram'), consegue = soma('consegue'), atendidas = soma('atendidas');
-      // pessoas a contratar: só dali para a frente (meses já passados não mudam com contratação)
-      const inicioContratacao = Math.max(per.de, t);
-      const futuro = meses.slice(inicioContratacao, per.ate + 1);
-      const somaF = campo => futuro.reduce((s, m) => s + m[campo], 0);
-      const producaoPessoa = somaF('producaoPessoa');
-      const filaInicioF = futuro.length ? futuro[0].filaInicio : 0;
-      const entramF = somaF('entram');
-      const falta = futuro.length ? Math.max(0, filaInicioF + somaF('entram') - somaF('consegue')) : 0;
-      const sobra = futuro.length ? Math.max(0, somaF('consegue') - (filaInicioF + somaF('entram'))) : 0;
-      return {
-        de: per.de, ate: per.ate, nMeses: trecho.length, contratarDe: inicioContratacao,
-        filaInicio, entram, consegue, atendidas, filaFim, falta,
-        aAtender: filaInicioF + entramF, consegueFuturo: somaF('consegue'), // dali para a frente
-        pessoas: falta > 1e-9 && producaoPessoa > 0 ? Math.ceil(falta / producaoPessoa - 1e-9) : 0,
-        pessoasSobram: sobra > 1e-9 && producaoPessoa > 0 ? Math.floor(sobra / producaoPessoa + 1e-9) : 0,
-        status: trecho.length ? piorStatus(trecho.map(m => m.status)) : 'ok',
-      };
-    };
-
-    const filaGrupo = (item, f) => {
-      const entregas = ENTREGAS_DA_FUNCAO[f];
-      let pend = inicialDe(item, f); // o que ficou em aberto do ano anterior entra em janeiro
-      const meses = item.meses.map((m, i) => {
-        // entrega gargalo do grupo no mês (técnicos: inspeções ou relatórios, a menor)
-        const gargaloEntrega = entregas.reduce((a, b) => (m.entregas[b.id].consegue < m.entregas[a.id].consegue ? b : a));
-        const gargalo = m.entregas[gargaloEntrega.id];
-        const informado = n(m.precisa); // número lançado no mês = o que vence no mês (nos passados, o que venceu e ainda está em aberto)
-        const consegue = Math.max(0, n(gargalo.consegue));
-        // sempre: pendentes = o que sobrou do mês anterior + o que vence no mês
-        const filaInicio = pend;
-        const entram = informado;
-        const pendentes = filaInicio + entram;
-        // meses passados: o lançado já é o que ficou em aberto — não se desconta a equipe de novo; tudo passa adiante
-        // do mês atual em diante: a equipe atende o que consegue; o resto passa para o mês seguinte
-        const atendidas = i < t ? 0 : Math.min(pendentes, consegue);
-        const filaFim = Math.max(0, pendentes - atendidas);
-        pend = filaFim;
-        const producaoDiaPor = {};
-        entregas.forEach(e => { producaoDiaPor[e.id] = m.diasUteis > 0 ? Math.max(0, n(m.entregas[e.id].consegue)) / m.diasUteis : 0; });
-        return {
-          mes: m.mes, nome: m.nome, nomeLongo: m.nomeLongo, diasUteis: m.diasUteis,
-          passado: i < t, hoje: i === t,
-          informado, entram, filaInicio, pendentes, consegue, atendidas, filaFim,
-          pessoas: n(m.pessoas[f]), producaoPessoa: n(gargalo.producaoPessoa),
-          producaoDia: m.diasUteis > 0 ? consegue / m.diasUteis : 0,
-          producaoDiaPor, gargaloId: gargaloEntrega.id,
-          status: filaFim <= 1e-9 ? 'ok' : filaFim <= consegue + 1e-9 ? 'atencao' : 'deficit',
-        };
-      });
-      return { meses, resumo: resumoFila(meses, f), periodo: resumoPeriodo(meses) };
-    };
-
-    const resumoFila = (meses, f) => {
-      const hoje = meses[t];
-      const prazo = meses.slice(t, Math.min(12, t + pm));
-      const filaHoje = hoje ? hoje.pendentes : 0;                     // acumulado total: vence no mês + sobrou dos anteriores
-      const deMesesAnteriores = hoje ? hoje.filaInicio : 0;           // parte que veio de meses anteriores ainda não atendidos
-      const entramPrazo = prazo.slice(1).reduce((s, m) => s + m.entram, 0); // o que vence nos meses seguintes dentro do prazo
-      const conseguePrazo = prazo.reduce((s, m) => s + m.consegue, 0);
-      const producaoPessoaPrazo = prazo.reduce((s, m) => s + m.producaoPessoa, 0);
-      const faltaPrazo = Math.max(0, filaHoje + entramPrazo - conseguePrazo);
-      const pessoasPrazo = faltaPrazo > 1e-9 && producaoPessoaPrazo > 0 ? Math.ceil(faltaPrazo / producaoPessoaPrazo - 1e-9) : 0;
-      const sobraPrazo = Math.max(0, conseguePrazo - (filaHoje + entramPrazo));
-      const pessoasSobram = sobraPrazo > 1e-9 && producaoPessoaPrazo > 0 ? Math.floor(sobraPrazo / producaoPessoaPrazo + 1e-9) : 0;
-      const zeraIdx = meses.findIndex((m, i) => i >= t && m.filaFim <= 1e-9);
-      const entramResto = meses.slice(t).reduce((s, m) => s + m.entram, 0);
-      return {
-        funcao: f, mesAtual: t, prazoMeses: pm,
-        filaHoje, deMesesAnteriores, entramHoje: hoje ? hoje.informado : 0, entramPrazo, conseguePrazo, faltaPrazo, pessoasPrazo, pessoasSobram,
-        entramResto, filaDezembro: meses[11].filaFim,
-        zeraEm: zeraIdx >= 0 ? zeraIdx : null, zeraEmNome: zeraIdx >= 0 ? nomeMes(zeraIdx) : null,
-        pessoas: hoje ? hoje.pessoas : 0, producaoDia: hoje ? hoje.producaoDia : 0,
-        producaoDiaPor: hoje ? hoje.producaoDiaPor : {}, gargaloId: hoje ? hoje.gargaloId : null,
-        status: piorStatus(meses.slice(t).map(m => m.status)),
-      };
-    };
-
-    const unidades = resultado.unidades.map(u => {
-      const grupos = {};
-      FUNCOES.forEach(f => { grupos[f] = filaGrupo(u, f); });
-      return { id: u.id, nome: u.nome, grupos };
+  /** Coortes: lista de { ano, mes, uep }, consumida do mais antigo para o mais novo. */
+  const somaCoortes = lista => lista.reduce((s, c) => s + c.uep, 0);
+  function consumirCoortes(lista, quantidade) {
+    let resta = Math.max(0, quantidade);
+    const saida = [], fica = [];
+    lista.forEach(c => {
+      if (resta <= 1e-9) { fica.push(c); return; }
+      const usa = Math.min(c.uep, resta);
+      resta -= usa;
+      if (usa > 1e-9) saida.push({ ano: c.ano, mes: c.mes, uep: usa });
+      if (c.uep - usa > 1e-9) fica.push({ ano: c.ano, mes: c.mes, uep: c.uep - usa });
     });
-
-    // total = soma das unidades (a fila de uma unidade não é atendida pela equipe de outra)
-    const grupos = {};
-    FUNCOES.forEach(f => {
-      const meses = resultado.total.meses.map((m, i) => {
-        const partes = unidades.map(u => u.grupos[f].meses[i]);
-        const soma = campo => partes.reduce((s, x) => s + x[campo], 0);
-        const filaFim = soma('filaFim'), entram = soma('entram');
-        const producaoDiaPor = {};
-        ENTREGAS_DA_FUNCAO[f].forEach(e => { producaoDiaPor[e.id] = partes.reduce((s, x) => s + (x.producaoDiaPor[e.id] || 0), 0); });
-        const gargaloId = ENTREGAS_DA_FUNCAO[f].reduce((a, b) => (producaoDiaPor[b.id] < producaoDiaPor[a.id] ? b : a)).id;
-        return {
-          mes: m.mes, nome: m.nome, nomeLongo: m.nomeLongo, diasUteis: m.diasUteis,
-          passado: i < t, hoje: i === t,
-          informado: soma('informado'), pendentes: soma('pendentes'),
-          entram, filaInicio: soma('filaInicio'), consegue: soma('consegue'), atendidas: soma('atendidas'), filaFim,
-          pessoas: soma('pessoas'), producaoPessoa: soma('producaoPessoa') / Math.max(1, partes.length), producaoDia: soma('producaoDia'),
-          producaoDiaPor, gargaloId,
-          status: partes.length ? piorStatus(partes.map(x => x.status)) : 'ok',
-        };
-      });
-      const resumo = resumoFila(meses, f);
-      // pessoas a contratar no total = soma das unidades (folga numa não cobre fila de outra)
-      resumo.pessoasPrazo = unidades.reduce((s, u) => s + u.grupos[f].resumo.pessoasPrazo, 0);
-      resumo.pessoasSobram = unidades.reduce((s, u) => s + u.grupos[f].resumo.pessoasSobram, 0);
-      resumo.faltaPrazo = unidades.reduce((s, u) => s + u.grupos[f].resumo.faltaPrazo, 0);
-      const periodoTotal = resumoPeriodo(meses);
-      periodoTotal.pessoas = unidades.reduce((s, u) => s + u.grupos[f].periodo.pessoas, 0);
-      periodoTotal.pessoasSobram = unidades.reduce((s, u) => s + u.grupos[f].periodo.pessoasSobram, 0);
-      periodoTotal.falta = unidades.reduce((s, u) => s + u.grupos[f].periodo.falta, 0);
-      grupos[f] = { meses, resumo, periodo: periodoTotal };
+    return { saida, fica };
+  }
+  const juntarCoortes = lista => {
+    const mapa = new Map();
+    lista.forEach(c => {
+      if (c.uep <= 1e-9) return;
+      const k = `${c.ano}-${c.mes}`;
+      mapa.set(k, (mapa.get(k) || 0) + c.uep);
     });
-
-    const filaInicialTotal = {};
-    FUNCOES.forEach(f => { filaInicialTotal[f] = resultado.unidades.reduce((s, u) => s + inicialDe(u, f), 0); });
-    return { mesAtual: t, prazoMeses: pm, periodo: per, unidades, total: { grupos }, filaInicial: filaInicialTotal };
+    return [...mapa.entries()]
+      .map(([k, uep]) => ({ ano: Number(k.split('-')[0]), mes: Number(k.split('-')[1]), uep }))
+      .sort((a, b) => a.ano - b.ano || a.mes - b.mes);
+  };
+  /** Idade das coortes em relação a um mês de referência, nas faixas de 30 dias. */
+  function idadeDasCoortes(lista, anoRef, mesRef, limiteMeses) {
+    const faixas = {};
+    FAIXAS_IDADE.forEach(f => { faixas[f.id] = 0; });
+    const limite = Math.max(1, Math.round(n(limiteMeses)) || 1);
+    let foraDoPrazo = 0, total = 0, maisAntiga = null;
+    lista.forEach(c => {
+      const meses = Math.max(0, (anoRef - c.ano) * 12 + (mesRef - c.mes));
+      const faixa = FAIXAS_IDADE.find(f => meses >= f.minMeses && meses <= f.maxMeses) || FAIXAS_IDADE[FAIXAS_IDADE.length - 1];
+      faixas[faixa.id] += c.uep;
+      total += c.uep;
+      // fora do prazo: vencido há mais tempo que o prazo de atendimento configurado
+      if (meses >= limite) foraDoPrazo += c.uep;
+      if (maisAntiga == null || meses > maisAntiga) maisAntiga = meses;
+    });
+    return { faixas, total, maisAntigaMeses: maisAntiga, foraDoPrazo, limiteMeses: limite };
   }
 
-  /* ---------- evolução mês a mês (controle histórico) ----------
-     Responde, mês a mês e por área: com a carteira daquele mês e a equipe daquele mês, o quadro
-     estava insuficiente, adequado ou excedente? Quantas pessoas deveriam ter sido admitidas?
+  /** Atendimento informado de um mês, em UEP: por porte (exato) ou número único (peso médio). */
+  function atendidasEmUep(valor, p, pesoMedio) {
+    if (valor == null || valor === '') return null;
+    if (typeof valor === 'object') {
+      let uep = 0, clientes = 0, exato = true;
+      Object.entries(valor).forEach(([porte, qtd]) => {
+        const q = Math.max(0, n(qtd));
+        clientes += q;
+        uep += q * pesoPorte(p, porte);
+      });
+      return { uep, clientes, exato };
+    }
+    const q = Math.max(0, n(valor));
+    return { uep: q * (pesoMedio > 0 ? pesoMedio : 1), clientes: q, exato: false };
+  }
 
-       fila_inicial(jan) = fila do fim do ano anterior (`filaInicial[unidadeId][grupo]`)
-       entram(mês)       = clientes que vencem no mês × peso do porte
-       atendidas(mês)    = o que foi informado em Empresas por Unidade (contagem convertida em
-                           demanda equivalente pelo peso médio do mês); sem informação, 0 nos meses
-                           passados e o que a equipe consegue do mês atual em diante
-       fila_final(mês)   = fila_inicial + entram − atendidas      → fila_inicial do mês seguinte
-
-     Quadro necessário em duas leituras:
-       vazão       = dar conta do que entra no mês (não deixa a fila crescer)
-       recuperação = dar conta do que entra + a fila diluída no prazo (elimina o passivo)
-
-     Cenário "se tivéssemos contratado": repete a recorrência admitindo as pessoas sugeridas
-     (acumulativas — quem entra permanece), com o período de adaptação, para comparar a fila real
-     com a fila que teríamos.
-     ---------------------------------------------------- */
-
-  function evolucao(resultado, { mesAtual = 0, prazoMeses = 2, filaInicial = null, atendidas = null, parametros = null } = {}) {
+  /**
+   * Núcleo: cadeia de etapas, filas por coorte, quadro necessário e custo, mês a mês.
+   * Entrada: o resultado de calcular() (capacidades já com margem) + as opções.
+   * Não conhece tela, banco nem Vue.
+   */
+  function fluxo(resultado, { mesAtual = 0, prazoMeses = 2, filaInicial = null, atendidas = null, parametros = null, ano = new Date().getFullYear() } = {}) {
     const p = normalizarParametros(parametros);
     const t = Number(mesAtual) === 12 ? 12 : clampMes(mesAtual, 0);
     const pm = Math.max(1, Math.round(n(prazoMeses)) || 1);
-    const inicialDe = (id, f) => Math.max(0, n(filaInicial && filaInicial[id] && filaInicial[id][f]));
+    const anoRef = Number(ano) || new Date().getFullYear();
 
-    /** Uma área (técnicos ou administrativos) de uma unidade (ou do total), mês a mês. */
-    function areaDeItem(meses12, f, informadasDoMes, filaInicialArea) {
-      const entregas = ENTREGAS_DA_FUNCAO[f];
-      let fila = Math.max(0, n(filaInicialArea));
-      let filaCenario = fila;
-      const admissoes = []; // [{ mes, quantidade }] — acumulativas: quem entra permanece
+    /** Fila inicial de uma etapa: formato novo (coortes por etapa) ou o antigo (número por função). */
+    function inicialDaEtapa(unidadeId, etapa) {
+      const doItem = filaInicial && filaInicial[unidadeId];
+      if (!doItem) return [];
+      const porEtapa = doItem[etapa.id];
+      if (Array.isArray(porEtapa)) return juntarCoortes(porEtapa.map(c => ({ ano: n(c.ano) || anoRef - 1, mes: clampMes(c.mes, 11), uep: Math.max(0, n(c.uep)) })));
+      // compatibilidade: { tecnico, administrativo } → tudo na primeira etapa da função, vindo de dezembro anterior
+      const valor = n(doItem[etapa.funcao]);
+      const primeira = ENTREGAS_DA_FUNCAO[etapa.funcao][0];
+      return valor > 0 && etapa.id === primeira.id ? [{ ano: anoRef - 1, mes: 11, uep: valor }] : [];
+    }
 
-      const meses = meses12.map((m, i) => {
-        const gargaloEntrega = entregas.reduce((x, y) => (m.entregas[y.id].consegue < m.entregas[x.id].consegue ? y : x));
-        const gargalo = m.entregas[gargaloEntrega.id];
-        const capacidade = Math.max(0, n(gargalo.consegue));           // o que a equipe do mês entrega, já com a margem
-        const producaoPessoa = Math.max(0, n(gargalo.producaoPessoa)); // uma pessoa inteira no mês
-        const pessoas = v => (v > 1e-9 && producaoPessoa > 0 ? Math.ceil(v / producaoPessoa - 1e-9) : 0);
-        const quadro = n(m.pessoas[f]);
-        const entram = Math.max(0, n(m.precisa));
+    const pessoasInteiras = (quanto, producaoPessoa) => (quanto > 1e-9 && producaoPessoa > 0 ? Math.ceil(quanto / producaoPessoa - 1e-9) : 0);
+
+    function fluxoDaUnidade(item, informadasDoMes, iniciais) {
+      // estado das filas por etapa (coortes)
+      const fila = {};
+      ENTREGAS.forEach(e => { fila[e.id] = (iniciais && iniciais[e.id] ? iniciais[e.id] : []).slice(); });
+      const filaCenario = {};
+      ENTREGAS.forEach(e => { filaCenario[e.id] = fila[e.id].slice(); });
+      const admissoes = { [TEC]: [], [ADM]: [] }; // [{ mes, quantidade }] acumulativas
+
+      const meses = item.meses.map((m, i) => {
+        const demanda = Math.max(0, n(m.precisa));
         const clientes = Math.max(0, n(m.empresas));
-        const pesoMedio = clientes > 0 ? entram / clientes : 1;
-        const custoPessoa = m.funcoes[f].custo ? n(m.funcoes[f].custo.pessoa) : 0;
+        const pesoMedio = clientes > 0 ? demanda / clientes : 1;
+        const informado = atendidasEmUep(informadasDoMes(m.mes), p, pesoMedio);
+        const passado = i < t;
 
-        // fila real
-        const informadas = informadasDoMes(m.mes);
-        const filaInicio = fila;
-        const pendentes = filaInicio + entram;
-        const atendidasMes = informadas != null
-          ? Math.min(pendentes, informadas * pesoMedio)
-          : i < t ? 0 : Math.min(pendentes, capacidade);
-        const filaFim = Math.max(0, pendentes - atendidasMes);
-        fila = filaFim;
+        /* ---- cadeia: cada etapa recebe o que a anterior concluiu ---- */
+        const etapas = {};
+        let entrada = [{ ano: anoRef, mes: i, uep: demanda }]; // a primeira etapa recebe o que vence no mês
+        let filaAcumulada = 0; // fila das etapas anteriores: ainda vai passar por esta
+        ENTREGAS.forEach((e, idx) => {
+          const capacidade = Math.max(0, n(m.entregas[e.id].consegue));
+          const producaoPessoa = Math.max(0, n(m.entregas[e.id].producaoPessoa));
+          const filaInicio = fila[e.id];
+          const uepInicio = somaCoortes(filaInicio);
+          filaAcumulada += uepInicio; // o que está parado aqui e nas etapas anteriores passa por esta etapa
+          const uepEntrada = somaCoortes(entrada);
+          const disponivel = juntarCoortes(filaInicio.concat(entrada));
+          const uepDisponivel = somaCoortes(disponivel);
+          const ultima = idx === ENTREGAS.length - 1;
+          // quanto a etapa conclui: informado (última etapa) > capacidade (mês atual em diante) > nada (passado sem informação)
+          let concluir;
+          if (ultima && informado) concluir = Math.min(uepDisponivel, informado.uep);
+          else if (passado && !informado) concluir = 0;
+          else if (passado && informado && !ultima) concluir = Math.min(uepDisponivel, Math.max(informado.uep, 0)); // etapas anteriores entregaram ao menos o que foi concluído
+          else concluir = Math.min(uepDisponivel, capacidade);
+          const { saida, fica } = consumirCoortes(disponivel, concluir);
+          fila[e.id] = fica;
+          const uepConcluido = somaCoortes(saida);
+          const idade = idadeDasCoortes(fica, anoRef, i, pm);
+          etapas[e.id] = {
+            id: e.id, rotulo: e.rotulo, funcao: e.funcao, ordem: idx,
+            entrada: uepEntrada, filaInicio: uepInicio, filaAcumulada, disponivel: uepDisponivel,
+            capacidade, capacidadeNominal: Math.max(0, n(m.entregas[e.id].consegueMax)),
+            concluido: uepConcluido, filaFim: somaCoortes(fica),
+            ocioso: Math.max(0, capacidade - uepDisponivel),
+            saturada: uepDisponivel > capacidade + 1e-9,
+            producaoPessoa, quadro: n(m.pessoas[e.funcao]),
+            coortes: fica, idade,
+            // dimensionamento: cada etapa precisa dar conta da DEMANDA do mês (toda empresa passa por
+            // todas as etapas). Usar a entrada estrangulada pela etapa anterior esconderia a necessidade.
+            qlpOperacional: pessoasInteiras(demanda, producaoPessoa),
+            qlpRecuperacao: pessoasInteiras(demanda + filaAcumulada / pm, producaoPessoa),
+            faltamOperacional: pessoasInteiras(Math.max(0, demanda - capacidade), producaoPessoa),
+            faltamRecuperacao: pessoasInteiras(Math.max(0, demanda + filaAcumulada / pm - capacidade), producaoPessoa),
+            sobram: capacidade > 0 && capacidade - demanda > 1e-9 && producaoPessoa > 0 ? Math.floor((capacidade - demanda) / producaoPessoa + 1e-9) : 0,
+          };
+          // sem produção possível (mês sem dias úteis ou ninguém com produção declarada) o quadro
+          // não pode ser calculado: o sistema diz isso em vez de devolver "ninguém é necessário"
+          etapas[e.id].impossivel = demanda > 1e-9 && producaoPessoa <= 0;
+          etapas[e.id].semEquipe = etapas[e.id].quadro <= 1e-9;
+          etapas[e.id].status = etapas[e.id].impossivel || etapas[e.id].faltamOperacional > 0 ? 'deficit'
+            : uepInicio > 1e-9 || (capacidade > 0 && capacidade - demanda < capacidade * MARGEM_ATENCAO) ? 'atencao' : 'ok';
+          entrada = saida; // o que esta etapa concluiu alimenta a próxima
+        });
 
-        // quadro necessário
-        const alvoVazao = entram;
-        const alvoRecuperacao = entram + filaInicio / pm;
-        const faltaVazao = Math.max(0, alvoVazao - capacidade);
-        const faltaRecuperacao = Math.max(0, alvoRecuperacao - capacidade);
-        const sobra = Math.max(0, capacidade - alvoVazao);
-        const faltamVazao = pessoas(faltaVazao);
-        const status = faltamVazao > 0 ? 'deficit'
-          : faltaRecuperacao > 1e-9 || (capacidade > 0 && sobra < capacidade * MARGEM_ATENCAO) ? 'atencao' : 'ok';
+        /* ---- cenário: as mesmas etapas com as admissões sugeridas (acumulativas, com adaptação) ---- */
+        const cenario = {};
+        let entradaCenario = [{ ano: anoRef, mes: i, uep: demanda }];
+        let filaAcumuladaCenario = 0;
+        const extraDaFuncao = (f, e) => admissoes[f].reduce((s, a) => s + a.quantidade * Math.max(0, n(m.entregas[e.id].producaoPessoa)) * fatorRampup(i - a.mes, p.rampup), 0);
+        const novasPorFuncao = { [TEC]: 0, [ADM]: 0 };
+        ENTREGAS.forEach((e, idx) => {
+          const capacidade = Math.max(0, n(m.entregas[e.id].consegue)) + extraDaFuncao(e.funcao, e);
+          const producaoPessoa = Math.max(0, n(m.entregas[e.id].producaoPessoa));
+          const uepInicio = somaCoortes(filaCenario[e.id]);
+          const uepEntrada = somaCoortes(entradaCenario);
+          filaAcumuladaCenario += uepInicio;
+          const falta = Math.max(0, demanda + filaAcumuladaCenario / pm - capacidade);
+          const novas = pessoasInteiras(falta, producaoPessoa);
+          novasPorFuncao[e.funcao] = Math.max(novasPorFuncao[e.funcao], novas); // uma pessoa atende as duas etapas da sua função
+          cenario[e.id] = { entrada: uepEntrada, filaInicio: uepInicio, capacidade, idx };
+          entradaCenario = [{ ano: anoRef, mes: i, uep: Math.min(uepEntrada + uepInicio, capacidade) }]; // estimativa para dimensionar a etapa seguinte
+        });
+        FUNCOES.forEach(f => { if (novasPorFuncao[f] > 0) admissoes[f].push({ mes: i, quantidade: novasPorFuncao[f] }); });
+        // com as admissões decididas, roda a cadeia do cenário de verdade
+        entradaCenario = [{ ano: anoRef, mes: i, uep: demanda }];
+        ENTREGAS.forEach(e => {
+          const capacidade = Math.max(0, n(m.entregas[e.id].consegue)) + extraDaFuncao(e.funcao, e);
+          const disponivel = juntarCoortes(filaCenario[e.id].concat(entradaCenario));
+          const { saida, fica } = consumirCoortes(disponivel, Math.min(somaCoortes(disponivel), capacidade));
+          filaCenario[e.id] = fica;
+          cenario[e.id] = { ...cenario[e.id], capacidade, concluido: somaCoortes(saida), filaFim: somaCoortes(fica) };
+          entradaCenario = saida;
+        });
 
-        // cenário com as admissões sugeridas
-        const capacidadeExtra = admissoes.reduce((acc, a) => acc + a.quantidade * producaoPessoa * fatorRampup(i - a.mes, p.rampup), 0);
-        const filaInicioCenario = filaCenario;
-        const novas = pessoas(Math.max(0, (entram + filaInicioCenario / pm) - (capacidade + capacidadeExtra)));
-        if (novas > 0) admissoes.push({ mes: i, quantidade: novas });
-        const capacidadeCenario = capacidade + capacidadeExtra + novas * producaoPessoa * fatorRampup(0, p.rampup);
-        const pendentesCenario = filaInicioCenario + entram;
-        const atendidasCenario = Math.min(pendentesCenario, capacidadeCenario);
-        filaCenario = Math.max(0, pendentesCenario - atendidasCenario);
-        const quadroCenario = quadro + admissoes.reduce((acc, a) => acc + a.quantidade, 0);
+        /* ---- leitura por área (uma pessoa cobre as etapas da sua função) ---- */
+        const areas = {};
+        FUNCOES.forEach(f => {
+          const daFuncao = ENTREGAS_DA_FUNCAO[f].map(e => etapas[e.id]);
+          const custoPessoa = m.funcoes[f].custo ? n(m.funcoes[f].custo.pessoa) : 0;
+          const gargalo = daFuncao.reduce((a, b) => (b.filaFim > a.filaFim ? b : (b.filaFim === a.filaFim && b.capacidade < a.capacidade ? b : a)));
+          areas[f] = {
+            funcao: f, rotulo: FUNCAO_CURTA[f],
+            quadro: n(m.pessoas[f]),
+            capacidade: Math.min(...daFuncao.map(e => e.capacidade)),
+            demanda,
+            entrada: Math.max(...daFuncao.map(e => e.entrada)),
+            concluido: daFuncao[daFuncao.length - 1].concluido,
+            filaInicio: daFuncao.reduce((s, e) => s + e.filaInicio, 0),
+            filaFim: daFuncao.reduce((s, e) => s + e.filaFim, 0),
+            qlpOperacional: Math.max(...daFuncao.map(e => e.qlpOperacional)),
+            qlpRecuperacao: Math.max(...daFuncao.map(e => e.qlpRecuperacao)),
+            faltamOperacional: Math.max(...daFuncao.map(e => e.faltamOperacional)),
+            faltamRecuperacao: Math.max(...daFuncao.map(e => e.faltamRecuperacao)),
+            sobram: Math.min(...daFuncao.map(e => e.sobram)),
+            producaoPessoa: Math.min(...daFuncao.map(e => e.producaoPessoa)),
+            custoPessoa,
+            admissoesCenario: novasPorFuncao[f],
+            quadroCenario: n(m.pessoas[f]) + admissoes[f].reduce((s, a) => s + a.quantidade, 0),
+            gargaloEtapa: gargalo.id,
+            status: piorStatus(daFuncao.map(e => e.status)),
+            etapas: daFuncao.map(e => e.id),
+          };
+          areas[f].custoDeficitOperacional = areas[f].faltamOperacional * custoPessoa;
+          areas[f].custoDeficitRecuperacao = areas[f].faltamRecuperacao * custoPessoa;
+          areas[f].custoAtual = areas[f].quadro * custoPessoa;
+        });
+
+        const backlog = ENTREGAS.reduce((s, e) => s + etapas[e.id].filaFim, 0);
+        const coortesTotais = juntarCoortes(ENTREGAS.flatMap(e => etapas[e.id].coortes));
+        const idadeTotal = idadeDasCoortes(coortesTotais, anoRef, i, pm);
+        const gargalo = ENTREGAS.map(e => etapas[e.id]).reduce((a, b) => (b.filaFim > a.filaFim ? b : (Math.abs(b.filaFim - a.filaFim) < 1e-9 && b.capacidade < a.capacidade ? b : a)));
 
         return {
           mes: m.mes, nome: m.nome, nomeLongo: m.nomeLongo, diasUteis: m.diasUteis,
-          passado: i < t, hoje: i === t,
-          clientes, entram, pesoMedio,
-          informadas, informado: informadas != null,
-          filaInicio, pendentes, capacidade, atendidas: atendidasMes, filaFim,
-          quadro, producaoPessoa, custoPessoa,
-          necessarioVazao: pessoas(alvoVazao),
-          necessarioRecuperacao: pessoas(alvoRecuperacao),
-          faltamVazao,
-          faltamRecuperacao: pessoas(faltaRecuperacao),
-          sobramPessoas: sobra > 1e-9 && producaoPessoa > 0 ? Math.floor(sobra / producaoPessoa + 1e-9) : 0,
-          custoDeficit: pessoas(faltaRecuperacao) * custoPessoa,
-          status,
-          cenario: {
-            filaInicio: filaInicioCenario, capacidade: capacidadeCenario, atendidas: atendidasCenario,
-            filaFim: filaCenario, admissoes: novas, quadro: quadroCenario,
-          },
+          passado, hoje: i === t,
+          clientes, demanda, pesoMedio,
+          informado: !!informado, informadas: informado ? informado.clientes : null,
+          informadasUep: informado ? informado.uep : null, informadasExatas: informado ? informado.exato : null,
+          etapas, areas,
+          concluido: etapas[ENTREGAS[ENTREGAS.length - 1].id].concluido,
+          backlog, backlogInicio: ENTREGAS.reduce((s, e) => s + etapas[e.id].filaInicio, 0),
+          coortes: coortesTotais, idade: idadeTotal,
+          gargalo: gargalo.id, gargaloRotulo: gargalo.rotulo,
+          impossivel: ENTREGAS.some(e => etapas[e.id].impossivel),
+          quadroEstimado: ENTREGAS.some(e => etapas[e.id].semEquipe && demanda > 1e-9),
+          backlogCenario: ENTREGAS.reduce((s, e) => s + cenario[e.id].filaFim, 0),
+          cenario,
+          status: piorStatus(FUNCOES.map(f => areas[f].status)),
         };
       });
 
-      const soma = campo => meses.reduce((acc, m) => acc + m[campo], 0);
+      /* ---- resumo do ano e quadro estrutural ---- */
+      const mediaDemanda = meses.reduce((s, m) => s + m.demanda, 0) / (meses.length || 1);
+      const estrutural = {};
+      FUNCOES.forEach(f => {
+        const producaoPessoa = meses.reduce((s, m) => s + m.areas[f].producaoPessoa, 0) / (meses.length || 1);
+        const quadroMedio = meses.reduce((s, m) => s + m.areas[f].quadro, 0) / (meses.length || 1);
+        const custoPessoa = meses.reduce((s, m) => s + m.areas[f].custoPessoa, 0) / (meses.length || 1);
+        const qlp = pessoasInteiras(mediaDemanda, producaoPessoa);
+        const pico = Math.max(0, ...meses.map(m => m.areas[f].qlpOperacional));
+        const recuperacao = Math.max(0, ...meses.slice(t === 12 ? 11 : t).map(m => m.areas[f].qlpRecuperacao));
+        estrutural[f] = {
+          funcao: f, qlp, pico, recuperacao,
+          quadroAtual: quadroMedio,
+          faltamEstrutural: Math.max(0, Math.ceil(qlp - quadroMedio - 1e-9)),
+          faltamRecuperacao: Math.max(0, Math.ceil(recuperacao - quadroMedio - 1e-9)),
+          temporarios: Math.max(0, recuperacao - qlp),
+          custoPessoa,
+          custoAtual: quadroMedio * custoPessoa,
+          custoEstrutural: qlp * custoPessoa,
+          custoRecuperacao: Math.max(0, recuperacao - qlp) * custoPessoa,
+          custoIncremental: Math.max(0, recuperacao - quadroMedio) * custoPessoa,
+        };
+      });
+      const admissoesResumo = {};
+      FUNCOES.forEach(f => {
+        admissoesResumo[f] = { lista: admissoes[f].slice(), total: admissoes[f].reduce((s, a) => s + a.quantidade, 0) };
+      });
       const ultimo = meses[meses.length - 1];
-      const primeiroDeficit = meses.findIndex(m => m.faltamVazao > 0);
+      const hoje = meses[Math.min(t, 11)];
+      const zeraIdx = meses.findIndex((m, i) => i >= (t === 12 ? 11 : t) && m.backlog <= 1e-9);
+
       return {
-        funcao: f,
-        meses,
+        id: item.id, nome: item.nome, meses,
         resumo: {
-          funcao: f,
-          entram: soma('entram'), atendidas: soma('atendidas'), capacidade: soma('capacidade'),
-          filaDezembro: ultimo ? ultimo.filaFim : 0,
-          filaDezembroCenario: ultimo ? ultimo.cenario.filaFim : 0,
-          admissoes: admissoes.map(a => ({ mes: a.mes, quantidade: a.quantidade })),
-          admissoesTotal: admissoes.reduce((acc, a) => acc + a.quantidade, 0),
-          mesesInsuficientes: meses.filter(m => m.status === 'deficit').length,
+          mediaDemanda,
+          demandaAno: meses.reduce((s, m) => s + m.demanda, 0),
+          concluidoAno: meses.reduce((s, m) => s + m.concluido, 0),
+          backlogHoje: hoje ? hoje.backlog : 0,
+          backlogInicioHoje: hoje ? hoje.backlogInicio : 0,
+          idadeHoje: hoje ? hoje.idade : null,
+          backlogDezembro: ultimo ? ultimo.backlog : 0,
+          backlogDezembroCenario: ultimo ? ultimo.backlogCenario : 0,
+          gargaloHoje: hoje ? hoje.gargalo : null,
+          zeraEm: zeraIdx >= 0 ? zeraIdx : null,
           mesesInformados: meses.filter(m => m.informado).length,
-          custoDeficitMes: meses.length ? soma('custoDeficit') / meses.length : 0,
-          primeiroDeficit: primeiroDeficit >= 0 ? primeiroDeficit : null,
-          status: piorStatus(meses.map(m => m.status)),
+          mesesInsuficientes: meses.filter(m => m.status === 'deficit').length,
+          primeiroDeficit: (() => { const i = meses.findIndex(m => m.status === 'deficit'); return i >= 0 ? i : null; })(),
+          estrutural, admissoes: admissoesResumo,
+          filaFinal: Object.fromEntries(ENTREGAS.map(e => [e.id, meses.length ? meses[meses.length - 1].etapas[e.id].coortes : []])),
         },
       };
     }
 
     const informadasDe = id => mes => {
       const porMes = atendidas && atendidas[id];
-      const v = porMes ? porMes[mes + 1] : null;
-      return v == null || v === '' ? null : Math.max(0, n(v));
+      return porMes ? porMes[mes + 1] : null;
     };
-    /** No total, o mês só é considerado informado quando alguma unidade informou. */
     const informadasTotal = mes => {
       if (!atendidas) return null;
       let total = null;
       resultado.unidades.forEach(u => {
         const v = (atendidas[u.id] || {})[mes + 1];
-        if (v != null && v !== '') total = n(total) + Math.max(0, n(v));
+        if (v == null || v === '') return;
+        if (typeof v === 'object') {
+          total = typeof total === 'object' && total ? total : {};
+          Object.entries(v).forEach(([porte, q]) => { total[porte] = n(total[porte]) + Math.max(0, n(q)); });
+        } else if (typeof total === 'object' && total) {
+          total.P = n(total.P) + Math.max(0, n(v));
+        } else {
+          total = n(total) + Math.max(0, n(v));
+        }
       });
       return total;
     };
 
-    const unidades = resultado.unidades.map(u => {
+    const iniciaisDe = unidadeId => Object.fromEntries(ENTREGAS.map(e => [e.id, inicialDaEtapa(unidadeId, e)]));
+    const unidades = resultado.unidades.map(u => fluxoDaUnidade(u, informadasDe(u.id), iniciaisDe(u.id)));
+    // no total, a fila inicial é a soma das unidades (a equipe de uma não atende a fila de outra,
+    // mas o backlog consolidado é a soma dos backlogs)
+    const iniciaisTotal = Object.fromEntries(ENTREGAS.map(e => [e.id, juntarCoortes(resultado.unidades.flatMap(u => inicialDaEtapa(u.id, e)))]));
+    const total = fluxoDaUnidade({ id: '__total__', nome: 'Todas as unidades', meses: resultado.total.meses }, informadasTotal, iniciaisTotal);
+    return { mesAtual: t, prazoMeses: pm, ano: anoRef, faixasIdade: FAIXAS_IDADE, unidades, total };
+  }
+
+  /* ---------- adaptadores: fila() e evolucao() sobre o núcleo ----------
+     Mantêm o formato que as telas já consomem, mas a conta é uma só (fluxo()).
+     ---------------------------------------------------- */
+
+  /** Fila de atendimento por área (formato usado por Projeção, Dashboard e Resumo do mês). */
+  function fila(resultado, opcoes = {}) {
+    const fx = fluxo(resultado, opcoes);
+    const t = fx.mesAtual, pm = fx.prazoMeses;
+    const nomeMes = i => MESES_LONGO[i];
+
+    const grupoDeItem = (item, f) => {
+      const meses = item.meses.map((m, i) => {
+        const a = m.areas[f];
+        const producaoDiaPor = {};
+        ENTREGAS_DA_FUNCAO[f].forEach(e => { producaoDiaPor[e.id] = m.diasUteis > 0 ? m.etapas[e.id].capacidade / m.diasUteis : 0; });
+        return {
+          mes: m.mes, nome: m.nome, nomeLongo: m.nomeLongo, diasUteis: m.diasUteis,
+          passado: m.passado, hoje: m.hoje,
+          informado: m.demanda, entram: m.demanda,
+          filaInicio: a.filaInicio, pendentes: a.filaInicio + m.demanda,
+          consegue: a.capacidade, atendidas: a.concluido, filaFim: a.filaFim,
+          pessoas: a.quadro, producaoPessoa: a.producaoPessoa,
+          producaoDia: m.diasUteis > 0 ? a.capacidade / m.diasUteis : 0,
+          producaoDiaPor, gargaloId: a.gargaloEtapa,
+          status: a.status,
+        };
+      });
+      const hoje = meses[Math.min(t, 11)];
+      const prazo = meses.slice(Math.min(t, 11), Math.min(12, Math.min(t, 11) + pm));
+      const filaHoje = hoje ? hoje.pendentes : 0;
+      const entramPrazo = prazo.slice(1).reduce((s, x) => s + x.entram, 0);
+      const conseguePrazo = prazo.reduce((s, x) => s + x.consegue, 0);
+      const producaoPessoaPrazo = prazo.reduce((s, x) => s + x.producaoPessoa, 0);
+      const faltaPrazo = Math.max(0, filaHoje + entramPrazo - conseguePrazo);
+      const sobraPrazo = Math.max(0, conseguePrazo - (filaHoje + entramPrazo));
+      const zeraIdx = meses.findIndex((x, i) => i >= Math.min(t, 11) && x.filaFim <= 1e-9);
+      const resumo = {
+        funcao: f, mesAtual: t, prazoMeses: pm,
+        filaHoje, deMesesAnteriores: hoje ? hoje.filaInicio : 0, entramHoje: hoje ? hoje.entram : 0,
+        entramPrazo, conseguePrazo, faltaPrazo,
+        pessoasPrazo: faltaPrazo > 1e-9 && producaoPessoaPrazo > 0 ? Math.ceil(faltaPrazo / producaoPessoaPrazo - 1e-9) : 0,
+        pessoasSobram: sobraPrazo > 1e-9 && producaoPessoaPrazo > 0 ? Math.floor(sobraPrazo / producaoPessoaPrazo + 1e-9) : 0,
+        entramResto: meses.slice(Math.min(t, 11)).reduce((s, x) => s + x.entram, 0),
+        filaDezembro: meses[11].filaFim,
+        zeraEm: zeraIdx >= 0 ? zeraIdx : null, zeraEmNome: zeraIdx >= 0 ? nomeMes(zeraIdx) : null,
+        pessoas: hoje ? hoje.pessoas : 0, producaoDia: hoje ? hoje.producaoDia : 0,
+        producaoDiaPor: hoje ? hoje.producaoDiaPor : {}, gargaloId: hoje ? hoje.gargaloId : null,
+        status: piorStatus(meses.slice(Math.min(t, 11)).map(x => x.status)),
+      };
+      return { meses, resumo };
+    };
+
+    const unidades = fx.unidades.map(u => {
+      const grupos = {};
+      FUNCOES.forEach(f => { grupos[f] = grupoDeItem(u, f); });
+      return { id: u.id, nome: u.nome, grupos };
+    });
+    const grupos = {};
+    FUNCOES.forEach(f => { grupos[f] = grupoDeItem(fx.total, f); });
+    // no total, contratar é a soma das unidades (folga numa não cobre a fila de outra)
+    FUNCOES.forEach(f => {
+      grupos[f].resumo.pessoasPrazo = unidades.reduce((s, u) => s + u.grupos[f].resumo.pessoasPrazo, 0);
+      grupos[f].resumo.pessoasSobram = unidades.reduce((s, u) => s + u.grupos[f].resumo.pessoasSobram, 0);
+      grupos[f].resumo.faltaPrazo = unidades.reduce((s, u) => s + u.grupos[f].resumo.faltaPrazo, 0);
+    });
+    const filaInicialTotal = {};
+    FUNCOES.forEach(f => { filaInicialTotal[f] = fx.total.meses[0].areas[f].filaInicio; });
+    return { mesAtual: t, prazoMeses: pm, unidades, total: { grupos }, filaInicial: filaInicialTotal, fluxo: fx };
+  }
+
+  /** Evolução (controle histórico) por área — mesmo núcleo, formato da tela Evolução. */
+  function evolucao(resultado, opcoes = {}) {
+    const fx = fluxo(resultado, opcoes);
+    const areaDeItem = (item, f) => {
+      const meses = item.meses.map(m => {
+        const a = m.areas[f];
+        return {
+          mes: m.mes, nome: m.nome, nomeLongo: m.nomeLongo, diasUteis: m.diasUteis,
+          passado: m.passado, hoje: m.hoje,
+          clientes: m.clientes, entram: m.demanda, pesoMedio: m.pesoMedio,
+          informadas: m.informadas, informado: m.informado, informadasExatas: m.informadasExatas,
+          filaInicio: a.filaInicio, pendentes: a.filaInicio + m.demanda,
+          capacidade: a.capacidade, atendidas: a.concluido, filaFim: a.filaFim,
+          quadro: a.quadro, producaoPessoa: a.producaoPessoa, custoPessoa: a.custoPessoa,
+          necessarioVazao: a.qlpOperacional, necessarioRecuperacao: a.qlpRecuperacao,
+          faltamVazao: a.faltamOperacional, faltamRecuperacao: a.faltamRecuperacao,
+          sobramPessoas: a.sobram,
+          custoDeficit: a.custoDeficitRecuperacao,
+          gargaloEtapa: a.gargaloEtapa,
+          status: a.status,
+          cenario: {
+            filaInicio: ENTREGAS_DA_FUNCAO[f].reduce((s, e) => s + n(m.cenario[e.id].filaInicio), 0),
+            capacidade: Math.min(...ENTREGAS_DA_FUNCAO[f].map(e => n(m.cenario[e.id].capacidade))),
+            atendidas: n(m.cenario[ENTREGAS_DA_FUNCAO[f][ENTREGAS_DA_FUNCAO[f].length - 1].id].concluido),
+            filaFim: ENTREGAS_DA_FUNCAO[f].reduce((s, e) => s + n(m.cenario[e.id].filaFim), 0),
+            admissoes: a.admissoesCenario, quadro: a.quadroCenario,
+          },
+        };
+      });
+      const soma = campo => meses.reduce((s, m) => s + m[campo], 0);
+      const ultimo = meses[meses.length - 1];
+      const estrutural = item.resumo.estrutural[f];
+      const adm = item.resumo.admissoes[f];
+      return {
+        funcao: f, meses,
+        resumo: {
+          funcao: f,
+          entram: soma('entram'), atendidas: soma('atendidas'), capacidade: soma('capacidade'),
+          filaDezembro: ultimo ? ultimo.filaFim : 0,
+          filaDezembroCenario: ultimo ? ultimo.cenario.filaFim : 0,
+          admissoes: adm.lista, admissoesTotal: adm.total,
+          mesesInsuficientes: meses.filter(m => m.status === 'deficit').length,
+          mesesInformados: meses.filter(m => m.informado).length,
+          custoDeficitMes: meses.length ? soma('custoDeficit') / meses.length : 0,
+          primeiroDeficit: (() => { const i = meses.findIndex(m => m.faltamVazao > 0); return i >= 0 ? i : null; })(),
+          estrutural,
+          status: piorStatus(meses.map(m => m.status)),
+        },
+      };
+    };
+    const unidades = fx.unidades.map(u => {
       const areas = {};
-      FUNCOES.forEach(f => { areas[f] = areaDeItem(u.meses, f, informadasDe(u.id), inicialDe(u.id, f)); });
+      FUNCOES.forEach(f => { areas[f] = areaDeItem(u, f); });
       return { id: u.id, nome: u.nome, areas };
     });
-
     const areasTotal = {};
-    FUNCOES.forEach(f => {
-      const inicial = resultado.unidades.reduce((acc, u) => acc + inicialDe(u.id, f), 0);
-      areasTotal[f] = areaDeItem(resultado.total.meses, f, informadasTotal, inicial);
-    });
-
-    return { mesAtual: t, prazoMeses: pm, unidades, total: { areas: areasTotal } };
+    FUNCOES.forEach(f => { areasTotal[f] = areaDeItem(fx.total, f); });
+    return { mesAtual: fx.mesAtual, prazoMeses: fx.prazoMeses, unidades, total: { areas: areasTotal }, fluxo: fx };
   }
 
   return {
     MESES, MESES_LONGO, TEC, ADM, FUNCOES, FUNCAO_CURTA, FUNCAO_SINGULAR, ENTREGAS, ENTREGAS_DA_FUNCAO, COLAB_PADRAO, MARGEM_ATENCAO, colaboradoresSimulados,
     empresasDoMes, empresasPonderadas, pesoPorte, presencaNoMes, fatorRampup, custoFuncao,
-    producaoMes, precisaMes, calcular, fila, evolucao, normalizarParametros, ritmoTexto, piorStatus,
+    producaoMes, precisaMes, calcular, fluxo, fila, evolucao, FAIXAS_IDADE, normalizarParametros, ritmoTexto, piorStatus,
   };
 })();
 

@@ -6,6 +6,7 @@ import { createRouter, createWebHashHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth.js';
 
 export const TELAS = [
+  { path: '/diretoria',       name: 'diretoria',       titulo: 'Diretoria',       secao: 'Dimensionamento', papeis: ['admin', 'leitura'], component: () => import('../views/DiretoriaView.vue') },
   { path: '/projecao',        name: 'projecao',        titulo: 'Projeção',        secao: 'Dimensionamento', papeis: ['admin', 'leitura'], component: () => import('../views/DimensionamentoView.vue') },
   { path: '/mes',             name: 'mes',             titulo: 'Resumo do mês',   secao: 'Dimensionamento', papeis: ['admin', 'leitura'], component: () => import('../views/MesView.vue') },
   { path: '/dashboard',       name: 'dashboard',       titulo: 'Dashboard',       secao: 'Dimensionamento', papeis: ['admin', 'leitura'], component: () => import('../views/DashboardView.vue') },

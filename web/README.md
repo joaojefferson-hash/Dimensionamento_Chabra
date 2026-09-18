@@ -51,6 +51,7 @@ web/
       DashboardView.vue         gráficos (Chart.js via components/ui/Grafico.vue) sobre a store de dimensionamento
       MesView.vue               resumo de um mês: acumulado, vencimentos, equipe, composição do acumulado e projeção
       EvolucaoView.vue          controle histórico (Calculo.evolucao): fila, capacidade, quadro real × necessário, impressão
+      DiretoriaView.vue         visão executiva (Calculo.fluxo): UEP, capacidade, backlog com idade, gargalo, QLP em 3 leituras, custo
       Unidades/Empresas/Colaboradores/Funcoes/Calendario/Historico/UsuariosView.vue
   src/composables/organograma.js  árvore do organograma (pura): chefias pela hierarquia das funções + equipes por unidade
   src/composables/useVersao.js    avisa quando uma nova versão é publicada (compara o script do index.html) → faixa em App.vue

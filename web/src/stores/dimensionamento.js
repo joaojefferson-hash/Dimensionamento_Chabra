@@ -36,13 +36,33 @@ export const useDimensionamentoStore = defineStore('dimensionamento', () => {
     const hojeAno = new Date().getFullYear();
     const mesAtualAnt = anoAnterior < hojeAno ? 12 : anoAnterior === hojeAno ? pref.mesAtual : 0;
     const rAnt = Calculo.calcular({ unidades: unidadesAnt, colaboradores: cad.colaboradoresCompletos, parametros: parametrosMotor.value, simulacoes: [], janela: { de: 0, ate: 11 }, ano: anoAnterior });
-    const fAnt = Calculo.fila(rAnt, { mesAtual: mesAtualAnt, prazoMeses: prazoMeses.value });
+    const atendidasAnt = {};
+    cad.unidades.forEach(u => {
+      const meses = (u.mesesPorAno || {})[anoAnterior] || {};
+      Object.entries(meses).forEach(([mes, v]) => {
+        const porte = v && v.atendidasPorte ? v.atendidasPorte : null;
+        if (porte && Object.keys(porte).length) { atendidasAnt[u.id] = atendidasAnt[u.id] || {}; atendidasAnt[u.id][Number(mes)] = { ...porte }; }
+      });
+    });
+    const fAnt = Calculo.fluxo(rAnt, { mesAtual: mesAtualAnt, prazoMeses: prazoMeses.value, atendidas: atendidasAnt, parametros: parametrosMotor.value, ano: anoAnterior });
+    // carrega as coortes por etapa: a idade do backlog atravessa a virada de ano
     const out = {};
-    fAnt.unidades.forEach(u => { out[u.id] = {}; Calculo.FUNCOES.forEach(f => { out[u.id][f] = u.grupos[f].meses[11].filaFim; }); });
+    fAnt.unidades.forEach(u => { out[u.id] = u.resumo.filaFinal; });
     return out;
   });
   /** Pendentes mês a mês (o passado acumula sem descontar; do mês atual em diante a equipe atende). */
-  const fila = computed(() => Calculo.fila(resultado.value, { mesAtual: pref.mesAtual, prazoMeses: prazoMeses.value, filaInicial: filaInicial.value }));
+  // a mesma conta em todas as telas: fila() e evolucao() são adaptadores do mesmo núcleo (Calculo.fluxo)
+  const opcoesFluxo = computed(() => ({
+    mesAtual: pref.mesAtual, prazoMeses: prazoMeses.value, filaInicial: filaInicial.value,
+    atendidas: atendidasInformadas.value, parametros: parametrosMotor.value, ano: pref.ano,
+  }));
+  const fila = computed(() => Calculo.fila(resultado.value, opcoesFluxo.value));
+  /** Núcleo completo: etapas da cadeia, coortes, idade do backlog, QLP e custos. */
+  const fluxo = computed(() => Calculo.fluxo(resultado.value, opcoesFluxo.value));
+  const fluxoAlvo = computed(() => (unidadeSelValida.value ? fluxo.value.unidades.find(u => u.id === unidadeSelValida.value) : fluxo.value.total));
+  /** Backlog da unidade em um mês (soma das filas das três etapas da cadeia) — fonte única. */
+  const backlogMes = mes => fluxoAlvo.value.meses[mes].backlog;
+  const backlogCenarioMes = mes => fluxoAlvo.value.meses[mes].backlogCenario;
 
   const unidadeSelValida = computed(() => (cad.unidades.some(u => u.id === pref.unidadeSel) ? pref.unidadeSel : ''));
   /** Alvo da tela: a unidade escolhida ou o total. */
@@ -52,25 +72,20 @@ export const useDimensionamentoStore = defineStore('dimensionamento', () => {
   const varias = computed(() => !unidadeSelValida.value && resultado.value.unidades.length > 1);
   const temCusto = computed(() => Calculo.FUNCOES.some(f => resultado.value.total.meses.some(m => m.funcoes[f].custo && m.funcoes[f].custo.pessoa > 0)));
 
-  /** Empresas concluídas informadas por unidade e mês: { [unidadeId]: { 1..12: n } }. */
+  /** Empresas concluídas informadas: { [unidadeId]: { 1..12: { P, M, G } } } — mesma unidade da demanda. */
   const atendidasInformadas = computed(() => {
     const out = {};
     cad.unidades.forEach(u => {
       const meses = (u.mesesPorAno || {})[pref.ano] || {};
       Object.entries(meses).forEach(([mes, v]) => {
-        if (v && v.atendidas > 0) { out[u.id] = out[u.id] || {}; out[u.id][Number(mes)] = v.atendidas; }
+        const porte = v && v.atendidasPorte ? v.atendidasPorte : null;
+        if (porte && Object.keys(porte).length) { out[u.id] = out[u.id] || {}; out[u.id][Number(mes)] = { ...porte }; }
       });
     });
     return out;
   });
   /** Evolução mês a mês (controle histórico): fila, capacidade, quadro necessário e admissões sugeridas. */
-  const evolucao = computed(() => Calculo.evolucao(resultado.value, {
-    mesAtual: pref.mesAtual,
-    prazoMeses: prazoMeses.value,
-    filaInicial: filaInicial.value,
-    atendidas: atendidasInformadas.value,
-    parametros: parametrosMotor.value,
-  }));
+  const evolucao = computed(() => Calculo.evolucao(resultado.value, opcoesFluxo.value));
   /** Evolução da unidade escolhida (ou o total). */
   const evolucaoAlvo = computed(() => (unidadeSelValida.value
     ? evolucao.value.unidades.find(u => u.id === unidadeSelValida.value).areas
@@ -100,5 +115,5 @@ export const useDimensionamentoStore = defineStore('dimensionamento', () => {
     return { mes: t, pendentes: pend.pendentes, deAntes: pend.filaInicio, vencem: pend.informado, deAnoAnterior, anoAnterior: pref.ano - 1, areas };
   });
 
-  return { resultado, fila, filaInicial, alvo, filaAlvo, titulo, varias, temCusto, hoje, prazoMeses, unidadeSelValida, evolucao, evolucaoAlvo, atendidasInformadas, temAtendidas };
+  return { resultado, fila, fluxo, fluxoAlvo, backlogMes, backlogCenarioMes, filaInicial, alvo, filaAlvo, titulo, varias, temCusto, hoje, prazoMeses, unidadeSelValida, evolucao, evolucaoAlvo, atendidasInformadas, temAtendidas };
 });

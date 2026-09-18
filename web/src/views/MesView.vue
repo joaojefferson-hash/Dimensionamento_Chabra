@@ -41,7 +41,7 @@ const composicao = computed(() => {
       entrou: a.entram,
       atendido: Math.min(a.atendidas, b.atendidas),
       informado: a.informado,
-      restou: Math.max(a.filaFim, b.filaFim),
+      restou: dim.backlogMes(i),
     });
   }
   return linhas;
@@ -74,7 +74,7 @@ const areas = computed(() => FUNCOES.map(f => {
 
 const totalAAtender = computed(() => acumulado.value + dim.hoje.vencem);
 const capacidadeMes = computed(() => Math.min(...FUNCOES.map(f => doMes(f).capacidade)));
-const pendenteFim = computed(() => Math.max(...FUNCOES.map(f => doMes(f).filaFim)));
+const pendenteFim = computed(() => dim.backlogMes(t.value));
 const atendeNoMes = computed(() => Math.max(0, totalAAtender.value - pendenteFim.value));
 const classeStatus = s => 'row-' + (s === 'atencao' || s === 'deficit' ? s : 'ok');
 
@@ -83,13 +83,13 @@ const projecao = computed(() => {
   const resumo = dim.filaAlvo[TEC].resumo;
   const resumoAdm = dim.filaAlvo[ADM].resumo;
   const zera = [resumo.zeraEm, resumoAdm.zeraEm].filter(v => v != null);
-  const dezembro = Math.max(dim.filaAlvo[TEC].meses[11].filaFim, dim.filaAlvo[ADM].meses[11].filaFim);
+  const dezembro = dim.backlogMes(11);
   const proximos = [];
   for (let i = t.value + 1; i <= Math.min(11, t.value + 3); i++) {
     proximos.push({
       mes: i, nome: MESES_LONGO[i],
       entram: dim.filaAlvo[TEC].meses[i].entram,
-      filaFim: Math.max(dim.filaAlvo[TEC].meses[i].filaFim, dim.filaAlvo[ADM].meses[i].filaFim),
+      filaFim: dim.backlogMes(i),
     });
   }
   return { zeraEm: zera.length === 2 ? Math.max(...zera) : null, dezembro, proximos };

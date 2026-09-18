@@ -138,7 +138,12 @@ const fmtData = d => (d ? d.toLocaleDateString('pt-BR') : '—');
 
 async function gravar() {
   const unidadesAlvo = [...new Set(linhasRpc.value.map(l => l.unidade_id))].map(id => cad.unidadePorId[id].nome);
-  const ok = await ui.confirmar({ titulo: `Importar demanda de ${ano.value}`, mensagem: `Substituir ${escopoTxt.value} de ${ano.value} (todos os meses) de: ${unidadesAlvo.join(', ')} pelos ${num(totalImportar.value)} clientes da planilha? ${preservaTxt.value} A alteração se aplica a todos os usuários.`, textoConfirmar: 'Substituir', perigo: true });
+  const mesesNoArquivo = [...new Set(linhasRpc.value.map(l => l.mes))].sort((a, b) => a - b);
+  const zerados = MESES.map((m, k) => k + 1).filter(m => !mesesNoArquivo.includes(m));
+  const avisoZerados = zerados.length
+    ? ` Os meses sem lançamento no arquivo (${zerados.map(m => MESES[m - 1]).join(', ')}) ficarão zerados nesta condição.`
+    : '';
+  const ok = await ui.confirmar({ titulo: `Importar demanda de ${ano.value}`, mensagem: `Substituir ${escopoTxt.value} de ${ano.value} de: ${unidadesAlvo.join(', ')} pelos ${num(totalImportar.value)} clientes da planilha (meses no arquivo: ${mesesNoArquivo.map(m => MESES[m - 1]).join(', ') || 'nenhum'}).${avisoZerados} ${preservaTxt.value} A alteração se aplica a todos os usuários.`, textoConfirmar: 'Substituir', perigo: true });
   if (!ok) return;
   gravando.value = true;
   try {

@@ -146,7 +146,30 @@ Não serão transformadas em regra sem confirmação.
 
 ---
 
-## 7. Evidências
+## 7. Situação dos achados após a correção (18/09/2026)
+
+| Achado | Situação | Onde |
+|---|---|---|
+| C1 — dois backlogs | **corrigido**: `fila()` e `evolucao()` passaram a ser adaptadores do núcleo `Calculo.fluxo`; as atendidas informadas valem em todas as telas | `js/calculo.js`, `stores/dimensionamento.js` |
+| C2 — cadeia não modelada | **corrigido**: três etapas em série, fila por etapa, gargalo e ociosidade nomeados | `Calculo.fluxo`, tela Diretoria |
+| C3 — unidades misturadas | **corrigido**: atendimento informado por porte (migração 0029), convertido em UEP pelos mesmos pesos; número único vira aproximação declarada | banco, API, tela Empresas |
+| A1 — sem idade do backlog | **corrigido**: coortes mensais com consumo FIFO, faixas de 30 dias e "fora do prazo" | `Calculo.fluxo`, tela Diretoria |
+| A2 — sem QLP estrutural | **corrigido**: operacional, recuperação e estrutural, com reforço temporário e custos separados | `Calculo.fluxo`, tela Diretoria |
+| A3 — importação apaga meses ausentes | **mitigado**: a confirmação lista os meses do arquivo e avisa quais ficarão zerados | `ImportarPlanilha.vue` |
+| A4 — regra duplicada nas telas | **corrigido**: backlog vem de `dim.backlogMes()` nas quatro telas | stores e views |
+| A5 — presença por dias corridos | **corrigido**: presença proporcional aos dias úteis do período | `presencaNoMes` |
+| M1 — `ocupacaoAlvo = 0` virava 85 | **corrigido** | `normalizarParametros` |
+| M2 — zero dias úteis | **corrigido**: o mês é sinalizado como impossível de dimensionar | `Calculo.fluxo`, tela Diretoria |
+| M3 — produção de referência invisível | **corrigido**: a tela marca o quadro como estimativa | tela Diretoria |
+| M4 — prazo por `round(dias/30)` | **mantido**: documentado no modelo de cálculo | — |
+| M5 — custo sem separação | **corrigido**: atual, estrutural, recuperação, incremental e anualizado | `Calculo.fluxo`, tela Diretoria |
+| M6 — concorrência sem proteção | **em aberto**: exige versionamento de linha; risco registrado | — |
+| M7 — fallback legado de contagem | **corrigido** na contagem de clientes (todas as condições) | `clientesDoMes` |
+| B1 — senhas vazadas | **em aberto**: depende de ativar a proteção no painel do Supabase | — |
+| B2 — sem lint | **em aberto** | — |
+| B4 — cobertura de testes | **corrigido**: 58 testes (15 + 35 + 8), com invariantes e casos extremos | `tests/` |
+
+## 8. Evidências
 
 Sondas executadas sobre o motor (cenários controlados, sem dados de produção):
 

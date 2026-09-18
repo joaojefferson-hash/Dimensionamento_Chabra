@@ -47,6 +47,15 @@ Parâmetros configuráveis (tela Calendário, compartilhados por toda a equipe):
 
 ## 3. Telas de dimensionamento
 
+### 3.0 Diretoria (visão executiva)
+
+Uma página para a decisão de contratação, com impressão em PDF:
+
+- **Carteira, demanda (UEP), capacidade da cadeia (nominal, margem e planejada) e backlog** com a parcela **fora do prazo**.
+- **Quadro de lotação (QLP)** por área, em três leituras — operacional (manter a operação), recuperação (eliminar o backlog no prazo), estrutural (quadro permanente) — além do pico do ano, do reforço temporário e do déficit; com custo atual, necessário e incremental quando há custo cadastrado.
+- **Onde está o gargalo**: entrada, capacidade, conclusão, ociosidade e fila de cada etapa da cadeia, com a etapa gargalo destacada.
+- **Gráficos**: demanda × capacidade, backlog mês a mês (real e com as admissões sugeridas), idade do backlog por faixa e quadro atual × necessário.
+
 ### 3.1 Projeção
 
 A tela de resultado, de uma unidade por vez, para o ano selecionado.
@@ -108,7 +117,7 @@ A carteira, por unidade e mês, no ano selecionado. Linhas de cada unidade:
 | **Empresa sem avaliação** | sim | clientes ainda sem avaliação realizada |
 | **Contratos novos** | sim | clientes de contratos firmados no mês |
 | Total | — | soma das quatro condições, com a demanda equivalente entre parênteses |
-| **Atendidas no mês** | sim | empresas efetivamente concluídas — é o que sai da fila |
+| **Atendidas no mês** | sim | empresas efetivamente concluídas, por porte — é o que sai da fila |
 
 Recursos da tela: seletor de **ano** (vale para a tabela e para a importação), filtro **Exibir** (todas ou uma linha por vez), seletor de **porte** (os lançamentos são feitos por porte; "Todos" exibe a soma, somente leitura), coluna **Acumulado até o mês atual**, totais e médias por unidade e no rodapé, e o botão para excluir os lançamentos do ano de uma unidade. Tudo é salvo automaticamente e registrado no Histórico.
 
@@ -194,7 +203,7 @@ No perfil de Leitura, os formulários e botões de gravação ficam desativados 
 ## 10. Apêndice técnico
 
 - **Interface**: Vue 3 + Vite, Pinia, Vue Router (rotas em hash), Tailwind CSS v4, Chart.js para os gráficos e SheetJS para a leitura de planilhas. Publicação automática na Vercel a partir do branch `main`.
-- **Motor de cálculo**: `js/calculo.js` — funções puras, sem interface, com testes automatizados (`npm test`). É a única fonte da lógica: a versão usada pela interface é copiada desse arquivo na compilação.
+- **Motor de cálculo**: `js/calculo.js` — funções puras, sem interface, com testes automatizados (`npm test`). É a única fonte da lógica: `Calculo.fluxo()` é o núcleo (cadeia, coortes, QLP e custo) e `fila()`/`evolucao()` são adaptadores dele; a versão usada pela interface é copiada desse arquivo na compilação. A matemática está documentada em [docs/MODELO-DE-CALCULO.md](docs/MODELO-DE-CALCULO.md).
 - **Banco de dados**: Supabase (PostgreSQL). Tabelas principais — `unidades`, `demanda_mensal` (unidade × ano × mês × condição × porte), `unidade_mes` (clientes ativos e atendidas), `colaboradores`, `colaborador_unidades`, `funcoes`, `portes`, `clientes_porte`, `parametros`, `historico`.
 - **Segurança**: autenticação por e-mail e senha, perfis em `app_metadata`, políticas RLS por perfil, gatilhos de histórico e funções específicas para importação de planilha e de backup. A gestão de usuários passa por uma Edge Function com a chave de serviço no servidor.
-- **Testes**: 15 casos no motor de cálculo (produção, adaptação, presença, custo, fila, evolução) e 8 na importação de planilhas.
+- **Testes**: 15 casos no motor de cálculo, 35 no dimensionamento (UEP, capacidade, cadeia, coortes e idade, QLP nas três leituras, custo, invariantes e casos extremos) e 8 na importação de planilhas.

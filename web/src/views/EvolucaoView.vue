@@ -29,8 +29,8 @@ const meses = computed(() => areas.value[TEC].meses.map((m, i) => ({
   porArea: Object.fromEntries(FUNCOES.map(f => [f, areas.value[f].meses[i]])),
 })));
 /** A fila da unidade é a maior entre as áreas (a que trava o atendimento). */
-const filaDoMes = i => Math.max(areas.value[TEC].meses[i].filaFim, areas.value[ADM].meses[i].filaFim);
-const filaCenarioDoMes = i => Math.max(areas.value[TEC].meses[i].cenario.filaFim, areas.value[ADM].meses[i].cenario.filaFim);
+const filaDoMes = i => dim.backlogMes(i);            // fonte única: soma das filas das etapas
+const filaCenarioDoMes = i => dim.backlogCenarioMes(i);
 const admissoesDoMes = i => FUNCOES.reduce((s, f) => s + areas.value[f].meses[i].cenario.admissoes, 0);
 const custoDoMes = i => FUNCOES.reduce((s, f) => s + areas.value[f].meses[i].custoDeficit, 0);
 

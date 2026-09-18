@@ -17,7 +17,7 @@ const pref = usePreferenciasStore();
 const ui = useUiStore();
 
 const ATIVOS = { campo: 'clientesAtivos', rotulo: 'Clientes ativos', cor: 'bg-page text-muted', ajuda: 'total de clientes da unidade no mês — apenas informativo, não é considerado no cálculo' };
-const ATENDIDAS = { campo: 'atendidas', rotulo: 'Atendidas no mês', cor: 'bg-ok-bg text-ok', ajuda: 'empresas efetivamente concluídas no mês — saem da fila na tela Evolução' };
+const ATENDIDAS = { campo: 'atendidas', porPorte: true, rotulo: 'Atendidas no mês', cor: 'bg-ok-bg text-ok', ajuda: 'empresas efetivamente concluídas no mês, no porte selecionado — saem da fila nas telas de dimensionamento' };
 const ESPECIAIS = [ATIVOS, ATENDIDAS];
 const condSel = ref('todas');
 const porteSel = ref((() => { try { return localStorage.getItem('chabra-dimensiona:empresas-porte') || 'P'; } catch (_) { return 'P'; } })());
@@ -35,6 +35,7 @@ const mesDe = (u, mes) => ((u.mesesPorAno || {})[pref.ano] || {})[mes] || null;
 const condicaoDe = campo => (CONDICOES.find(c => c.campo === campo) || {}).condicao || null;
 function valor(u, mes, campo) {
   const x = mesDe(u, mes); if (!x) return 0;
+  if (campo === ATENDIDAS.campo) return somaPortes.value ? (x.atendidas || 0) : ((x.atendidasPorte || {})[porteSel.value] || 0);
   const cond = condicaoDe(campo);
   if (!cond) return x[campo] || 0;
   if (somaPortes.value) return x[campo] || 0;
@@ -44,6 +45,7 @@ const totalMes = (u, mes) => CONDICOES.reduce((s, c) => s + valor(u, mes, c.camp
 const ponderado = (u, mes) => { const x = mesDe(u, mes); if (!x) return 0; let s = 0; Object.values(x.demanda || {}).forEach(pp => Object.entries(pp || {}).forEach(([porte, q]) => { s += q * (cad.pesosPorte[porte] || 1); })); return s; };
 const somaAno = (u, campo) => { let s = 0; for (let m = 1; m <= 12; m++) s += campo ? valor(u, m, campo) : totalMes(u, m); return s; };
 const acumulado = (u, campo) => { let s = 0; for (let m = 1; m <= pref.mesAtual + 1; m++) s += campo ? valor(u, m, campo) : totalMes(u, m); return s; };
+const detalheAtendidas = (u, mes) => { const x = mesDe(u, mes); if (!x) return ''; return cad.portes.map(p => { const q = (x.atendidasPorte || {})[p.codigo] || 0; return q ? `${p.codigo} ${q}` : null; }).filter(Boolean).join(' · '); };
 const detalhe = (u, mes, campo) => { const cond = condicaoDe(campo); const x = mesDe(u, mes); if (!cond || !x) return ''; return cad.portes.map(p => { const q = ((x.demanda || {})[cond] || {})[p.codigo] || 0; return q ? `${p.codigo} ${q}` : null; }).filter(Boolean).join(' · '); };
 const fmt = v => (Number.isInteger(v) ? String(v) : num(v, 1));
 const temNumeros = u => Object.keys((u.mesesPorAno || {})[pref.ano] || {}).length > 0;
@@ -62,7 +64,7 @@ async function mudar(u, mes, campo, ev) {
   try {
     const cond = condicaoDe(campo);
     if (cond) await cad.definirDemanda(u.id, pref.ano, mes, cond, porteSel.value, novo);
-    else if (campo === ATENDIDAS.campo) await cad.definirAtendidas(u.id, pref.ano, mes, novo);
+    else if (campo === ATENDIDAS.campo) await cad.definirAtendidas(u.id, pref.ano, mes, porteSel.value, novo);
     else await cad.definirClientesAtivos(u.id, pref.ano, mes, novo);
   } catch (e) { ui.erro(e); ev.target.value = antes || ''; } finally { delete salvando.value[chave]; }
 }
@@ -139,7 +141,8 @@ async function limpar(u) {
             <tr v-if="mostrarTotal" :key="u.id + '-atendidas'">
               <td class="whitespace-nowrap text-left"><span class="chip" :class="ATENDIDAS.cor" :title="ATENDIDAS.ajuda">{{ ATENDIDAS.rotulo }}</span></td>
               <td v-for="mes in 12" :key="mes" :class="valor(u, mes, ATENDIDAS.campo) ? 'bg-ok-bg' : ''">
-                <input class="input input-sm w-12 !px-1 text-center" type="number" min="0" step="1" :value="valor(u, mes, ATENDIDAS.campo) || ''" placeholder="–" :disabled="!auth.podeEditar || salvando[`${u.id}-${mes}-${ATENDIDAS.campo}`]" @change="mudar(u, mes, ATENDIDAS.campo, $event)">
+                <span v-if="somaPortes" class="font-semibold" :title="detalheAtendidas(u, mes) || 'nenhuma informada'">{{ valor(u, mes, ATENDIDAS.campo) || '–' }}</span>
+                <input v-else class="input input-sm w-12 !px-1 text-center" type="number" min="0" step="1" :value="valor(u, mes, ATENDIDAS.campo) || ''" placeholder="–" :disabled="!auth.podeEditar || salvando[`${u.id}-${mes}-${ATENDIDAS.campo}`]" @change="mudar(u, mes, ATENDIDAS.campo, $event)">
               </td>
               <td class="bg-warn-bg">—</td><td class="bg-page font-semibold">{{ fmt(somaAno(u, ATENDIDAS.campo)) }}</td><td class="bg-page text-muted">{{ fmt(somaAno(u, ATENDIDAS.campo) / 12) }}</td>
             </tr>
