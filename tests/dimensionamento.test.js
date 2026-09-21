@@ -493,4 +493,22 @@ teste('headcount: custo só aparece com custo cadastrado', () => {
   perto(Calculo.headcount(semCusto.total, { mes: 0, prazos: [2] }).cenarios[0].custoTotal, 0);
 });
 
+teste('referência: quem está alocado sem produção declarada não puxa a régua para baixo', () => {
+  const semProducao = administrativo({ empresasDia: 0 });
+  const f = fluxo([unidade(mesesConst(50))], [administrativo(), administrativo(), administrativo(), semProducao, tecnico()], { mesAtual: 0 });
+  const e = f.total.meses[0].etapas.empresas;
+  perto(e.producaoPessoa, 1 * 20 * 0.85);              // a régua é de quem produz 1/dia
+  perto(e.capacidade, 3 * 1 * 20 * 0.85);              // a capacidade soma só quem produz
+  assert.ok(e.quadro > 3, 'o quadro continua contando a pessoa alocada');
+  const r = calc([unidade(mesesConst(50))], [administrativo(), administrativo({ empresasDia: 0 }), tecnico()]);
+  assert.strictEqual(r.avisos.colabProducaoZerada.length, 1, 'e o cadastro incompleto é denunciado');
+});
+
+teste('referência: sem ninguém com produção na unidade, usa a equipe; sem equipe, o padrão do sistema', () => {
+  const soZero = fluxo([unidade(mesesConst(50))], [administrativo({ empresasDia: 0 }), tecnico()], { mesAtual: 0 });
+  assert.ok(soZero.total.meses[0].etapas.empresas.producaoPessoa > 0, 'não fica sem régua');
+  const vazio = fluxo([unidade(mesesConst(50))], [], { mesAtual: 0 });
+  assert.ok(vazio.total.meses[0].etapas.empresas.producaoPessoa > 0, 'sem equipe, produção de referência do sistema');
+});
+
 console.log(`\n${passaram} testes passaram.`);

@@ -38,6 +38,16 @@ const idade = computed(() => calculo.value.backlog.idade);
 const temCusto = computed(() => calculo.value.cenarios.some(c => c.custoTotal > 0));
 const anosAnteriores = computed(() => dim.anosComLancamento.filter(a => a < pref.ano));
 const vindoDeAntes = computed(() => (dim.fluxoAlvo.meses[0] ? dim.fluxoAlvo.meses[0].backlogInicio : 0));
+/** Alocados nesta unidade sem produção diária declarada: contam no quadro e não produzem. */
+const semProducaoDeclarada = computed(() => {
+  const unidadeId = dim.unidadeSelValida;
+  return cad.colaboradoresCompletos.filter(c => {
+    if (!FUNCOES.includes(c.tipoProducao)) return false;
+    const aqui = (c.alocacoes || []).some(a => (!unidadeId || a.unidadeId === unidadeId) && Number(a.percentual) > 0);
+    if (!aqui) return false;
+    return Calculo.ENTREGAS_DA_FUNCAO[c.tipoProducao].every(e => Number(c[e.campo] || 0) <= 0);
+  }).map(c => c.nome);
+});
 const imprimir = () => window.print();
 </script>
 
@@ -59,6 +69,9 @@ const imprimir = () => window.print();
       <span>Chabra Dimensiona · emitido em {{ new Date().toLocaleDateString('pt-BR') }}</span>
     </div>
 
+    <div v-if="semProducaoDeclarada.length" class="card nao-imprimir border-[#f0d9a8] bg-warn-bg text-[13px] text-warn">
+      <strong>Cadastro incompleto:</strong> {{ semProducaoDeclarada.join(', ') }} {{ semProducaoDeclarada.length === 1 ? 'está alocado' : 'estão alocados' }} nesta unidade com <strong>produção diária zerada</strong>. {{ semProducaoDeclarada.length === 1 ? 'Conta' : 'Contam' }} no quadro, mas não {{ semProducaoDeclarada.length === 1 ? 'produz' : 'produzem' }} — informe a produção diária em Colaboradores para o cálculo ficar correto.
+    </div>
     <div v-if="escolhido.impossivel" class="card nao-imprimir border-danger bg-danger-bg text-[13px] text-danger-dark">
       <strong>Não é possível calcular o quadro deste mês.</strong> Não há produção possível — verifique os dias úteis no Calendário e a produção diária em Colaboradores.
     </div>

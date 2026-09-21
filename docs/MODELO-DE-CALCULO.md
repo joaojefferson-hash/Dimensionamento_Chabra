@@ -50,6 +50,11 @@ capacidade planejada = capacidade nominal × (1 − margem para imprevistos)
 - **Adaptação**: 1º mês 50%, 2º 80%, depois 100% (configurável). Vale para admissões reais e simuladas.
 - **Margem para imprevistos**: padrão 15%. As telas mostram **nominal**, **margem** e **planejada** —
   o desconto nunca fica escondido.
+- **Produção de uma pessoa inteira** (a régua do quadro necessário): média de quem está alocado na
+  unidade **e tem produção declarada**. Quem está cadastrado com 0/dia entra no quadro (é fato que
+  ocupa a vaga), mas não define a régua — senão o sistema pediria mais gente do que precisa. Sem
+  ninguém com produção na unidade, usa a média da equipe; sem equipe, a produção de referência do
+  sistema. As telas avisam quando há alocado sem produção declarada.
 
 ## 4. A cadeia produtiva
 

@@ -246,7 +246,7 @@ const Calculo = (() => {
    *                meses: [{ mes, nome, nomeLongo, diasUteis, empresas, precisa, excecao, entregas: {id: Bloco}, funcoes: {f: Resumo}, status }],
    *                janela: { nMeses, empresasMedia, precisa, precisaMedia, entregas, funcoes, status, mesesComExcecao } }],
    *   total: { pessoas, meses: [...], janela: {...}, chefia: [...] },
-   *   avisos: { colabSemProducao: [], colabSemUnidade: [], colabParcial: [], unidadesSemColab: [], unidadesSemFuncao: [{unidade, funcao}] },
+   *   avisos: { colabSemProducao: [], colabProducaoZerada: [], colabSemUnidade: [], colabParcial: [], unidadesSemColab: [], unidadesSemFuncao: [{unidade, funcao}] },
    *   parametros: p
    * }
    */
@@ -271,6 +271,11 @@ const Calculo = (() => {
       .map(c => ({ id: c.id, nome: c.nome, funcao: c.funcao || '', coordena: c.coordena || 'todos', ordem: n(c.funcaoOrdem) || 9999, unidades: alocValidas(c).map(a => a.unidadeId) }))
       .sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR')); // chefia mais alta primeiro (ordem do cadastro de funções)
     const colabSemProducao = colaboradores.filter(c => !FUNCOES.includes(c.tipoProducao) && !c.chefia).map(c => `${c.nome}${c.funcao ? ' (' + c.funcao + ')' : ''}`);
+    // conta na equipe, mas com produção diária zerada: o cadastro está incompleto e o cálculo sente
+    const colabProducaoZerada = colaboradores
+      .filter(c => FUNCOES.includes(c.tipoProducao) && alocValidas(c).length > 0
+        && ENTREGAS_DA_FUNCAO[c.tipoProducao].every(e => n(c[e.campo]) <= 0))
+      .map(c => `${c.nome}${c.funcao ? ' (' + c.funcao + ')' : ''}`);
     const produtivos = colaboradores.filter(c => FUNCOES.includes(c.tipoProducao));
     const produtivosESimulados = produtivos.concat(simulados);
     const colabSemUnidade = colaboradores.filter(c => (FUNCOES.includes(c.tipoProducao) || c.chefia) && alocValidas(c).length === 0).map(c => c.nome);
@@ -318,10 +323,19 @@ const Calculo = (() => {
           const cf = porFuncao[e.funcao].filter(c => ativoNoMes(c, mes));
           // desligamento simulado além do que existe não fica negativo: a equipe vai a zero
           const consegueMax = Math.max(0, cf.reduce((s, c) => s + producaoMes(c, e, mes, p) * c.fracao * fatorProducao(c, anoCalc, mes, p), 0));
+          // "uma pessoa inteira" é a referência do quadro necessário: quem está alocado na unidade
+          // COM produção declarada. Alguém cadastrado com 0/dia (produção ainda não informada) não
+          // pode puxar a régua para baixo — isso faria o sistema pedir mais gente do que precisa.
           const presentes = cf.filter(c => c.fracao > 0);
-          const ref = presentes.length ? presentes : globalPorFuncao[e.funcao];
-          const producaoPessoaMax = ref.reduce((s, c) => s + producaoMes(c, e, mes, p), 0) / ref.length; // uma pessoa inteira, veterana
+          const comProducao = presentes.filter(c => n(c[e.campo]) > 0);
+          const globalComProducao = globalPorFuncao[e.funcao].filter(c => n(c[e.campo]) > 0);
+          const ref = comProducao.length ? comProducao
+            : globalComProducao.length ? globalComProducao      // ninguém aqui produz: média da equipe
+              : [COLAB_PADRAO];                                  // nem na equipe: produção de referência do sistema
+          const producaoPessoaMax = ref.reduce((s, c) => s + producaoMes(c, e, mes, p), 0) / ref.length;
           entregas[e.id] = bloco(precisaMes(u, e, mes, p), consegueMax, pessoasMes[e.funcao], producaoPessoaMax, p);
+          entregas[e.id].referenciaLocal = comProducao.length > 0;     // a régua veio da própria unidade?
+          entregas[e.id].pessoasSemProducao = presentes.length - comProducao.length;
         });
         const funcoes = {};
         FUNCOES.forEach(f => {
@@ -363,6 +377,8 @@ const Calculo = (() => {
           ? blocos.reduce((s, b) => s + (b.producaoPessoa / alvo) * b.pessoas, 0) / pessoas
           : (blocos.length ? blocos.reduce((s, b) => s + b.producaoPessoa / alvo, 0) / blocos.length : 0);
         entregas[e.id] = bloco(precisa, consegueMax, pessoas, prodMax, p);
+        entregas[e.id].referenciaLocal = blocos.every(b2 => b2.referenciaLocal !== false);
+        entregas[e.id].pessoasSemProducao = blocos.reduce((s2, b2) => s2 + n(b2.pessoasSemProducao), 0);
       });
       const funcoes = {};
       FUNCOES.forEach(f => { funcoes[f] = resumoFuncao(f, entregas); });
@@ -414,6 +430,7 @@ const Calculo = (() => {
       simulacao: simulados.length > 0,
       avisos: {
         colabSemProducao,
+        colabProducaoZerada,
         colabSemUnidade,
         colabParcial,
         unidadesSemColab: resultadoUnidades.filter(u => u.colaboradores.length === 0 && u.janela.precisa > 0).map(u => u.nome),

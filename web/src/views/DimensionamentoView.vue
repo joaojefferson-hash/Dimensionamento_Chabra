@@ -30,6 +30,7 @@ const esc = t => String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', 
 const avisos = computed(() => {
   const a = dim.resultado.avisos, out = [];
   if (a.colabSemProducao && a.colabSemProducao.length) out.push(`<strong>Não considerados no cálculo (função sem produção):</strong> ${a.colabSemProducao.map(esc).join(', ')}.`);
+  if (a.colabProducaoZerada && a.colabProducaoZerada.length) out.push(`<strong>Produção diária não informada:</strong> ${a.colabProducaoZerada.map(esc).join(', ')}. Contam no quadro, mas não produzem — informe a produção diária em Colaboradores.`);
   if (a.colabSemUnidade.length) out.push(`<strong>Sem unidade (não considerados no dimensionamento):</strong> ${a.colabSemUnidade.map(esc).join(', ')}. Em Colaboradores, informe a unidade de atuação.`);
   if (a.colabParcial && a.colabParcial.length) out.push(`<strong>Alocação parcial:</strong> ${a.colabParcial.map(esc).join(', ')} — apenas a parte alocada é considerada.`);
   if (a.unidadesSemColab.length) out.push(`<strong>Unidades com demanda e sem equipe:</strong> ${a.unidadesSemColab.map(esc).join(', ')}.`);
