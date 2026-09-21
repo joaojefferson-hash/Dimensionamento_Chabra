@@ -74,7 +74,9 @@ fila(etapa, mês) = fila anterior + entrada da etapa − concluído
 ```
 
 - **Coortes**: cada parcela da fila guarda o mês em que venceu. O consumo é **FIFO** — o mais antigo sai
-  primeiro. As coortes atravessam a virada do ano, então a idade não se perde em janeiro.
+  primeiro. As coortes atravessam **todos** os anos com lançamento: ao abrir 2026, o sistema recalcula
+  2025 (e qualquer ano anterior) em ordem e carrega o que ficou em aberto, com a idade preservada. O
+  vencido não zera na virada do ano.
 - **Idade**: faixas de 0–30, 31–60, 61–90, 91–120 e mais de 120 dias, por aproximação de 30 dias por mês
   (o sistema trabalha com quantidades mensais, não com documentos individuais).
 - **Fora do prazo**: parcela do backlog com idade maior ou igual ao prazo de atendimento configurado.
@@ -126,6 +128,18 @@ Calculado apenas quando há custo mensal cadastrado (por colaborador ou por fun�
 Repete a cadeia inteira admitindo as pessoas sugeridas: **acumulativas** (quem entra permanece) e com o
 período de adaptação, como uma contratação real. Serve para comparar a fila real com a fila que teríamos.
 Não altera nenhum dado.
+
+## 8.1 Headcount para eliminar o vencido
+
+```
+trabalho(etapa, N meses) = vencido acumulado que ainda passa pela etapa
+                         + o que vence nos N meses do período
+pessoas(etapa)           = ⌈ (trabalho ÷ N) ÷ produção de uma pessoa no mês ⌉
+pessoas(área)            = a maior entre as etapas da área
+déficit                  = pessoas − quadro atual (nunca negativo)
+```
+
+Todo documento passa pelas três etapas, então o trabalho do período é o mesmo em cada uma — o que muda é a produção por pessoa. Quando o prazo ultrapassa dezembro, os meses que faltam entram pela média mensal do ano e o cenário é marcado como **estimado**.
 
 ## 9. Recálculo e alterações retroativas
 

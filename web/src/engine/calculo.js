@@ -871,6 +871,97 @@ const Calculo = (() => {
     return { mesAtual: t, prazoMeses: pm, ano: anoRef, faixasIdade: FAIXAS_IDADE, unidades, total };
   }
 
+  /* ---------- headcount para eliminar o vencido acumulado ----------
+
+     Responde à pergunta direta: "com o que está vencido até este mês, quantas pessoas eu
+     preciso para zerar isso em N meses?" — por etapa da cadeia, por área e no total.
+
+       trabalho(etapa, N) = vencido acumulado que ainda passa por essa etapa
+                          + o que vence nos N meses do período (tudo passa por todas as etapas)
+       por mês            = trabalho ÷ N
+       pessoas(etapa)     = ⌈ (trabalho ÷ N) ÷ produção de uma pessoa no mês ⌉
+       pessoas(área)      = a maior entre as etapas da área (a mesma pessoa cobre as duas)
+       déficit            = pessoas − quadro atual (nunca negativo)
+
+     Quando o prazo passa de dezembro, os meses que faltam entram pela média mensal do ano e
+     o cenário é marcado como estimado — o sistema não inventa demanda, declara a premissa.
+     ---------------------------------------------------- */
+
+  function headcount(item, { mes = 0, prazos = [1, 2, 3, 6, 12] } = {}) {
+    const meses = item.meses || [];
+    const i = clampMes(mes, 0);
+    const mesInfo = meses[i];
+    if (!mesInfo) return null;
+    const mediaEntrada = meses.length ? meses.reduce((acc, m) => acc + m.demanda, 0) / meses.length : 0;
+
+    const backlogPorEtapa = {};
+    ENTREGAS.forEach(e => { backlogPorEtapa[e.id] = Math.max(0, n(mesInfo.etapas[e.id].filaAcumulada)); });
+    const backlogTotal = ENTREGAS.reduce((acc, e) => acc + n(mesInfo.etapas[e.id].filaInicio), 0);
+
+    const cenarios = prazos.map(prazo => {
+      const n_ = Math.max(1, Math.round(n(prazo)) || 1);
+      const disponiveis = Math.min(n_, meses.length - i);
+      const entradaReal = meses.slice(i, i + disponiveis).reduce((acc, m) => acc + m.demanda, 0);
+      const mesesEstimados = Math.max(0, n_ - disponiveis);
+      const entradaPeriodo = entradaReal + mesesEstimados * mediaEntrada;
+
+      const etapas = {};
+      ENTREGAS.forEach(e => {
+        const d = mesInfo.etapas[e.id];
+        const trabalho = backlogPorEtapa[e.id] + entradaPeriodo;
+        const porMes = trabalho / n_;
+        const producaoPessoa = Math.max(0, n(d.producaoPessoa));
+        const pessoas = producaoPessoa > 0 && porMes > 1e-9 ? Math.ceil(porMes / producaoPessoa - 1e-9) : 0;
+        etapas[e.id] = {
+          id: e.id, rotulo: e.rotulo, funcao: e.funcao,
+          trabalho, porMes, producaoPessoa,
+          capacidadeAtual: Math.max(0, n(d.capacidade)),
+          quadro: Math.max(0, n(d.quadro)),
+          pessoas,
+          deficit: Math.max(0, Math.ceil(pessoas - n(d.quadro) - 1e-9)),
+          impossivel: porMes > 1e-9 && producaoPessoa <= 0,
+        };
+      });
+
+      const areas = {};
+      FUNCOES.forEach(f => {
+        const daFuncao = ENTREGAS_DA_FUNCAO[f].map(e => etapas[e.id]);
+        const quadro = Math.max(0, n(mesInfo.areas[f].quadro));
+        const pessoas = Math.max(...daFuncao.map(e => e.pessoas));
+        const custoPessoa = Math.max(0, n(mesInfo.areas[f].custoPessoa));
+        const deficit = Math.max(0, Math.ceil(pessoas - quadro - 1e-9));
+        areas[f] = {
+          funcao: f, rotulo: FUNCAO_CURTA[f],
+          quadro, pessoas, deficit,
+          etapaCritica: daFuncao.reduce((a, b) => (b.pessoas > a.pessoas ? b : a)).id,
+          custoPessoa,
+          custoDeficit: deficit * custoPessoa,
+          custoTotal: pessoas * custoPessoa,
+          impossivel: daFuncao.some(e => e.impossivel),
+        };
+      });
+
+      return {
+        prazoMeses: n_, mesesEstimados, entradaPeriodo, entradaReal,
+        trabalhoTotal: backlogTotal + entradaPeriodo,
+        etapas, areas,
+        pessoas: FUNCOES.reduce((acc, f) => acc + areas[f].pessoas, 0),
+        deficit: FUNCOES.reduce((acc, f) => acc + areas[f].deficit, 0),
+        custoDeficit: FUNCOES.reduce((acc, f) => acc + areas[f].custoDeficit, 0),
+        custoTotal: FUNCOES.reduce((acc, f) => acc + areas[f].custoTotal, 0),
+        impossivel: FUNCOES.some(f => areas[f].impossivel),
+      };
+    });
+
+    return {
+      mes: i, nomeMes: mesInfo.nomeLongo,
+      backlog: { total: backlogTotal, porEtapa: backlogPorEtapa, idade: mesInfo.idade },
+      demandaDoMes: mesInfo.demanda, clientesDoMes: mesInfo.clientes,
+      mediaEntrada, quadroAtual: FUNCOES.reduce((acc, f) => acc + n(mesInfo.areas[f].quadro), 0),
+      cenarios,
+    };
+  }
+
   /* ---------- adaptadores: fila() e evolucao() sobre o núcleo ----------
      Mantêm o formato que as telas já consomem, mas a conta é uma só (fluxo()).
      ---------------------------------------------------- */
@@ -1004,7 +1095,7 @@ const Calculo = (() => {
   return {
     MESES, MESES_LONGO, TEC, ADM, FUNCOES, FUNCAO_CURTA, FUNCAO_SINGULAR, ENTREGAS, ENTREGAS_DA_FUNCAO, COLAB_PADRAO, MARGEM_ATENCAO, colaboradoresSimulados,
     empresasDoMes, empresasPonderadas, pesoPorte, presencaNoMes, fatorRampup, custoFuncao,
-    producaoMes, precisaMes, calcular, fluxo, fila, evolucao, FAIXAS_IDADE, normalizarParametros, ritmoTexto, piorStatus,
+    producaoMes, precisaMes, calcular, fluxo, fila, evolucao, headcount, FAIXAS_IDADE, normalizarParametros, ritmoTexto, piorStatus,
   };
 })();
 

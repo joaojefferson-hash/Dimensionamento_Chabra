@@ -46,6 +46,7 @@ Não há "esqueci a senha" nem troca de senha pelo próprio usuário: o administ
 |---|---|---|
 | Dimensionamento | **Diretoria** | Visão executiva: carteira, demanda, capacidade, backlog com idade, gargalo da cadeia, QLP em três leituras e custo. Com impressão. |
 | Dimensionamento | **Projeção** | A tela de resultado, uma unidade por vez: pendências atuais, equipe → quadro ideal, mês a mês (contratação necessária?), simulação de cenários. |
+| Dimensionamento | **Headcount** | Quantos colaboradores para eliminar os documentos vencidos acumulados até o mês, por prazo de eliminação. Com impressão. |
 | Dimensionamento | **Resumo do mês** | A foto de um mês: acumulado dos meses anteriores, vencimentos do mês, equipe, pendências ao fim do mês e projeção. Com impressão. |
 | Dimensionamento | **Dashboard** | Os mesmos números em gráficos: pendentes mês a mês, vencem × equipe consegue, equipe hoje × ideal, por unidade, R$. |
 | Dimensionamento | **Evolução** | Controle histórico mês a mês: fila, capacidade, quadro real × necessário e as admissões que seriam necessárias, com impressão. |

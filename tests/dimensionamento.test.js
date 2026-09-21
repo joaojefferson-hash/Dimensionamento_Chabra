@@ -412,4 +412,85 @@ teste('caso extremo: sem equipe, o QLP é estimado por produção de referência
   perto(m.concluido, 0);
 });
 
+console.log('\nHeadcount para eliminar o vencido acumulado');
+
+/** 700 UEP vencidos em janeiro, nada mais vence no ano; 4 técnicos e 4 administrativos. */
+const cenario700 = () => {
+  const meses = { 1: { demanda: { mensal: { P: 700 } } } };
+  for (let i = 2; i <= 12; i++) meses[i] = { demanda: { mensal: { P: 0 } } };
+  const f = fluxo([unidade(meses)], equipe(4, 4), { mesAtual: 1 });
+  return Calculo.headcount(f.total, { mes: 1, prazos: [1, 2, 3, 6, 12] });
+};
+
+teste('headcount: pessoas = ⌈(vencido ÷ prazo) ÷ produção de uma pessoa⌉', () => {
+  const h = cenario700();
+  perto(h.backlog.total, 700);
+  const porPessoa = 1 * 20 * 0.85;                       // 17 UEP por relatório/mês
+  const c1 = h.cenarios.find(c => c.prazoMeses === 1);
+  const c2 = h.cenarios.find(c => c.prazoMeses === 2);
+  assert.strictEqual(c1.areas[TEC].pessoas, Math.ceil(700 / porPessoa));        // 42
+  assert.strictEqual(c2.areas[TEC].pessoas, Math.ceil(700 / 2 / porPessoa));    // 21
+  assert.strictEqual(c2.areas[ADM].pessoas, Math.ceil(700 / 2 / porPessoa));
+  assert.strictEqual(c2.deficit, c2.pessoas - h.quadroAtual);
+});
+
+teste('headcount: prazo maior exige menos gente, e nunca menos que o necessário', () => {
+  const h = cenario700();
+  let anterior = Infinity;
+  h.cenarios.forEach(c => {
+    assert.ok(c.pessoas <= anterior, `prazo ${c.prazoMeses}: não pode exigir mais que um prazo menor`);
+    anterior = c.pessoas;
+    const porPessoa = c.etapas.relatorios.producaoPessoa;
+    assert.ok(c.areas[TEC].pessoas * porPessoa + 1e-9 >= c.etapas.relatorios.porMes, 'o quadro cobre o trabalho mensal');
+  });
+});
+
+teste('headcount: o que vence durante o período também entra na conta', () => {
+  const f = fluxo([unidade(mesesConst(100))], equipe(1, 1), { mesAtual: 0 });
+  const h = Calculo.headcount(f.total, { mes: 0, prazos: [3] });
+  const c = h.cenarios[0];
+  perto(c.entradaReal, 300);                              // três meses de 100 UEP
+  perto(c.trabalhoTotal, h.backlog.total + 300);
+  assert.strictEqual(c.mesesEstimados, 0);
+});
+
+teste('headcount: prazo que passa de dezembro usa a média do ano e se declara estimado', () => {
+  const f = fluxo([unidade(mesesConst(60))], equipe(2, 2), { mesAtual: 10 });   // novembro
+  const h = Calculo.headcount(f.total, { mes: 10, prazos: [6] });
+  const c = h.cenarios[0];
+  assert.strictEqual(c.mesesEstimados, 4, 'novembro e dezembro são reais; faltam quatro');
+  perto(c.entradaReal, 120);
+  perto(c.entradaPeriodo, 120 + 4 * h.mediaEntrada);
+});
+
+teste('headcount: sem equipe, o déficit é o quadro inteiro; sem produção possível, avisa', () => {
+  const semGente = fluxo([unidade(mesesConst(50))], [], { mesAtual: 0 });
+  const h1 = Calculo.headcount(semGente.total, { mes: 0, prazos: [2] }).cenarios[0];
+  assert.strictEqual(h1.areas[TEC].quadro, 0);
+  assert.strictEqual(h1.areas[TEC].deficit, h1.areas[TEC].pessoas);
+  assert.ok(h1.areas[TEC].pessoas > 0);
+
+  const semDias = fluxo([unidade(mesesConst(50))], equipe(1, 1), { mesAtual: 0 }, { ...PARAM, diasUteis: Array(12).fill(0) });
+  const h2 = Calculo.headcount(semDias.total, { mes: 0, prazos: [2] }).cenarios[0];
+  assert.strictEqual(h2.impossivel, true, 'sem dias úteis não há quadro possível — o sistema diz isso');
+});
+
+teste('headcount: o vencido acumulado atravessa o ano (2025 → 2026)', () => {
+  const f25 = fluxo([unidade(mesesConst(40))], equipe(1, 1), { mesAtual: 12 }, PARAM, 2025);
+  const inicial = { u: f25.unidades[0].resumo.filaFinal };
+  const f26 = fluxo([unidade(mesesConst(0))], equipe(1, 1), { mesAtual: 0, filaInicial: inicial }, PARAM, 2026);
+  const h = Calculo.headcount(f26.total, { mes: 0, prazos: [2] });
+  perto(h.backlog.total, 40 * 12, 1);                     // todo o vencido de 2025 chega em janeiro/2026
+  assert.ok(h.cenarios[0].areas[TEC].pessoas > 0, 'e exige gente para ser eliminado');
+});
+
+teste('headcount: custo só aparece com custo cadastrado', () => {
+  const comCusto = fluxo([unidade(mesesConst(100))], equipe(2, 2, { custoMensal: 5000 }, { custoMensal: 4000 }), { mesAtual: 0 });
+  const c = Calculo.headcount(comCusto.total, { mes: 0, prazos: [2] }).cenarios[0];
+  perto(c.areas[TEC].custoTotal, c.areas[TEC].pessoas * 5000);
+  perto(c.areas[ADM].custoDeficit, c.areas[ADM].deficit * 4000);
+  const semCusto = fluxo([unidade(mesesConst(100))], equipe(2, 2), { mesAtual: 0 });
+  perto(Calculo.headcount(semCusto.total, { mes: 0, prazos: [2] }).cenarios[0].custoTotal, 0);
+});
+
 console.log(`\n${passaram} testes passaram.`);

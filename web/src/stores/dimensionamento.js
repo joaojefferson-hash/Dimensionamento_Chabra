@@ -25,30 +25,50 @@ export const useDimensionamentoStore = defineStore('dimensionamento', () => {
     janela: { de: 0, ate: 11 },
     ano: pref.ano,
   }));
-  /**
-   * O que ficou em aberto no ano anterior entra em janeiro: calcula a fila do ano anterior
-   * (todo passado se já terminou; até o mês atual se for o ano corrente) e pega dezembro.
-   */
-  const filaInicial = computed(() => {
-    const anoAnterior = pref.ano - 1;
-    const unidadesAnt = cad.unidadesDoAno(anoAnterior);
-    if (!unidadesAnt.some(u => Object.keys(u.meses).length)) return null;
-    const hojeAno = new Date().getFullYear();
-    const mesAtualAnt = anoAnterior < hojeAno ? 12 : anoAnterior === hojeAno ? pref.mesAtual : 0;
-    const rAnt = Calculo.calcular({ unidades: unidadesAnt, colaboradores: cad.colaboradoresCompletos, parametros: parametrosMotor.value, simulacoes: [], janela: { de: 0, ate: 11 }, ano: anoAnterior });
-    const atendidasAnt = {};
+  /** Anos que têm lançamento em alguma unidade, do mais antigo para o mais novo. */
+  const anosComLancamento = computed(() => {
+    const anos = new Set();
+    cad.unidades.forEach(u => Object.entries(u.mesesPorAno || {}).forEach(([ano, meses]) => {
+      if (meses && Object.keys(meses).length) anos.add(Number(ano));
+    }));
+    return [...anos].sort((x, y) => x - y);
+  });
+  /** Atendimentos informados de um ano: { [unidadeId]: { 1..12: { P, M, G } } }. */
+  const atendidasDoAno = ano => {
+    const out = {};
     cad.unidades.forEach(u => {
-      const meses = (u.mesesPorAno || {})[anoAnterior] || {};
+      const meses = (u.mesesPorAno || {})[ano] || {};
       Object.entries(meses).forEach(([mes, v]) => {
         const porte = v && v.atendidasPorte ? v.atendidasPorte : null;
-        if (porte && Object.keys(porte).length) { atendidasAnt[u.id] = atendidasAnt[u.id] || {}; atendidasAnt[u.id][Number(mes)] = { ...porte }; }
+        if (porte && Object.keys(porte).length) { out[u.id] = out[u.id] || {}; out[u.id][Number(mes)] = { ...porte }; }
       });
     });
-    const fAnt = Calculo.fluxo(rAnt, { mesAtual: mesAtualAnt, prazoMeses: prazoMeses.value, atendidas: atendidasAnt, parametros: parametrosMotor.value, ano: anoAnterior });
-    // carrega as coortes por etapa: a idade do backlog atravessa a virada de ano
-    const out = {};
-    fAnt.unidades.forEach(u => { out[u.id] = u.resumo.filaFinal; });
     return out;
+  };
+  /**
+   * O que ficou em aberto NÃO zera na virada do ano: a fila atravessa todos os anos com
+   * lançamento, do mais antigo até o ano anterior ao escolhido, carregando as coortes
+   * (e, portanto, a idade do backlog). Um documento vencido em 2025 continua vencido em 2026.
+   */
+  const filaInicial = computed(() => {
+    const anteriores = anosComLancamento.value.filter(a => a < pref.ano);
+    if (!anteriores.length) return null;
+    const hojeAno = new Date().getFullYear();
+    let carga = null;
+    anteriores.forEach(ano => {
+      const unidadesDoAno = cad.unidadesDoAno(ano);
+      const r = Calculo.calcular({ unidades: unidadesDoAno, colaboradores: cad.colaboradoresCompletos, parametros: parametrosMotor.value, simulacoes: [], janela: { de: 0, ate: 11 }, ano });
+      // ano já encerrado: tudo é passado; ano corrente: até o mês escolhido na barra
+      const mesAtualDoAno = ano < hojeAno ? 12 : ano === hojeAno ? pref.mesAtual : 0;
+      const f = Calculo.fluxo(r, {
+        mesAtual: mesAtualDoAno, prazoMeses: prazoMeses.value, filaInicial: carga,
+        atendidas: atendidasDoAno(ano), parametros: parametrosMotor.value, ano,
+      });
+      const out = {};
+      f.unidades.forEach(u => { out[u.id] = u.resumo.filaFinal; });
+      carga = out;
+    });
+    return carga;
   });
   /** Pendentes mês a mês (o passado acumula sem descontar; do mês atual em diante a equipe atende). */
   // a mesma conta em todas as telas: fila() e evolucao() são adaptadores do mesmo núcleo (Calculo.fluxo)
@@ -109,11 +129,16 @@ export const useDimensionamentoStore = defineStore('dimensionamento', () => {
         producaoDia: Calculo.ENTREGAS_DA_FUNCAO[f].map(e => ({ id: e.id, unidade: e.unidade, valor: res.producaoDiaPor[e.id] || 0 })),
       };
     });
-    const deAnoAnterior = unidadeSelValida.value
-      ? (filaInicial.value && filaInicial.value[unidadeSelValida.value] ? filaInicial.value[unidadeSelValida.value][Calculo.TEC] : 0)
-      : fila.value.filaInicial[Calculo.TEC];
-    return { mes: t, pendentes: pend.pendentes, deAntes: pend.filaInicio, vencem: pend.informado, deAnoAnterior, anoAnterior: pref.ano - 1, areas };
+    // o que veio de anos anteriores: a fila de janeiro, antes de qualquer vencimento deste ano
+    const janeiro = fluxoAlvo.value.meses[0];
+    const deAnoAnterior = janeiro ? janeiro.backlogInicio : 0;
+    return {
+      mes: t, pendentes: pend.pendentes, deAntes: pend.filaInicio, vencem: pend.informado,
+      deAnoAnterior, anoAnterior: pref.ano - 1,
+      anosAnteriores: anosComLancamento.value.filter(a => a < pref.ano),
+      areas,
+    };
   });
 
-  return { resultado, fila, fluxo, fluxoAlvo, backlogMes, backlogCenarioMes, filaInicial, alvo, filaAlvo, titulo, varias, temCusto, hoje, prazoMeses, unidadeSelValida, evolucao, evolucaoAlvo, atendidasInformadas, temAtendidas };
+  return { resultado, fila, fluxo, fluxoAlvo, backlogMes, backlogCenarioMes, filaInicial, anosComLancamento, atendidasDoAno, alvo, filaAlvo, titulo, varias, temCusto, hoje, prazoMeses, unidadeSelValida, evolucao, evolucaoAlvo, atendidasInformadas, temAtendidas };
 });
