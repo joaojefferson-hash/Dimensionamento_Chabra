@@ -125,7 +125,7 @@ const imprimir = () => window.print();
   <header class="page-header flex flex-wrap items-start justify-between gap-3">
     <div>
       <h1>Headcount</h1>
-      <p>Quantos colaboradores são necessários para eliminar os documentos vencidos acumulados até o mês escolhido. Selecione ano, mês e unidade na barra, e o prazo de eliminação abaixo.</p>
+      <p><strong>{{ dim.titulo }}</strong> · {{ mesLongo(pref.mesAtual) }} de {{ pref.ano }} — quantos colaboradores são necessários para eliminar os documentos vencidos acumulados até esse mês. Troque ano, mês e unidade na barra, e o prazo de eliminação abaixo.</p>
     </div>
     <button class="btn btn-ghost nao-imprimir" type="button" title="Imprimir ou salvar em PDF" @click="imprimir">Imprimir</button>
   </header>
@@ -180,7 +180,7 @@ const imprimir = () => window.print();
     <section class="card">
       <div class="card-head">
         <div>
-          <h2>Quadro necessário para eliminar em {{ escolhido.prazoMeses }} {{ escolhido.prazoMeses === 1 ? 'mês' : 'meses' }}</h2>
+          <h2>{{ dim.titulo }}: quadro necessário para eliminar em {{ escolhido.prazoMeses }} {{ escolhido.prazoMeses === 1 ? 'mês' : 'meses' }}</h2>
           <div class="muted text-[13px]">Zera o vencido acumulado até {{ mesLongo(pref.mesAtual) }}, atendendo também o que continua vencendo no período. Troque o prazo ao lado.</div>
         </div>
         <div class="flex flex-wrap items-center gap-2 text-[12px] nao-imprimir">
@@ -232,7 +232,7 @@ const imprimir = () => window.print();
 
     <!-- detalhe por etapa do prazo escolhido -->
     <section class="card">
-      <div class="card-head"><div><h2>Onde entra cada pessoa — prazo de {{ escolhido.prazoMeses }} {{ escolhido.prazoMeses === 1 ? 'mês' : 'meses' }}</h2><div class="muted text-[13px]">Todo documento passa por inspeção, relatório e finalização. As duas primeiras são do mesmo técnico, então contam como uma pessoa só.</div></div></div>
+      <div class="card-head"><div><h2>Onde entra cada pessoa · {{ dim.titulo }} — prazo de {{ escolhido.prazoMeses }} {{ escolhido.prazoMeses === 1 ? 'mês' : 'meses' }}</h2><div class="muted text-[13px]">Todo documento passa por inspeção, relatório e finalização. As duas primeiras são do mesmo técnico, então contam como uma pessoa só.</div></div></div>
       <div class="table-wrap">
         <table class="table table-grade">
           <thead><tr><th>Área</th><th>Atividades</th><th class="num">A fazer no período</th><th class="num">Por mês</th><th>Uma pessoa faz, por mês</th><th class="num">Pessoas</th><th class="num">Hoje</th><th class="num">Faltam</th></tr></thead>
@@ -258,7 +258,7 @@ const imprimir = () => window.print();
 
     <!-- idade do que está vencido -->
     <section class="card">
-      <div class="card-head"><div><h2>Há quanto tempo está vencido</h2><div class="muted text-[13px]">Por coortes mensais (aproximação de 30 dias por mês), em UEP.</div></div></div>
+      <div class="card-head"><div><h2>Há quanto tempo está vencido · {{ dim.titulo }}</h2><div class="muted text-[13px]">Por coortes mensais (aproximação de 30 dias por mês), em UEP.</div></div></div>
       <div class="table-wrap">
         <table class="table table-grade">
           <thead><tr><th>Faixa</th><th v-for="f in Calculo.FAIXAS_IDADE" :key="f.id" class="num">{{ f.rotulo }}</th><th class="num bg-warn-bg">Fora do prazo ({{ p.prazoDias }} dias)</th></tr></thead>
@@ -280,11 +280,11 @@ const imprimir = () => window.print();
     <!-- os mesmos números em gráfico -->
     <div class="grid gap-5 xl:grid-cols-2">
       <section class="card">
-        <div class="card-head"><div><h2>Quadro necessário por prazo</h2><div class="muted text-[13px]">Quanto mais longo o prazo, menos gente é preciso admitir. Em cor cheia, o prazo escolhido; a linha tracejada é a equipe de hoje.</div></div></div>
+        <div class="card-head"><div><h2>Quadro necessário por prazo · {{ dim.titulo }}</h2><div class="muted text-[13px]">Quanto mais longo o prazo, menos gente é preciso admitir. Em cor cheia, o prazo escolhido; a linha tracejada é a equipe de hoje.</div></div></div>
         <Grafico type="bar" :data="gPrazos" :options="oPrazos" />
       </section>
       <section class="card">
-        <div class="card-head"><div><h2>Idade do vencido acumulado</h2><div class="muted text-[13px]">Em UEP, por faixas de 30 dias. Acima de {{ p.prazoDias }} dias está fora do prazo de atendimento.</div></div></div>
+        <div class="card-head"><div><h2>Idade do vencido acumulado · {{ dim.titulo }}</h2><div class="muted text-[13px]">Em UEP, por faixas de 30 dias. Acima de {{ p.prazoDias }} dias está fora do prazo de atendimento.</div></div></div>
         <Grafico type="bar" :data="gIdade" />
       </section>
     </div>
