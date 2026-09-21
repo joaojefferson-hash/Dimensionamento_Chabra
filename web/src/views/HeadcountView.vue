@@ -15,7 +15,6 @@ const pref = usePreferenciasStore();
 const dim = useDimensionamentoStore();
 const TEC = Calculo.TEC, ADM = Calculo.ADM;
 const FUNCOES = Calculo.FUNCOES;
-const ETAPAS = Calculo.ENTREGAS.map(e => ({ id: e.id, rotulo: e.rotulo, funcao: e.funcao }));
 const ROTULO = { [TEC]: 'Técnicos', [ADM]: 'Administrativos' };
 
 watch(() => [cad.unidades.length, pref.unidadeSel], () => {
@@ -75,6 +74,24 @@ const equipeProdutiva = computed(() => equipeDaUnidade.value.filter(c => FUNCOES
 const equipeChefia = computed(() => equipeDaUnidade.value.filter(c => c.chefia));
 const equipeForaDoMes = computed(() => equipeDaUnidade.value.filter(c => FUNCOES.includes(c.tipoProducao) && c.presenca <= 0));
 const equipeSemFuncao = computed(() => equipeDaUnidade.value.filter(c => !c.chefia && !FUNCOES.includes(c.tipoProducao)));
+/** Uma linha por área: o técnico faz a inspeção e o relatório do mesmo documento, então as duas
+    atividades são uma conta só — vale a mais exigente, porque é a mesma pessoa. */
+const areasDetalhe = computed(() => FUNCOES.map(f => {
+  const daArea = Calculo.ENTREGAS_DA_FUNCAO[f];
+  const a = escolhido.value.areas[f];
+  const critica = escolhido.value.etapas[a.etapaCritica];
+  const producoes = daArea.map(e => ({ rotulo: e.unidade, valor: escolhido.value.etapas[e.id].producaoPessoa }));
+  return {
+    funcao: f, rotulo: ROTULO[f],
+    atividades: daArea.map(e => e.rotulo.toLowerCase()).join(' e '),
+    trabalho: critica.trabalho, porMes: critica.porMes,
+    producao: producoes.map(x => `${num(x.valor)} ${x.rotulo}`).join(' · '),
+    criticaRotulo: critica.rotulo.toLowerCase(),
+    // só vale destacar a atividade que manda quando as duas exigem gente diferente
+    mandaUma: daArea.length > 1 && daArea.some(e => escolhido.value.etapas[e.id].pessoas !== a.pessoas),
+    pessoas: a.pessoas, quadro: a.quadro, cabecas: a.cabecas, deficit: a.deficit,
+  };
+}));
 /** A diferença entre gente e equivalente vem de tempo parcial e de entradas/saídas no meio do mês. */
 const temTempoParcial = computed(() => Math.abs(calculo.value.cabecasAtual - calculo.value.quadroAtual) > 0.05);
 const imprimir = () => window.print();
@@ -233,31 +250,36 @@ const imprimir = () => window.print();
         </table>
       </div>
       <p class="note">
-        Uma pessoa inteira produz, por mês: {{ ETAPAS.map(e => `${num(escolhido.etapas[e.id].producaoPessoa)} em ${e.rotulo.toLowerCase()}`).join(' · ') }} — já descontada a margem para imprevistos de {{ Math.round(100 - p.ocupacaoAlvo) }}%.
-        O quadro de cada área é o da etapa mais exigente, porque a mesma pessoa cobre as etapas da sua área.
+        Uma pessoa inteira produz, por mês — <template v-for="(a, i) in areasDetalhe" :key="a.funcao"><strong>{{ a.rotulo.toLowerCase() }}</strong>: {{ a.producao }}{{ i < areasDetalhe.length - 1 ? '; ' : '' }}</template> —
+        já descontada a margem para imprevistos de {{ Math.round(100 - p.ocupacaoAlvo) }}%.
+        O quadro de cada área é o da atividade mais exigente, porque é a mesma pessoa que faz as duas.
       </p>
     </section>
 
     <!-- detalhe por etapa do prazo escolhido -->
     <section class="card">
-      <div class="card-head"><div><h2>Onde entra cada pessoa — prazo de {{ escolhido.prazoMeses }} {{ escolhido.prazoMeses === 1 ? 'mês' : 'meses' }}</h2><div class="muted text-[13px]">A cadeia é sequencial: todo documento passa por inspeção, relatório e finalização.</div></div></div>
+      <div class="card-head"><div><h2>Onde entra cada pessoa — prazo de {{ escolhido.prazoMeses }} {{ escolhido.prazoMeses === 1 ? 'mês' : 'meses' }}</h2><div class="muted text-[13px]">Todo documento passa por inspeção, relatório e finalização. As duas primeiras são do mesmo técnico, então contam como uma pessoa só.</div></div></div>
       <div class="table-wrap">
         <table class="table table-grade">
-          <thead><tr><th>Etapa</th><th>Área</th><th class="num">A fazer no período</th><th class="num">Por mês</th><th class="num">Uma pessoa faz</th><th class="num">Pessoas</th><th class="num">Hoje</th><th class="num">Faltam</th></tr></thead>
+          <thead><tr><th>Área</th><th>Atividades</th><th class="num">A fazer no período</th><th class="num">Por mês</th><th>Uma pessoa faz, por mês</th><th class="num">Pessoas</th><th class="num">Hoje</th><th class="num">Faltam</th></tr></thead>
           <tbody>
-            <tr v-for="e in ETAPAS" :key="e.id" :class="escolhido.etapas[e.id].deficit > 0 ? 'row-deficit' : 'row-ok'">
-              <td class="font-medium">{{ e.rotulo }}</td>
-              <td class="muted">{{ ROTULO[e.funcao] }}</td>
-              <td class="num">{{ num(escolhido.etapas[e.id].trabalho) }}</td>
-              <td class="num">{{ num(escolhido.etapas[e.id].porMes) }}</td>
-              <td class="num">{{ num(escolhido.etapas[e.id].producaoPessoa) }}</td>
-              <td class="num font-semibold">{{ escolhido.etapas[e.id].pessoas }}</td>
-              <td class="num">{{ numFte(escolhido.etapas[e.id].quadro) }}</td>
-              <td class="num" :class="escolhido.etapas[e.id].deficit > 0 ? 'txt-deficit' : 'txt-ok'">{{ escolhido.etapas[e.id].deficit || '—' }}</td>
+            <tr v-for="a in areasDetalhe" :key="a.funcao" :class="a.deficit > 0 ? 'row-deficit' : 'row-ok'">
+              <td class="font-medium">{{ a.rotulo }}</td>
+              <td class="muted">{{ a.atividades }}</td>
+              <td class="num">{{ num(a.trabalho) }}</td>
+              <td class="num">{{ num(a.porMes) }}</td>
+              <td>{{ a.producao }}<small v-if="a.mandaUma" class="muted"> — manda {{ a.criticaRotulo }}</small></td>
+              <td class="num font-semibold">{{ a.pessoas }}</td>
+              <td class="num">{{ numFte(a.quadro) }}</td>
+              <td class="num" :class="a.deficit > 0 ? 'txt-deficit' : 'txt-ok'">{{ a.deficit || '—' }}</td>
             </tr>
           </tbody>
         </table>
       </div>
+      <p class="note">
+        O técnico faz a inspeção e o relatório do mesmo documento, e o administrativo finaliza. Por isso as atividades do técnico
+        não somam gente: quando uma delas exige mais pessoas, é ela que define o quadro da área.
+      </p>
     </section>
 
     <!-- idade do que está vencido -->
