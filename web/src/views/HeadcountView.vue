@@ -6,6 +6,7 @@ import { computed, ref, watch } from 'vue';
 import Calculo from '../engine/calculo.js';
 import BarraOpcoes from '../components/BarraOpcoes.vue';
 import EquipeDaUnidade from '../components/EquipeDaUnidade.vue';
+import Grafico from '../components/ui/Grafico.vue';
 import { useCadastrosStore } from '../stores/cadastros.js';
 import { usePreferenciasStore } from '../stores/preferencias.js';
 import { useDimensionamentoStore } from '../stores/dimensionamento.js';
@@ -40,8 +41,83 @@ const anosAnteriores = computed(() => dim.anosComLancamento.filter(a => a < pref
 const vindoDeAntes = computed(() => (dim.fluxoAlvo.meses[0] ? dim.fluxoAlvo.meses[0].backlogInicio : 0));
 /** Alocados nesta unidade sem produção diária declarada: contam no quadro e não produzem. */
 const semProducaoDeclarada = computed(() => dim.equipeDoMes.filter(c => FUNCOES.includes(c.tipoProducao) && c.semProducao).map(c => c.nome));
+/** Uma linha por área: o técnico faz a inspeção e o relatório do mesmo documento, então as duas
+    atividades são uma conta só — vale a mais exigente, porque é a mesma pessoa. */
+const areasDetalhe = computed(() => FUNCOES.map(f => {
+  const daArea = Calculo.ENTREGAS_DA_FUNCAO[f];
+  const a = escolhido.value.areas[f];
+  const critica = escolhido.value.etapas[a.etapaCritica];
+  const producoes = daArea.map(e => ({ rotulo: e.unidade, valor: escolhido.value.etapas[e.id].producaoPessoa }));
+  return {
+    funcao: f, rotulo: ROTULO[f],
+    atividades: daArea.map(e => e.rotulo.toLowerCase()).join(' e '),
+    trabalho: critica.trabalho, porMes: critica.porMes,
+    producao: producoes.map(x => `${num(x.valor)} ${x.rotulo}`).join(' · '),
+    criticaRotulo: critica.rotulo.toLowerCase(),
+    // só vale destacar a atividade que manda quando as duas exigem gente diferente
+    mandaUma: daArea.length > 1 && daArea.some(e => escolhido.value.etapas[e.id].pessoas !== a.pessoas),
+    pessoas: a.pessoas, quadro: a.quadro, cabecas: a.cabecas, deficit: a.deficit,
+  };
+}));
 /** A diferença entre gente e equivalente vem de tempo parcial e de entradas/saídas no meio do mês. */
 const temTempoParcial = computed(() => Math.abs(calculo.value.cabecasAtual - calculo.value.quadroAtual) > 0.05);
+/* ---- gráficos ---- */
+const COR = { [TEC]: '#006b54', [ADM]: '#e0a800', atual: '#5f6b66' };
+const barra = { borderRadius: 4, borderSkipped: false, maxBarThickness: 34 };
+/** O prazo escolhido em cor cheia; os outros esmaecidos — a comparação sem tirar o foco. */
+const tom = (f, prazo) => (prazo === prazoEscolhido.value ? COR[f] : COR[f] + '59');
+
+const gPrazos = computed(() => ({
+  labels: calculo.value.cenarios.map(c => `${c.prazoMeses} ${c.prazoMeses === 1 ? 'mês' : 'meses'}`),
+  datasets: [
+    ...FUNCOES.map(f => ({
+      label: ROTULO[f],
+      data: calculo.value.cenarios.map(c => c.areas[f].pessoas),
+      backgroundColor: calculo.value.cenarios.map(c => tom(f, c.prazoMeses)),
+      stack: 'quadro',
+      ...barra,
+    })),
+    {
+      type: 'line', label: `Equipe atual (${numFte(calculo.value.quadroAtual)} em tempo integral)`,
+      data: calculo.value.cenarios.map(() => calculo.value.quadroAtual),
+      borderColor: COR.atual, backgroundColor: COR.atual, borderWidth: 2, borderDash: [6, 4],
+      pointRadius: 0, pointHoverRadius: 0, tension: 0,
+    },
+  ],
+}));
+const oPrazos = computed(() => ({
+  scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: 'pessoas' } } },
+  plugins: {
+    // a legenda mostra a cor cheia: o esmaecido é destaque do prazo escolhido, não identidade da série
+    legend: {
+      labels: {
+        generateLabels: grafico => grafico.data.datasets.map((d, i) => {
+          const cor = [COR[TEC], COR[ADM], COR.atual][i];
+          return { text: d.label, fillStyle: cor, strokeStyle: cor, lineWidth: 0, pointStyle: 'circle', hidden: !grafico.isDatasetVisible(i), datasetIndex: i };
+        }),
+      },
+    },
+    tooltip: {
+      callbacks: {
+        footer: itens => {
+          const c = calculo.value.cenarios[itens[0].dataIndex];
+          return c ? `Total: ${c.pessoas} · déficit ${c.deficit > 0 ? '+' + c.deficit : 'nenhum'}` : '';
+        },
+      },
+    },
+  },
+}));
+
+const gIdade = computed(() => ({
+  labels: Calculo.FAIXAS_IDADE.map(f => f.rotulo),
+  datasets: [{
+    label: 'Vencido acumulado (UEP)',
+    data: Calculo.FAIXAS_IDADE.map(f => idade.value.faixas[f.id] || 0),
+    backgroundColor: ['#2f9e6b', '#8bbf6b', '#e0a800', '#d2691e', '#c0392b'],
+    ...barra,
+  }],
+}));
+
 const imprimir = () => window.print();
 </script>
 
@@ -200,5 +276,17 @@ const imprimir = () => window.print();
         O vencido não zera na virada do ano: o que ficou em aberto em {{ anosAnteriores.length ? anosAnteriores.join(', ') : 'anos anteriores' }} continua contando aqui.
       </p>
     </section>
+
+    <!-- os mesmos números em gráfico -->
+    <div class="grid gap-5 xl:grid-cols-2">
+      <section class="card">
+        <div class="card-head"><div><h2>Quadro necessário por prazo</h2><div class="muted text-[13px]">Quanto mais longo o prazo, menos gente é preciso admitir. Em cor cheia, o prazo escolhido; a linha tracejada é a equipe de hoje.</div></div></div>
+        <Grafico type="bar" :data="gPrazos" :options="oPrazos" />
+      </section>
+      <section class="card">
+        <div class="card-head"><div><h2>Idade do vencido acumulado</h2><div class="muted text-[13px]">Em UEP, por faixas de 30 dias. Acima de {{ p.prazoDias }} dias está fora do prazo de atendimento.</div></div></div>
+        <Grafico type="bar" :data="gIdade" />
+      </section>
+    </div>
   </template>
 </template>

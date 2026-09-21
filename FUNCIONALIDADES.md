@@ -70,6 +70,7 @@ Responde diretamente: **quantas pessoas para zerar os documentos vencidos acumul
 - **Quadro necessário para o prazo escolhido**: uma linha só, a do prazo selecionado nos botões — o trabalho total (vencido + o que vence durante o período), o volume mensal, o quadro por área, o total, o déficit e o custo. Prazos que passam de dezembro usam a média do ano e são marcados como estimados.
 - **Onde entra cada pessoa**: o mesmo cálculo por área, uma linha para cada. Inspeção e relatório são atividades do mesmo técnico, então aparecem juntas e contam como uma pessoa só — quando uma delas exige mais gente, é ela que define o quadro da área.
 - **Há quanto tempo está vencido**: faixas de idade e a parcela fora do prazo.
+- **Gráficos**: o quadro necessário em cada um dos cinco prazos, empilhado por área, com a equipe de hoje como linha de referência (o prazo escolhido em cor cheia); e a idade do vencido acumulado por faixa de 30 dias.
 
 ### 3.1 Projeção
 
