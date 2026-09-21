@@ -1,5 +1,6 @@
 <script setup>
-/* Barra de opções da Projeção: ano · mês atual · unidade (tudo fica no navegador, via store de preferências). */
+/* Barra de opções: ano · mês atual · unidade (tudo fica no navegador, via store de preferências).
+   O slot recebe controles próprios da tela — o Headcount põe ali o prazo de eliminação. */
 import { computed } from 'vue';
 import { useCadastrosStore } from '../stores/cadastros.js';
 import { usePreferenciasStore } from '../stores/preferencias.js';
@@ -32,5 +33,6 @@ const anos = computed(() => cad.anosDisponiveis(pref.ano));
         <option v-for="u in cad.unidades" :key="u.id" :value="u.id">{{ u.nome }}</option>
       </select>
     </label>
+    <slot />
   </form>
 </template>

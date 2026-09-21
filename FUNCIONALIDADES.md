@@ -63,7 +63,7 @@ Uma página para a decisão de contratação, com impressão em PDF:
 
 ### 3.05 Headcount (eliminar o vencido)
 
-Responde diretamente: **quantas pessoas para zerar os documentos vencidos acumulados até o mês escolhido?** Ano, mês e unidade vêm da barra; o prazo de eliminação (1, 2, 3, 6 ou 12 meses) é escolhido na própria tela.
+Responde diretamente: **quantas pessoas para zerar os documentos vencidos acumulados até o mês escolhido?** Tudo se escolhe na barra do topo: ano, mês, unidade e o prazo de eliminação (1, 2, 3, 6 ou 12 meses). O prazo fica lembrado no navegador.
 
 - **Cartões**: vencido acumulado até o mês (com a parcela herdada de anos anteriores), o que vence no mês, a equipe atual e quantas pessoas faltam para o prazo escolhido.
 - **Equipe da unidade, pessoa por pessoa**: a lista de quem está alocado ali no mês, com a alocação, a presença (quem entrou ou saiu no meio do mês), a produção diária declarada e quanto cada um equivale em tempo integral — a conferência do número da equipe contra o cadastro. A chefia alocada na unidade aparece à parte, porque coordena e não entra no quadro.

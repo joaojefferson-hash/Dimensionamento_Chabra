@@ -125,12 +125,23 @@ const imprimir = () => window.print();
   <header class="page-header flex flex-wrap items-start justify-between gap-3">
     <div>
       <h1>Headcount</h1>
-      <p><strong>{{ dim.titulo }}</strong> · {{ mesLongo(pref.mesAtual) }} de {{ pref.ano }} — quantos colaboradores são necessários para eliminar os documentos vencidos acumulados até esse mês. Troque ano, mês e unidade na barra, e o prazo de eliminação abaixo.</p>
+      <p><strong>{{ dim.titulo }}</strong> · {{ mesLongo(pref.mesAtual) }} de {{ pref.ano }} — quantos colaboradores são necessários para eliminar os documentos vencidos acumulados até esse mês. Troque ano, mês, unidade e o prazo de eliminação na barra abaixo.</p>
     </div>
     <button class="btn btn-ghost nao-imprimir" type="button" title="Imprimir ou salvar em PDF" @click="imprimir">Imprimir</button>
   </header>
 
-  <div class="nao-imprimir"><BarraOpcoes sem-todas /></div>
+  <div class="nao-imprimir">
+    <BarraOpcoes sem-todas>
+      <div class="text-[12px]">
+        <span class="mb-1 block font-semibold uppercase tracking-wider text-muted">Prazo de eliminação</span>
+        <div class="flex overflow-hidden rounded-lg border border-line text-[13px]">
+          <button v-for="pz in PRAZOS" :key="pz" type="button" class="px-3 py-[4px]"
+            :class="prazoEscolhido === pz ? 'bg-primary text-white' : 'bg-white hover:bg-primary-light'"
+            @click="prazoEscolhido = pz">{{ pz }} {{ pz === 1 ? 'mês' : 'meses' }}</button>
+        </div>
+      </div>
+    </BarraOpcoes>
+  </div>
 
   <section v-if="!cad.unidades.length" class="card"><p class="muted">Cadastre unidades, empresas por unidade e colaboradores.</p></section>
   <template v-else>
@@ -181,15 +192,7 @@ const imprimir = () => window.print();
       <div class="card-head">
         <div>
           <h2>{{ dim.titulo }}: quadro necessário para eliminar em {{ escolhido.prazoMeses }} {{ escolhido.prazoMeses === 1 ? 'mês' : 'meses' }}</h2>
-          <div class="muted text-[13px]">Zera o vencido acumulado até {{ mesLongo(pref.mesAtual) }}, atendendo também o que continua vencendo no período. Troque o prazo ao lado.</div>
-        </div>
-        <div class="flex flex-wrap items-center gap-2 text-[12px] nao-imprimir">
-          <span class="muted">Prazo:</span>
-          <div class="flex overflow-hidden rounded-lg border border-line">
-            <button v-for="pz in PRAZOS" :key="pz" type="button" class="px-3 py-1"
-              :class="prazoEscolhido === pz ? 'bg-primary text-white' : 'bg-white hover:bg-primary-light'"
-              @click="prazoEscolhido = pz">{{ pz }} {{ pz === 1 ? 'mês' : 'meses' }}</button>
-          </div>
+          <div class="muted text-[13px]">Zera o vencido acumulado até {{ mesLongo(pref.mesAtual) }}, atendendo também o que continua vencendo no período. Troque o prazo na barra acima.</div>
         </div>
       </div>
       <div class="table-wrap">
