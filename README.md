@@ -1,27 +1,30 @@
 # Chabra Dimensiona
 
 Ferramenta de dimensionamento de quadro para consultoria de Segurança e Saúde do
-Trabalho (SST). App web independente — HTML/CSS/JS vanilla, sem framework e sem
-build step. Dados na nuvem (Supabase), compartilhados por toda a equipe, com
-login por e-mail/senha.
+Trabalho (SST). Aplicação Vue 3 + Vite em `web/`, com dados na nuvem (Supabase)
+compartilhados por toda a equipe e login por e-mail/senha.
+
+O motor de cálculo (`js/calculo.js`) é puro — sem tela e sem banco — e é copiado
+para `web/src/engine/` antes de cada build. Modelo documentado em
+[docs/MODELO-DE-CALCULO.md](docs/MODELO-DE-CALCULO.md); 84 testes em `tests/`.
 
 Manual completo do programa (telas, papéis, contas, rotina): [MANUAL.md](MANUAL.md).
 
 ## Como rodar
 
-**Live Server (VS Code):** abra a pasta no VS Code, clique com o botão direito em
-`index.html` → *Open with Live Server*.
+```bash
+cd web
+npm install
+npm run dev      # http://localhost:5173
+npm test         # 84 testes (motor, dimensionamento, sincronização, importação)
+```
 
-**Qualquer servidor estático:** `python -m http.server 5500` e acesse
-`http://localhost:5500`.
-
-Precisa de internet: o `supabase-js` vem do CDN (jsDelivr, versão pinada) e os
-dados ficam no Supabase.
+Precisa de internet: os dados ficam no Supabase.
 
 ## Hospedagem
 
-Site estático: basta publicar a pasta inteira (Vercel, Netlify, GitHub Pages,
-Nginx…). Nenhuma configuração extra.
+Vercel, a partir do branch `main` (ver `vercel.json`): instala e builda em `web/`
+e publica `web/dist`. Um `git push` publica.
 
 ## Configuração do Supabase (uma vez por projeto)
 
@@ -141,27 +144,18 @@ pessoas que faltam/sobram    = sobra ÷ produção de uma pessoa inteira no per�
 ## Estrutura
 
 ```
-index.html              casca da aplicação (telas de login/carregando, menu lateral, diálogo, toasts)
-style.css               identidade visual (verde institucional #006B54)
-js/config.js            URL e chave publishable do Supabase
-js/ui.js                utilitários: escape, formatação, toast, confirmação, busy
-js/auth.js              cliente Supabase (`db`) + sessão (login/logout)
-js/store.js             cache em memória sobre as tabelas + exportar/importar JSON
-js/views/unidades.js        tela Unidades (CRUD)
-js/views/empresas.js        tela Empresas por Unidade (quantidade por unidade)
-js/views/catalogo.js        tela Catálogo de Documentos (oculta neste modelo)
-js/views/colaboradores.js   tela Colaboradores (CRUD; função vem do cadastro de funções) + modo Organograma
-js/organograma.js       organograma (hierarquia das funções de chefia + equipes por unidade) e barras por unidade
-js/views/funcoes.js         tela Funções (nome, tipo de produção, chefia, ordem)
-js/views/usuarios.js        tela Usuários (só admin) — chama a Edge Function `usuarios`
-js/views/calendario.js      tela Calendário (dias úteis por mês, folga, prazo)
-js/views/dimensionamento.js tela Dimensionamento (hoje, mês a mês, por unidade, "E se…?")
-js/views/historico.js       tela Histórico de alterações
-js/calculo.js           motor de dimensionamento (puro)
-js/programacao.js       utilitários do Dimensionamento (mês atual, barra, simulação, formatação)
-js/app.js               inicialização, navegação por hash (#/unidades …), badges, backup
-supabase/migrations/    SQL do banco (0005 = alocação multiunidade, 0007 = empresas por mês, 0008 = produção diária, 0009 = frequência, 0010/0011 = histórico, 0012 = funções cadastráveis, 0013 = chefia, 0014 = coordena/responde_para, 0015 = situação da documentação no lugar do grau, 0016 = só documentos vencidos, 0017 = prazo para atender, 0018 = papéis na RLS, 0019 = ano nos valores por mês, 0020 = condição Exclusiva TST, 0021 = clientes ativos informativo)
-supabase/functions/usuarios/index.ts   Edge Function de gestão de usuários (chave secreta só no servidor)
+web/                    a aplicação (Vue 3 + Vite) — arquitetura detalhada em web/README.md
+  src/views/            uma tela por arquivo: Headcount, Unidades, Empresas, Colaboradores,
+                        Funções, Calendário, Histórico, Usuários, Login
+  src/stores/           cadastros (cache do Supabase), preferências (navegador), dimensionamento (derivações)
+  src/engine/calculo.js cópia do motor, gerada por scripts/sync-engine.mjs
+js/calculo.js           MOTOR DE CÁLCULO (fonte): calcular, fluxo, headcount, fila, evolucao — funções puras
+tests/                  testes do motor, do dimensionamento e da sincronização (node, sem framework)
+docs/MODELO-DE-CALCULO.md   a matemática documentada, para auditar qualquer número
+supabase/migrations/    SQL do banco (0001…0030)
+supabase/functions/     usuarios (gestão de acessos) e sincronizar-sst (API de documentos)
+MANUAL.md               manual do usuário    FUNCIONALIDADES.md  o que o programa faz, tela a tela
+index.html, style.css, js/app.js, js/views/   PRIMEIRA VERSÃO, não publicada (só js/calculo.js segue em uso)
 ```
 
 ## Modelo de dados
