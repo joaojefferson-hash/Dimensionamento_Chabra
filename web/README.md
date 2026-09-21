@@ -35,23 +35,23 @@ web/
                             portes, parametros; carregar(); escritas que atualizam o cache;
                             getters para o motor (unidadesDoAno, colaboradoresCompletos, pesosPorte);
                             exportarBackup / importarBackup
-      preferencias.js       só do navegador: ano, mês atual, unidade, simulação "E se…?" (localStorage)
-      dimensionamento.js    SÓ DERIVAÇÕES: resultado = Calculo.calcular(...), filaInicial (pendente do ano
-                            anterior → janeiro), fila = Calculo.fila(...), alvo, hoje — muda um cadastro, recalcula
+      preferencias.js       só do navegador: ano, mês atual, unidade (localStorage)
+      dimensionamento.js    SÓ DERIVAÇÕES: resultado = Calculo.calcular(...), filaInicial (vencido dos anos
+                            anteriores → janeiro), fluxo/fluxoAlvo = Calculo.fluxo(...), equipeDoMes —
+                            muda um cadastro, recalcula
     router/index.js         rotas + TELAS (menu) + guard por papel
     composables/useFormat.js num, numFte, moeda, meses
     components/
       layout/Sidebar.vue    menu por seção, filtrado pelo papel; usuário e Sair
-      BarraOpcoes.vue       ano · mês atual · unidade (liga na store de preferências)
+      BarraOpcoes.vue       ano · mês atual · unidade + <slot> para controles da tela (o prazo, no Headcount)
+      EquipeDaUnidade.vue   lista de conferência da equipe: alocação, presença no mês, produção e equivalente
+      ui/Grafico.vue        Chart.js reativo (barras/linhas), usado pelo Headcount
       colaboradores/        Organograma.vue (indicadores + barras + árvore + impressão),
                             OrgChefe.vue (nó recursivo), OrgEquipe.vue, OrgPessoa.vue
     views/
       LoginView.vue
-      DimensionamentoView.vue   tela "Projeção" (rota /projecao): barra + Hoje + TabelaMeses + Simulacao + avisos
-      DashboardView.vue         gráficos (Chart.js via components/ui/Grafico.vue) sobre a store de dimensionamento
-      MesView.vue               resumo de um mês: acumulado, vencimentos, equipe, composição do acumulado e projeção
-      EvolucaoView.vue          controle histórico (Calculo.evolucao): fila, capacidade, quadro real × necessário, impressão
-      DiretoriaView.vue         visão executiva (Calculo.fluxo): UEP, capacidade, backlog com idade, gargalo, QLP em 3 leituras, custo
+      HeadcountView.vue         a tela de dimensionamento (Calculo.headcount): vencido acumulado, equipe,
+                                quadro necessário no prazo escolhido, idade do backlog, gráficos e impressão
       Unidades/Empresas/Colaboradores/Funcoes/Calendario/Historico/UsuariosView.vue
   src/composables/organograma.js  árvore do organograma (pura): chefias pela hierarquia das funções + equipes por unidade
   src/composables/useVersao.js    avisa quando uma nova versão é publicada (compara o script do index.html) → faixa em App.vue

@@ -6,12 +6,7 @@ import { createRouter, createWebHashHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth.js';
 
 export const TELAS = [
-  { path: '/diretoria',       name: 'diretoria',       titulo: 'Diretoria',       secao: 'Dimensionamento', papeis: ['admin', 'leitura'], component: () => import('../views/DiretoriaView.vue') },
-  { path: '/projecao',        name: 'projecao',        titulo: 'Projeção',        secao: 'Dimensionamento', papeis: ['admin', 'leitura'], component: () => import('../views/DimensionamentoView.vue') },
-  { path: '/mes',             name: 'mes',             titulo: 'Resumo do mês',   secao: 'Dimensionamento', papeis: ['admin', 'leitura'], component: () => import('../views/MesView.vue') },
   { path: '/headcount',       name: 'headcount',       titulo: 'Headcount',       secao: 'Dimensionamento', papeis: ['admin', 'leitura'], component: () => import('../views/HeadcountView.vue') },
-  { path: '/dashboard',       name: 'dashboard',       titulo: 'Dashboard',       secao: 'Dimensionamento', papeis: ['admin', 'leitura'], component: () => import('../views/DashboardView.vue') },
-  { path: '/evolucao',        name: 'evolucao',        titulo: 'Evolução',        secao: 'Dimensionamento', papeis: ['admin', 'leitura'], component: () => import('../views/EvolucaoView.vue') },
   { path: '/unidades',        name: 'unidades',        titulo: 'Unidades',            secao: 'Cadastros', component: () => import('../views/UnidadesView.vue') },
   { path: '/empresas',        name: 'empresas',        titulo: 'Empresas por Unidade', secao: 'Cadastros', component: () => import('../views/EmpresasView.vue') },
   { path: '/colaboradores',   name: 'colaboradores',   titulo: 'Colaboradores',       secao: 'Cadastros', component: () => import('../views/ColaboradoresView.vue') },
@@ -28,15 +23,15 @@ const router = createRouter({
   routes: [
     { path: '/entrar', name: 'entrar', component: () => import('../views/LoginView.vue'), meta: { publica: true } },
     ...TELAS.map(t => ({ path: t.path, name: t.name, component: t.component, meta: { titulo: t.titulo, papeis: t.papeis } })),
-    { path: '/dimensionamento', redirect: '/projecao' }, // links antigos
-    { path: '/:resto(.*)', redirect: '/projecao' },
+    // links antigos das telas que saíram (Diretoria, Projeção, Resumo do mês, Dashboard, Evolução)
+    { path: '/:resto(.*)', redirect: '/headcount' },
   ],
 });
 
 router.beforeEach(async to => {
   const auth = useAuthStore();
   if (!auth.pronto) await auth.iniciar();
-  if (to.meta.publica) return auth.logado ? { name: 'projecao' } : true;
+  if (to.meta.publica) return auth.logado ? { name: 'headcount' } : true;
   if (!auth.logado) return { name: 'entrar' };
   const tela = TELAS.find(t => t.name === to.name);
   if (tela && !podeVer(tela, auth.papel)) {

@@ -16,7 +16,7 @@ async function entrar() {
   try {
     await auth.entrar(email.value.trim(), senha.value);
     if (!auth.papel) { erro.value = 'Esta conta ainda não possui perfil de acesso definido. Contate o administrador.'; await auth.sair(); return; }
-    router.push({ name: 'projecao' });
+    router.push({ name: 'headcount' });
   } catch (e) {
     erro.value = e.message;
   } finally {

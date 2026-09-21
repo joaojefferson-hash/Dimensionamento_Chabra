@@ -22,7 +22,6 @@ export const useDimensionamentoStore = defineStore('dimensionamento', () => {
     unidades: cad.unidadesDoAno(pref.ano),
     colaboradores: cad.colaboradoresCompletos,
     parametros: parametrosMotor.value,
-    simulacoes: pref.simulacoes,
     janela: { de: 0, ate: 11 },
     ano: pref.ano,
   }));
@@ -71,27 +70,17 @@ export const useDimensionamentoStore = defineStore('dimensionamento', () => {
     });
     return carga;
   });
-  /** Pendentes mês a mês (o passado acumula sem descontar; do mês atual em diante a equipe atende). */
-  // a mesma conta em todas as telas: fila() e evolucao() são adaptadores do mesmo núcleo (Calculo.fluxo)
   const opcoesFluxo = computed(() => ({
     mesAtual: pref.mesAtual, prazoMeses: prazoMeses.value, filaInicial: filaInicial.value,
     atendidas: atendidasInformadas.value, parametros: parametrosMotor.value, ano: pref.ano,
   }));
-  const fila = computed(() => Calculo.fila(resultado.value, opcoesFluxo.value));
   /** Núcleo completo: etapas da cadeia, coortes, idade do backlog, QLP e custos. */
   const fluxo = computed(() => Calculo.fluxo(resultado.value, opcoesFluxo.value));
   const fluxoAlvo = computed(() => (unidadeSelValida.value ? fluxo.value.unidades.find(u => u.id === unidadeSelValida.value) : fluxo.value.total));
-  /** Backlog da unidade em um mês (soma das filas das três etapas da cadeia) — fonte única. */
-  const backlogMes = mes => fluxoAlvo.value.meses[mes].backlog;
-  const backlogCenarioMes = mes => fluxoAlvo.value.meses[mes].backlogCenario;
-
   const unidadeSelValida = computed(() => (cad.unidades.some(u => u.id === pref.unidadeSel) ? pref.unidadeSel : ''));
   /** Alvo da tela: a unidade escolhida ou o total. */
   const alvo = computed(() => (unidadeSelValida.value ? resultado.value.unidades.find(u => u.id === unidadeSelValida.value) : resultado.value.total));
-  const filaAlvo = computed(() => (unidadeSelValida.value ? fila.value.unidades.find(u => u.id === unidadeSelValida.value).grupos : fila.value.total.grupos));
   const titulo = computed(() => (unidadeSelValida.value ? alvo.value.nome : 'Todas as unidades'));
-  const varias = computed(() => !unidadeSelValida.value && resultado.value.unidades.length > 1);
-  const temCusto = computed(() => Calculo.FUNCOES.some(f => resultado.value.total.meses.some(m => m.funcoes[f].custo && m.funcoes[f].custo.pessoa > 0)));
 
   /** Empresas concluídas informadas: { [unidadeId]: { 1..12: { P, M, G } } } — mesma unidade da demanda. */
   const atendidasInformadas = computed(() => {
@@ -105,42 +94,6 @@ export const useDimensionamentoStore = defineStore('dimensionamento', () => {
     });
     return out;
   });
-  /** Evolução mês a mês (controle histórico): fila, capacidade, quadro necessário e admissões sugeridas. */
-  const evolucao = computed(() => Calculo.evolucao(resultado.value, opcoesFluxo.value));
-  /** Evolução da unidade escolhida (ou o total). */
-  const evolucaoAlvo = computed(() => (unidadeSelValida.value
-    ? evolucao.value.unidades.find(u => u.id === unidadeSelValida.value).areas
-    : evolucao.value.total.areas));
-  /** Há atendimentos informados no ano? (sem eles, o histórico só acumula) */
-  const temAtendidas = computed(() => Object.keys(atendidasInformadas.value).length > 0);
-
-  /** "Hoje": pendentes e, por área, equipe → ideal, contratar para zerar no prazo, produção por dia. */
-  const hoje = computed(() => {
-    const t = pref.mesAtual;
-    const pend = filaAlvo.value[Calculo.TEC].meses[t];
-    const areas = Calculo.FUNCOES.map(f => {
-      const m = alvo.value.meses[t];
-      const g = m.funcoes[f];
-      const res = filaAlvo.value[f].resumo;
-      return {
-        funcao: f, rotulo: Calculo.FUNCAO_CURTA[f], singular: Calculo.FUNCAO_SINGULAR[f],
-        pessoas: m.pessoas[f], cabecas: m.cabecas ? m.cabecas[f] : 0, ideal: g.ideal, faltam: g.faltam, sobram: g.sobram, status: g.status, emRampup: g.emRampup || 0,
-        custoPessoa: g.custo ? g.custo.pessoa : 0,
-        contratarPrazo: res.pessoasPrazo, custoContratarPrazo: g.custo ? res.pessoasPrazo * g.custo.pessoa : 0,
-        producaoDia: Calculo.ENTREGAS_DA_FUNCAO[f].map(e => ({ id: e.id, unidade: e.unidade, valor: res.producaoDiaPor[e.id] || 0 })),
-      };
-    });
-    // o que veio de anos anteriores: a fila de janeiro, antes de qualquer vencimento deste ano
-    const janeiro = fluxoAlvo.value.meses[0];
-    const deAnoAnterior = janeiro ? janeiro.backlogInicio : 0;
-    return {
-      mes: t, pendentes: pend.pendentes, deAntes: pend.filaInicio, vencem: pend.informado,
-      deAnoAnterior, anoAnterior: pref.ano - 1,
-      anosAnteriores: anosComLancamento.value.filter(a => a < pref.ano),
-      areas,
-    };
-  });
-
   /** A equipe alocada no alvo da tela (unidade escolhida, ou todas), no mês da barra: gente de
       verdade, com o que cada um contribui. Fonte única das listas de conferência das telas. */
   const equipeDoMes = computed(() => {
@@ -167,5 +120,5 @@ export const useDimensionamentoStore = defineStore('dimensionamento', () => {
       .sort((a, b) => a.tipoProducao.localeCompare(b.tipoProducao) || a.nome.localeCompare(b.nome, 'pt-BR'));
   });
 
-  return { resultado, fila, fluxo, fluxoAlvo, equipeDoMes, backlogMes, backlogCenarioMes, filaInicial, anosComLancamento, atendidasDoAno, alvo, filaAlvo, titulo, varias, temCusto, hoje, prazoMeses, unidadeSelValida, evolucao, evolucaoAlvo, atendidasInformadas, temAtendidas };
+  return { resultado, fluxo, fluxoAlvo, equipeDoMes, filaInicial, anosComLancamento, atendidasDoAno, alvo, titulo, prazoMeses, unidadeSelValida, atendidasInformadas };
 });

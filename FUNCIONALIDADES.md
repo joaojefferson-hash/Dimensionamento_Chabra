@@ -45,23 +45,9 @@ Parâmetros configuráveis (tela Calendário, compartilhados por toda a equipe):
 
 ---
 
-## 3. Telas de dimensionamento
+## 3. A tela de dimensionamento
 
-### 3.0 Diretoria (visão executiva)
-
-Uma página para a decisão de contratação, com impressão em PDF:
-
-- **Carteira, demanda (UEP), capacidade da cadeia (nominal, margem e planejada) e backlog** com a parcela **fora do prazo**.
-- **Quadro de lotação (QLP)** por área, em três leituras — operacional (manter a operação), recuperação (eliminar o backlog no prazo), estrutural (quadro permanente) — além do pico do ano, do reforço temporário e do déficit; com custo atual, necessário e incremental quando há custo cadastrado.
-- **Onde está o gargalo**: entrada, capacidade, conclusão, ociosidade e fila **por área** — inspeção e relatório são atividades do mesmo técnico, então formam uma linha só, com a atividade que trava a cadeia nomeada. A nota abaixo separa as duas perguntas: qual atividade limita a conclusão (a de menor capacidade) e onde está a maior fila.
-- **Equipe da unidade**: a lista de conferência pessoa por pessoa (também no Headcount e no Resumo do mês).
-- **Gráficos**: demanda × capacidade, backlog mês a mês (real e com as admissões sugeridas), idade do backlog por faixa e quadro atual × necessário.
-
-> **Pessoas e equivalente em tempo integral.** Em todas as telas deste capítulo, o número em destaque
-> é a contagem de gente; logo abaixo vem o equivalente em tempo integral, que é o que entra na conta de
-> capacidade. Oito pessoas com uma a 80% e outra admitida no dia 16 equivalem a 7,3.
-
-### 3.05 Headcount (eliminar o vencido)
+### 3.1 Headcount (a tela de resultado)
 
 Responde diretamente: **quantas pessoas para zerar os documentos vencidos acumulados até o mês escolhido?** Tudo se escolhe na barra do topo: ano, mês, unidade e o prazo de eliminação (1, 2, 3, 6 ou 12 meses). O prazo fica lembrado no navegador.
 
@@ -71,49 +57,6 @@ Responde diretamente: **quantas pessoas para zerar os documentos vencidos acumul
 - **Onde entra cada pessoa**: o mesmo cálculo por área, uma linha para cada. Inspeção e relatório são atividades do mesmo técnico, então aparecem juntas e contam como uma pessoa só — quando uma delas exige mais gente, é ela que define o quadro da área.
 - **Há quanto tempo está vencido**: faixas de idade e a parcela fora do prazo.
 - **Gráficos**: o quadro necessário em cada um dos cinco prazos, empilhado por área, com a equipe de hoje como linha de referência (o prazo escolhido em cor cheia); e a idade do vencido acumulado por faixa de 30 dias.
-
-### 3.1 Projeção
-
-A tela de resultado, de uma unidade por vez, para o ano selecionado.
-
-- **Pendências atuais**: o total em aberto no mês atual, separando o que veio acumulado dos meses anteriores (com a parcela herdada do ano anterior) e o que vence no mês.
-- **Por área (técnicos e administrativos)**: equipe atual em pessoas (com o equivalente em tempo integral quando há alocação parcial ou entrada no meio do mês) → quadro ideal do mês; quantas pessoas eliminariam as pendências dentro do prazo, com o custo mensal; produção diária da equipe; quantos estão em período de adaptação.
-- **Tabela dos 12 meses**: vencimentos, pendências ao fim do mês, quadro atual → ideal por área e a conclusão de cada mês — "Contratação necessária: 1 técnico e 2 administrativos", "Equipe suficiente", "margem reduzida" — com o custo quando há valores cadastrados. Meses já decorridos aparecem como realizado; do mês atual em diante, como projeção. O rodapé traz o total do ano, as pendências de dezembro e o quadro necessário para atender todos os meses.
-- **Simulação de cenários**: linhas de contratação (quantidade positiva) ou desligamento (negativa) por unidade, área, período e produção diária. Recalcula tudo na hora, inclusive meses passados, com período de adaptação. Fica apenas no navegador de quem simula.
-- **Avisos de cadastro**: colaboradores sem unidade, alocação parcial, unidades com demanda e sem equipe, unidades sem profissionais de uma área.
-
-### 3.2 Resumo do mês
-
-A foto de um único mês (o escolhido na barra), própria para reunião ou PDF:
-
-- Acumulado até aquele mês, vencimentos do mês, total a atender e quanto a equipe consegue atender, pendências ao fim do mês.
-- Equipe do mês por área: quadro atual → ideal, quantas pessoas eliminariam as pendências no prazo, capacidade e produção diária.
-- **De onde vem o acumulado**: uma linha por mês anterior (o que venceu, o que foi atendido, o que permaneceu em aberto) até o total que chega no mês escolhido.
-- **Projeção com a equipe atual**: os três meses seguintes, em que mês as pendências zeram e quanto sobra em dezembro.
-- Botão **Imprimir** (também salva em PDF).
-
-### 3.3 Dashboard
-
-Os mesmos números em gráficos, uma unidade por vez: pendências ao fim de cada mês (distinguindo meses decorridos, mês atual e projeção), vencimentos × produção da equipe, equipe atual × quadro ideal por área e o impacto financeiro mensal (contratações necessárias × excedente de pessoal).
-
-### 3.4 Evolução (controle histórico)
-
-Responde à pergunta da diretoria: **mês a mês, o quadro estava suficiente? Quantas admissões seriam necessárias?**
-
-- **Cartões**: meses com quadro insuficiente (e desde quando), admissões que seriam necessárias, pendências em dezembro (real e no cenário com as admissões) e custo médio do déficit.
-- **Tabela**: fila inicial, entrada do mês, atendidas, fila final e, por área, quadro real com duas leituras do necessário —
-
-  | Coluna | Pergunta que responde |
-  |---|---|
-  | **vazão** | Quantas pessoas para dar conta do que entra no mês (não deixar a fila crescer)? |
-  | **recuperação** | Quantas pessoas para dar conta da entrada **e** diluir a fila dentro do prazo? |
-
-- **Cenário "se tivéssemos contratado"**: as admissões sugeridas são acumulativas (quem entra permanece) e entram com período de adaptação; os gráficos comparam a fila real com a fila que teríamos.
-- **Gráficos**: fila com e sem as admissões, entrada × capacidade por área, quadro real × necessário.
-- Avisos quando faltam dados: sem a linha *Atendidas no mês*, o histórico apenas acumula; sem datas de admissão, a equipe é considerada constante.
-- Botão **Imprimir**.
-
----
 
 ## 4. Cadastros
 
@@ -189,16 +132,16 @@ No perfil de Leitura, os formulários e botões de gravação ficam desativados 
 
 | Ficam no navegador de cada pessoa | Ficam no banco, para toda a equipe |
 |---|---|
-| ano, mês atual, unidade selecionada | unidades, colaboradores, funções, portes |
+| ano, mês atual, unidade e prazo de eliminação | unidades, colaboradores, funções, portes |
 | filtros das telas e porte selecionado | lançamentos mensais (demanda, clientes ativos, atendidas) |
 | modo da tela Colaboradores e orientação de impressão | parâmetros do Calendário |
-| simulação de cenários | usuários e perfis |
+| — | usuários e perfis |
 
 ---
 
 ## 8. Recursos de apoio
 
-- **Impressão em PDF**: organograma, Resumo do mês e Evolução imprimem apenas o conteúdo, sem o menu, com cabeçalho identificando unidade, período e data de emissão.
+- **Impressão em PDF**: o Headcount e o organograma imprimem apenas o conteúdo, sem o menu, com cabeçalho identificando unidade, período e data de emissão.
 - **Aviso de nova versão**: quando uma atualização é publicada, aparece a faixa "Nova versão disponível" com o botão **Atualizar agora**. A verificação ocorre ao voltar para a aba e a cada 10 minutos.
 - **Recarga automática dos dados** ao voltar para a aba, para refletir lançamentos feitos por outras pessoas.
 - **Menu lateral fixo**, com contadores de unidades e colaboradores.
