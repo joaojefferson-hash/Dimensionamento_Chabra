@@ -62,7 +62,7 @@ Responde diretamente: **quantas pessoas para zerar os documentos vencidos acumul
 
 - **Cartões**: vencido acumulado até o mês (com a parcela herdada de anos anteriores), o que vence no mês, a equipe atual e quantas pessoas faltam para o prazo escolhido.
 - **Equipe da unidade, pessoa por pessoa**: a lista de quem está alocado ali no mês, com a alocação, a presença (quem entrou ou saiu no meio do mês), a produção diária declarada e quanto cada um equivale em tempo integral — a conferência do número da equipe contra o cadastro. A chefia alocada na unidade aparece à parte, porque coordena e não entra no quadro.
-- **Cenários por prazo**: para cada prazo, o trabalho total (vencido + o que vence durante o período), o volume mensal, o quadro necessário por área, o total, o déficit e o custo. Prazos que passam de dezembro usam a média do ano e são marcados como estimados.
+- **Quadro necessário para o prazo escolhido**: uma linha só, a do prazo selecionado nos botões — o trabalho total (vencido + o que vence durante o período), o volume mensal, o quadro por área, o total, o déficit e o custo. Prazos que passam de dezembro usam a média do ano e são marcados como estimados.
 - **Onde entra cada pessoa**: o mesmo cálculo por etapa da cadeia (inspeção, relatório, finalização), mostrando a etapa que exige mais gente.
 - **Há quanto tempo está vencido**: faixas de idade e a parcela fora do prazo.
 

@@ -189,8 +189,8 @@ const imprimir = () => window.print();
     <section class="card">
       <div class="card-head">
         <div>
-          <h2>Quadro necessário por prazo de eliminação</h2>
-          <div class="muted text-[13px]">Cada linha zera o vencido acumulado no prazo indicado, atendendo também o que continua vencendo no período.</div>
+          <h2>Quadro necessário para eliminar em {{ escolhido.prazoMeses }} {{ escolhido.prazoMeses === 1 ? 'mês' : 'meses' }}</h2>
+          <div class="muted text-[13px]">Zera o vencido acumulado até {{ mesLongo(pref.mesAtual) }}, atendendo também o que continua vencendo no período. Troque o prazo ao lado.</div>
         </div>
         <div class="flex flex-wrap items-center gap-2 text-[12px] nao-imprimir">
           <span class="muted">Prazo:</span>
@@ -215,11 +215,9 @@ const imprimir = () => window.print();
             </tr>
           </thead>
           <tbody>
-            <tr v-for="c in calculo.cenarios" :key="c.prazoMeses"
-              :class="[c.prazoMeses === prazoEscolhido ? 'font-semibold' : '', c.deficit > 0 ? 'row-deficit' : 'row-ok']">
+            <tr v-for="c in [escolhido]" :key="c.prazoMeses" class="font-semibold" :class="c.deficit > 0 ? 'row-deficit' : 'row-ok'">
               <td class="whitespace-nowrap">
                 {{ c.prazoMeses }} {{ c.prazoMeses === 1 ? 'mês' : 'meses' }}
-                <span v-if="c.prazoMeses === prazoEscolhido" class="chip chip-blue">escolhido</span>
                 <span v-if="c.mesesEstimados" class="chip bg-warn-bg text-warn" :title="`${c.mesesEstimados} mês(es) além de dezembro entram pela média do ano`">estimado</span>
               </td>
               <td class="num">{{ num(c.trabalhoTotal) }}</td>
