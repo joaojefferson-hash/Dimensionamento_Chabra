@@ -50,6 +50,11 @@ capacidade planejada = capacidade nominal × (1 − margem para imprevistos)
 - **Adaptação**: 1º mês 50%, 2º 80%, depois 100% (configurável). Vale para admissões reais e simuladas.
 - **Margem para imprevistos**: padrão 15%. As telas mostram **nominal**, **margem** e **planejada** —
   o desconto nunca fica escondido.
+- **Pessoas x equivalente em tempo integral**: as telas mostram as duas leituras. **Pessoas** é gente
+  de verdade — quem tem alocação na unidade conta 1, mesmo a 50% ou entrando no dia 16. **Equivalente
+  em tempo integral** é o que entra na conta de capacidade: alocação × presença. Oito pessoas com uma
+  a 80% e outra entrando no meio do mês equivalem a 7,3. No total da empresa, quem atende duas
+  unidades conta como uma pessoa (e não duas), embora o equivalente se divida entre elas.
 - **Produção de uma pessoa inteira** (a régua do quadro necessário): média de quem está alocado na
   unidade **e tem produção declarada**. Quem está cadastrado com 0/dia entra no quadro (é fato que
   ocupa a vaga), mas não define a régua — senão o sistema pediria mais gente do que precisa. Sem

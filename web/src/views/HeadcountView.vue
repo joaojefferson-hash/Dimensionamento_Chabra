@@ -48,6 +48,35 @@ const semProducaoDeclarada = computed(() => {
     return Calculo.ENTREGAS_DA_FUNCAO[c.tipoProducao].every(e => Number(c[e.campo] || 0) <= 0);
   }).map(c => c.nome);
 });
+/** Equipe alocada NESTA unidade, no mês escolhido — a lista que a diretoria confere na mão. */
+const equipeDaUnidade = computed(() => {
+  const unidadeId = dim.unidadeSelValida;
+  const data = d => (d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '');
+  return cad.colaboradoresCompletos
+    .map(c => {
+      const alocs = (c.alocacoes || []).filter(a => a.unidadeId === unidadeId && Number(a.percentual) > 0);
+      if (!alocs.length) return null;
+      const fracao = alocs.reduce((s2, a) => s2 + Number(a.percentual), 0) / 100;
+      const presenca = Calculo.presencaNoMes(c, pref.ano, pref.mesAtual);
+      const entregas = Calculo.ENTREGAS_DA_FUNCAO[c.tipoProducao] || [];
+      return {
+        id: c.id, nome: c.nome, funcao: c.funcao, tipoProducao: c.tipoProducao, chefia: c.chefia,
+        fracao, presenca, equivalente: fracao * presenca,
+        producao: c.tipoProducao === TEC ? `${num(c.inspecoesDia, 1)} inspeções · ${num(c.relatoriosDia, 1)} relatórios/dia`
+          : c.tipoProducao === ADM ? `${num(c.empresasDia, 1)} empresas/dia` : 'sem produção',
+        semProducao: entregas.length > 0 && entregas.every(e => Number(c[e.campo] || 0) <= 0),
+        admissao: data(c.dataAdmissao), desligamento: data(c.dataDesligamento),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.tipoProducao.localeCompare(b.tipoProducao) || a.nome.localeCompare(b.nome, 'pt-BR'));
+});
+const equipeProdutiva = computed(() => equipeDaUnidade.value.filter(c => FUNCOES.includes(c.tipoProducao) && c.presenca > 0));
+const equipeChefia = computed(() => equipeDaUnidade.value.filter(c => c.chefia));
+const equipeForaDoMes = computed(() => equipeDaUnidade.value.filter(c => FUNCOES.includes(c.tipoProducao) && c.presenca <= 0));
+const equipeSemFuncao = computed(() => equipeDaUnidade.value.filter(c => !c.chefia && !FUNCOES.includes(c.tipoProducao)));
+/** A diferença entre gente e equivalente vem de tempo parcial e de entradas/saídas no meio do mês. */
+const temTempoParcial = computed(() => Math.abs(calculo.value.cabecasAtual - calculo.value.quadroAtual) > 0.05);
 const imprimir = () => window.print();
 </script>
 
@@ -93,8 +122,9 @@ const imprimir = () => window.print();
       </div>
       <div class="stat row-ok">
         <div class="label">Equipe atual</div>
-        <div class="value">{{ numFte(calculo.quadroAtual) }}<small> pessoas</small></div>
-        <div class="stat-detalhe muted">{{ FUNCOES.map(f => `${numFte(mesFluxo.areas[f].quadro)} ${ROTULO[f].toLowerCase()}`).join(' · ') }}</div>
+        <div class="value">{{ num(calculo.cabecasAtual) }}<small>&nbsp;{{ calculo.cabecasAtual === 1 ? 'pessoa' : 'pessoas' }}</small></div>
+        <div class="stat-detalhe muted">{{ FUNCOES.map(f => `${num(mesFluxo.areas[f].cabecas)} ${ROTULO[f].toLowerCase()}`).join(' · ') }}</div>
+        <div v-if="temTempoParcial" class="stat-detalhe muted" title="Tempo parcial e admissões ou desligamentos no meio do mês">equivalem a {{ numFte(calculo.quadroAtual) }} em tempo integral</div>
       </div>
       <div class="stat" :class="escolhido.deficit > 0 ? 'row-deficit' : 'row-ok'">
         <div class="label">Faltam para eliminar em {{ escolhido.prazoMeses }} {{ escolhido.prazoMeses === 1 ? 'mês' : 'meses' }}</div>
@@ -102,6 +132,58 @@ const imprimir = () => window.print();
         <div class="stat-detalhe">quadro necessário: <strong>{{ escolhido.pessoas }}</strong> {{ escolhido.pessoas === 1 ? 'pessoa' : 'pessoas' }}<span v-if="escolhido.custoDeficit > 0" class="muted"> · ≈ {{ moeda(escolhido.custoDeficit) }}/mês</span></div>
       </div>
     </div>
+
+    <!-- a equipe, pessoa por pessoa: o número da unidade tem que bater com o cadastro -->
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Equipe de {{ dim.titulo }} em {{ mesLongo(pref.mesAtual) }}</h2>
+          <div class="muted text-[13px]">
+            <strong>{{ plural(calculo.cabecasAtual, 'pessoa', 'pessoas') }}</strong> com alocação nesta unidade.
+            <template v-if="temTempoParcial">O cálculo usa o equivalente em tempo integral — <strong>{{ numFte(calculo.quadroAtual) }}</strong> —, porque quem divide a jornada com outra unidade ou entrou no meio do mês não trabalha o mês inteiro aqui.</template>
+            <template v-else>Todas em tempo integral no mês.</template>
+          </div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="table table-grade">
+          <thead><tr><th>Nome</th><th>Função</th><th class="num">Alocação aqui</th><th class="num">Presença no mês</th><th>Produção diária declarada</th><th class="num">Equivale a</th></tr></thead>
+          <tbody>
+            <tr v-for="c in equipeProdutiva" :key="c.id" :class="c.semProducao ? 'row-deficit' : ''">
+              <td class="font-medium">{{ c.nome }}</td>
+              <td class="muted">{{ c.funcao }}</td>
+              <td class="num">{{ Math.round(c.fracao * 100) }}%</td>
+              <td class="num">
+                {{ Math.round(c.presenca * 100) }}%
+                <small v-if="c.presenca < 0.999" class="muted block">{{ c.admissao ? 'desde ' + c.admissao : '' }}{{ c.desligamento ? ' até ' + c.desligamento : '' }}</small>
+              </td>
+              <td :class="c.semProducao ? 'txt-deficit' : ''">{{ c.producao }}<small v-if="c.semProducao"> — informe a produção</small></td>
+              <td class="num font-semibold">{{ numFte(c.equivalente) }}</td>
+            </tr>
+            <tr v-if="!equipeProdutiva.length"><td colspan="6" class="muted">Ninguém com produção alocado nesta unidade neste mês.</td></tr>
+          </tbody>
+          <tfoot v-if="equipeProdutiva.length">
+            <tr class="font-semibold">
+              <td>Total</td>
+              <td colspan="4" class="muted">{{ FUNCOES.map(f => `${num(mesFluxo.areas[f].cabecas)} ${ROTULO[f].toLowerCase()}`).join(' · ') }}</td>
+              <td class="num">{{ numFte(calculo.quadroAtual) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <p v-if="equipeChefia.length" class="note">
+        <strong>Chefia alocada aqui:</strong> {{ equipeChefia.map(c => `${c.nome} (${c.funcao})`).join(', ') }}.
+        Não entra no quadro porque não tem produção própria — coordena a equipe.
+      </p>
+      <p v-if="equipeForaDoMes.length" class="note">
+        <strong>Fora deste mês:</strong> {{ equipeForaDoMes.map(c => `${c.nome}${c.admissao ? ' (admissão em ' + c.admissao + ')' : ''}${c.desligamento ? ' (desligamento em ' + c.desligamento + ')' : ''}`).join(', ') }}.
+        Está alocado na unidade, mas não conta em {{ mesLongo(pref.mesAtual) }}.
+      </p>
+      <p v-if="equipeSemFuncao.length" class="note">
+        <strong>Sem produção cadastrada na função:</strong> {{ equipeSemFuncao.map(c => `${c.nome}${c.funcao ? ' (' + c.funcao + ')' : ''}`).join(', ') }}.
+        A função está marcada como sem produção, então não entra no dimensionamento.
+      </p>
+    </section>
 
     <!-- cenários por prazo -->
     <section class="card">

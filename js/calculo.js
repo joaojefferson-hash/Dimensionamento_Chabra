@@ -312,11 +312,15 @@ const Calculo = (() => {
         const q = empresasDoMes(u, mes);
         const precisa = empresasPonderadas(u, p, mes);
         const entregas = {};
-        const pessoasMes = {}, emRampup = {};
+        const pessoasMes = {}, cabecasMes = {}, emRampup = {};
         FUNCOES.forEach(f => {
           const cf = porFuncao[f].filter(c => ativoNoMes(c, mes));
           // pessoas = presença no mês (quem entra dia 15 conta meio); ramp-up só reduz a produção
           pessoasMes[f] = Math.max(0, cf.reduce((s, c) => s + c.fracao * (c.simulado ? 1 : presencaNoMes(c, anoCalc, mes)), 0));
+          // cabeças = gente de verdade no mês: 1 por pessoa, mesmo em tempo parcial ou entrando no dia 16.
+          // É o número que a diretoria confere na lista de colaboradores; `pessoasMes` é o equivalente
+          // em tempo integral, que é o que a capacidade usa.
+          cabecasMes[f] = Math.max(0, cf.reduce((s, c) => s + (c.simulado ? c.fracao : (c.fracao > 0 ? 1 : 0)), 0));
           emRampup[f] = cf.filter(c => c.fracao > 0 && fatorRampup(mesesDeCasa(c, anoCalc, mes), p.rampup) < 1).reduce((s, c) => s + Math.abs(c.fracao), 0);
         });
         ENTREGAS.forEach(e => {
@@ -346,7 +350,7 @@ const Calculo = (() => {
         return {
           mes, nome: MESES[mes], nomeLongo: MESES_LONGO[mes], diasUteis: n(p.diasUteis[mes]),
           empresas: clientesDoMes(u, mes), precisa, excecao: q.excecao,
-          pessoas: pessoasMes,
+          pessoas: pessoasMes, cabecas: cabecasMes,
           entregas, funcoes, status: piorStatus(FUNCOES.map(f => funcoes[f].status)),
         };
       });
@@ -382,12 +386,19 @@ const Calculo = (() => {
       });
       const funcoes = {};
       FUNCOES.forEach(f => { funcoes[f] = resumoFuncao(f, entregas); });
-      const pessoasMes = {};
+      const pessoasMes = {}, cabecasMes = {};
       FUNCOES.forEach(f => { pessoasMes[f] = linhas.reduce((s, l) => s + l.pessoas[f], 0); });
+      // cabeças do total: contadas na equipe inteira, não somando as unidades — quem está
+      // alocado em Teresópolis e em Petrópolis é uma pessoa, não duas.
+      FUNCOES.forEach(f => {
+        const reais = produtivos.filter(c => c.tipoProducao === f && alocValidas(c).length > 0 && ativoNoMes(c, mes)).length;
+        const sim = simulados.filter(c => c.tipoProducao === f && ativoNoMes(c, mes)).reduce((s, c) => s + n(c.quantidade), 0);
+        cabecasMes[f] = Math.max(0, reais + sim);
+      });
       return {
         mes, nome: MESES[mes], nomeLongo: MESES_LONGO[mes], diasUteis: n(p.diasUteis[mes]),
         empresas: linhas.reduce((s, l) => s + l.empresas, 0), precisa: linhas.reduce((s, l) => s + l.precisa, 0), excecao: linhas.some(l => l.excecao),
-        pessoas: pessoasMes,
+        pessoas: pessoasMes, cabecas: cabecasMes,
         entregas, funcoes, status: piorStatus(FUNCOES.map(f => funcoes[f].status)),
       };
     });
@@ -754,7 +765,8 @@ const Calculo = (() => {
           const gargalo = daFuncao.reduce((a, b) => (b.filaFim > a.filaFim ? b : (b.filaFim === a.filaFim && b.capacidade < a.capacidade ? b : a)));
           areas[f] = {
             funcao: f, rotulo: FUNCAO_CURTA[f],
-            quadro: n(m.pessoas[f]),
+            quadro: n(m.pessoas[f]),                       // equivalente em tempo integral
+            cabecas: n(m.cabecas && m.cabecas[f]),         // gente de verdade no mês
             capacidade: Math.min(...daFuncao.map(e => e.capacidade)),
             demanda,
             entrada: Math.max(...daFuncao.map(e => e.entrada)),
@@ -948,7 +960,7 @@ const Calculo = (() => {
         const deficit = Math.max(0, Math.ceil(pessoas - quadro - 1e-9));
         areas[f] = {
           funcao: f, rotulo: FUNCAO_CURTA[f],
-          quadro, pessoas, deficit,
+          quadro, cabecas: Math.max(0, n(mesInfo.areas[f].cabecas)), pessoas, deficit,
           etapaCritica: daFuncao.reduce((a, b) => (b.pessoas > a.pessoas ? b : a)).id,
           custoPessoa,
           custoDeficit: deficit * custoPessoa,
@@ -973,7 +985,9 @@ const Calculo = (() => {
       mes: i, nomeMes: mesInfo.nomeLongo,
       backlog: { total: backlogTotal, porEtapa: backlogPorEtapa, idade: mesInfo.idade },
       demandaDoMes: mesInfo.demanda, clientesDoMes: mesInfo.clientes,
-      mediaEntrada, quadroAtual: FUNCOES.reduce((acc, f) => acc + n(mesInfo.areas[f].quadro), 0),
+      mediaEntrada,
+      quadroAtual: FUNCOES.reduce((acc, f) => acc + n(mesInfo.areas[f].quadro), 0),      // tempo integral
+      cabecasAtual: FUNCOES.reduce((acc, f) => acc + n(mesInfo.areas[f].cabecas), 0),    // pessoas
       cenarios,
     };
   }

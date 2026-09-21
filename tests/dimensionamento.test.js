@@ -511,4 +511,34 @@ teste('referência: sem ninguém com produção na unidade, usa a equipe; sem eq
   assert.ok(vazio.total.meses[0].etapas.empresas.producaoPessoa > 0, 'sem equipe, produção de referência do sistema');
 });
 
+teste('cabeças x tempo integral: meia alocação é uma pessoa e meio equivalente', () => {
+  const meio = administrativo({ alocacoes: [{ unidadeId: 'u', percentual: 50 }] });
+  const f = fluxo([unidade(mesesConst(10))], [administrativo(), meio, tecnico()], { mesAtual: 0 });
+  const area = f.unidades[0].meses[0].areas[ADM];
+  assert.strictEqual(area.cabecas, 2, 'são duas pessoas de verdade');
+  perto(area.quadro, 1.5);                                   // mas 1,5 em tempo integral
+  const h = Calculo.headcount(f.unidades[0], { mes: 0 });
+  assert.strictEqual(h.cabecasAtual, 3);                     // 2 administrativos + 1 técnico
+  perto(h.quadroAtual, 2.5);
+});
+
+teste('cabeças: quem entra no meio do mês conta como pessoa inteira e meia presença', () => {
+  const novato = administrativo({ dataAdmissao: '2026-09-16' });   // entra dia 16 de setembro
+  const f = fluxo([unidade(mesesConst(10))], [administrativo(), novato, tecnico()], { mesAtual: 8 });
+  const setembro = f.unidades[0].meses[8].areas[ADM];
+  assert.strictEqual(setembro.cabecas, 2, 'está na equipe desde o dia 16');
+  assert.ok(setembro.quadro > 1 && setembro.quadro < 2, `esperava entre 1 e 2, veio ${setembro.quadro}`);
+  const agosto = f.unidades[0].meses[7].areas[ADM];
+  assert.strictEqual(agosto.cabecas, 1, 'em agosto ainda não tinha entrado');
+});
+
+teste('cabeças no total: quem atende duas unidades é uma pessoa, não duas', () => {
+  const dividido = administrativo({ alocacoes: [{ unidadeId: 'u', percentual: 50 }, { unidadeId: 'v', percentual: 50 }] });
+  const f = fluxo([unidade(mesesConst(10)), unidade(mesesConst(10), 'v', 'V')], [dividido, tecnico()], { mesAtual: 0 });
+  assert.strictEqual(f.unidades[0].meses[0].areas[ADM].cabecas, 1);
+  assert.strictEqual(f.unidades[1].meses[0].areas[ADM].cabecas, 1);
+  assert.strictEqual(f.total.meses[0].areas[ADM].cabecas, 1, 'no total conta uma vez só');
+  perto(f.total.meses[0].areas[ADM].quadro, 1);
+});
+
 console.log(`\n${passaram} testes passaram.`);
