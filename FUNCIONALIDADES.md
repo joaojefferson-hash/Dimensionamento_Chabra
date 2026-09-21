@@ -53,8 +53,13 @@ Uma página para a decisão de contratação, com impressão em PDF:
 
 - **Carteira, demanda (UEP), capacidade da cadeia (nominal, margem e planejada) e backlog** com a parcela **fora do prazo**.
 - **Quadro de lotação (QLP)** por área, em três leituras — operacional (manter a operação), recuperação (eliminar o backlog no prazo), estrutural (quadro permanente) — além do pico do ano, do reforço temporário e do déficit; com custo atual, necessário e incremental quando há custo cadastrado.
-- **Onde está o gargalo**: entrada, capacidade, conclusão, ociosidade e fila de cada etapa da cadeia, com a etapa gargalo destacada.
+- **Onde está o gargalo**: entrada, capacidade, conclusão, ociosidade e fila **por área** — inspeção e relatório são atividades do mesmo técnico, então formam uma linha só, com a atividade que trava a cadeia nomeada. A nota abaixo separa as duas perguntas: qual atividade limita a conclusão (a de menor capacidade) e onde está a maior fila.
+- **Equipe da unidade**: a lista de conferência pessoa por pessoa (também no Headcount e no Resumo do mês).
 - **Gráficos**: demanda × capacidade, backlog mês a mês (real e com as admissões sugeridas), idade do backlog por faixa e quadro atual × necessário.
+
+> **Pessoas e equivalente em tempo integral.** Em todas as telas deste capítulo, o número em destaque
+> é a contagem de gente; logo abaixo vem o equivalente em tempo integral, que é o que entra na conta de
+> capacidade. Oito pessoas com uma a 80% e outra admitida no dia 16 equivalem a 7,3.
 
 ### 3.05 Headcount (eliminar o vencido)
 
@@ -71,7 +76,7 @@ Responde diretamente: **quantas pessoas para zerar os documentos vencidos acumul
 A tela de resultado, de uma unidade por vez, para o ano selecionado.
 
 - **Pendências atuais**: o total em aberto no mês atual, separando o que veio acumulado dos meses anteriores (com a parcela herdada do ano anterior) e o que vence no mês.
-- **Por área (técnicos e administrativos)**: equipe atual → quadro ideal do mês; quantas pessoas eliminariam as pendências dentro do prazo, com o custo mensal; produção diária da equipe; quantos estão em período de adaptação.
+- **Por área (técnicos e administrativos)**: equipe atual em pessoas (com o equivalente em tempo integral quando há alocação parcial ou entrada no meio do mês) → quadro ideal do mês; quantas pessoas eliminariam as pendências dentro do prazo, com o custo mensal; produção diária da equipe; quantos estão em período de adaptação.
 - **Tabela dos 12 meses**: vencimentos, pendências ao fim do mês, quadro atual → ideal por área e a conclusão de cada mês — "Contratação necessária: 1 técnico e 2 administrativos", "Equipe suficiente", "margem reduzida" — com o custo quando há valores cadastrados. Meses já decorridos aparecem como realizado; do mês atual em diante, como projeção. O rodapé traz o total do ano, as pendências de dezembro e o quadro necessário para atender todos os meses.
 - **Simulação de cenários**: linhas de contratação (quantidade positiva) ou desligamento (negativa) por unidade, área, período e produção diária. Recalcula tudo na hora, inclusive meses passados, com período de adaptação. Fica apenas no navegador de quem simula.
 - **Avisos de cadastro**: colaboradores sem unidade, alocação parcial, unidades com demanda e sem equipe, unidades sem profissionais de uma área.

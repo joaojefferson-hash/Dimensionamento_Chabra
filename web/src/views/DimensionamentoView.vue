@@ -26,6 +26,8 @@ const p = computed(() => cad.parametros);
 const fimPrazo = computed(() => Math.min(11, pref.mesAtual + dim.prazoMeses - 1));
 const rotuloPrazo = computed(() => (fimPrazo.value === pref.mesAtual ? mesMin(pref.mesAtual) : `${mesMin(pref.mesAtual)} a ${mesMin(fimPrazo.value)}`));
 const classeStatus = s => 'row-' + (s === 'atencao' || s === 'deficit' ? s : 'ok');
+/** Gente de verdade x equivalente em tempo integral: só vale dizer quando os dois diferem. */
+const parcial = a => Math.abs(a.cabecas - a.pessoas) > 0.05;
 const esc = t => String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const avisos = computed(() => {
   const a = dim.resultado.avisos, out = [];
@@ -69,7 +71,8 @@ const notaDistribuicao = a => {
       </div>
       <div v-for="a in dim.hoje.areas" :key="a.funcao" class="stat" :class="classeStatus(a.status)">
         <div class="label">{{ a.rotulo }}</div>
-        <div class="value">{{ numFte(a.pessoas) }}<small> atual</small> <span class="seta">→</span> <span :class="a.faltam > 0 ? 'txt-deficit' : 'txt-ok'">{{ a.ideal }}</span><small> ideal em {{ mesMin(dim.hoje.mes) }}</small></div>
+        <div class="value">{{ num(a.cabecas) }}<small> atual</small> <span class="seta">→</span> <span :class="a.faltam > 0 ? 'txt-deficit' : 'txt-ok'">{{ a.ideal }}</span><small> ideal em {{ mesMin(dim.hoje.mes) }}</small></div>
+        <div v-if="parcial(a)" class="stat-detalhe muted" title="Alocação em mais de uma unidade, admissões ou desligamentos no meio do mês">equivalem a {{ numFte(a.pessoas) }} em tempo integral</div>
         <div v-if="notaDistribuicao(a)" class="text-[12px] text-muted">{{ notaDistribuicao(a) }}</div>
         <div class="stat-detalhe">Para eliminar as pendências em {{ p.prazoDias }} dias ({{ rotuloPrazo }}):
           <strong v-if="a.contratarPrazo > 0" class="txt-deficit">+{{ qtdFuncao(a.funcao, a.contratarPrazo) }}</strong>

@@ -6,6 +6,7 @@ import { computed, watch } from 'vue';
 import Calculo from '../engine/calculo.js';
 import BarraOpcoes from '../components/BarraOpcoes.vue';
 import ChefiaLinha from '../components/ChefiaLinha.vue';
+import EquipeDaUnidade from '../components/EquipeDaUnidade.vue';
 import { useCadastrosStore } from '../stores/cadastros.js';
 import { usePreferenciasStore } from '../stores/preferencias.js';
 import { useDimensionamentoStore } from '../stores/dimensionamento.js';
@@ -57,6 +58,7 @@ const areas = computed(() => FUNCOES.map(f => {
   return {
     funcao: f, rotulo: ROTULO[f],
     pessoas: mes.value.pessoas[f],
+    cabecas: mes.value.cabecas ? mes.value.cabecas[f] : 0,
     capacidade: e.capacidade,
     ideal: g.ideal,
     faltam: g.faltam,
@@ -149,7 +151,8 @@ const imprimir = () => window.print();
       <div class="grid gap-3 md:grid-cols-2">
         <div v-for="a in areas" :key="a.funcao" class="stat" :class="classeStatus(a.status)">
           <div class="label">{{ a.rotulo }}</div>
-          <div class="value">{{ numFte(a.pessoas) }}<small> atual</small> <span class="seta">→</span> <span :class="a.faltam > 0 ? 'txt-deficit' : 'txt-ok'">{{ a.ideal }}</span><small> ideal em {{ mesMin(t) }}</small></div>
+          <div class="value">{{ num(a.cabecas) }}<small> atual</small> <span class="seta">→</span> <span :class="a.faltam > 0 ? 'txt-deficit' : 'txt-ok'">{{ a.ideal }}</span><small> ideal em {{ mesMin(t) }}</small></div>
+          <div v-if="Math.abs(a.cabecas - a.pessoas) > 0.05" class="stat-detalhe muted" title="Alocação em mais de uma unidade, admissões ou desligamentos no meio do mês">equivalem a {{ numFte(a.pessoas) }} em tempo integral</div>
           <div class="stat-detalhe">
             <template v-if="a.faltam > 0"><strong class="txt-deficit">Faltam {{ qtdFuncao(a.funcao, a.faltam) }}</strong> para os vencimentos do mês</template>
             <template v-else-if="a.sobram > 0"><strong class="txt-ok">Excedente de {{ qtdFuncao(a.funcao, a.sobram) }}</strong> em relação aos vencimentos do mês</template>
@@ -165,6 +168,8 @@ const imprimir = () => window.print();
         </div>
       </div>
     </section>
+
+    <EquipeDaUnidade />
 
     <section v-if="composicao.length" class="card">
       <div class="card-head"><div><h2>De onde vem o acumulado</h2><div class="muted text-[13px]">Os meses anteriores a {{ mesMin(t) }}: o que venceu, o que foi atendido e o que permaneceu em aberto.</div></div></div>

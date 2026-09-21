@@ -50,7 +50,8 @@ capacidade planejada = capacidade nominal × (1 − margem para imprevistos)
 - **Adaptação**: 1º mês 50%, 2º 80%, depois 100% (configurável). Vale para admissões reais e simuladas.
 - **Margem para imprevistos**: padrão 15%. As telas mostram **nominal**, **margem** e **planejada** —
   o desconto nunca fica escondido.
-- **Pessoas x equivalente em tempo integral**: as telas mostram as duas leituras. **Pessoas** é gente
+- **Pessoas x equivalente em tempo integral**: todas as telas do dimensionamento mostram as duas
+  leituras — a contagem de gente em destaque e o equivalente logo abaixo. **Pessoas** é gente
   de verdade — quem tem alocação na unidade conta 1, mesmo a 50% ou entrando no dia 16. **Equivalente
   em tempo integral** é o que entra na conta de capacidade: alocação × presença. Oito pessoas com uma
   a 80% e outra entrando no meio do mês equivalem a 7,3. No total da empresa, quem atende duas
@@ -72,6 +73,9 @@ demanda do mês → [inspeção] → [relatório] → [finalização administrat
 - Cada etapa recebe **o que a etapa anterior concluiu** no mês; a primeira recebe a demanda.
 - Cada etapa tem a sua própria fila. O **backlog da unidade é a soma das três filas** — cada UEP está
   em exatamente uma delas.
+- Uma **área** é uma equipe só: se a inspeção está saturada e o relatório parado por falta de
+  trabalho, o técnico não está ocioso — está inspecionando. Por isso a ociosidade da área é a
+  **menor** entre as suas atividades, e a área está saturada se qualquer uma delas estiver.
 - A **conclusão do mês é limitada pela etapa gargalo**. Capacidade sobrando em uma etapa a jusante é
   **ociosidade** (falta trabalho vindo de trás), não folga: contratar ali não aumenta a conclusão.
 - Técnicos atendem duas etapas (inspeção e relatório) com produções diárias declaradas separadamente;

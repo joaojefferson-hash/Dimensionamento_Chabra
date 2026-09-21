@@ -8,6 +8,7 @@ import { computed } from 'vue';
 import Calculo from '../engine/calculo.js';
 import { useCadastrosStore } from './cadastros.js';
 import { usePreferenciasStore } from './preferencias.js';
+import { num } from '../composables/useFormat.js';
 
 export const useDimensionamentoStore = defineStore('dimensionamento', () => {
   const cad = useCadastrosStore();
@@ -123,7 +124,7 @@ export const useDimensionamentoStore = defineStore('dimensionamento', () => {
       const res = filaAlvo.value[f].resumo;
       return {
         funcao: f, rotulo: Calculo.FUNCAO_CURTA[f], singular: Calculo.FUNCAO_SINGULAR[f],
-        pessoas: m.pessoas[f], ideal: g.ideal, faltam: g.faltam, sobram: g.sobram, status: g.status, emRampup: g.emRampup || 0,
+        pessoas: m.pessoas[f], cabecas: m.cabecas ? m.cabecas[f] : 0, ideal: g.ideal, faltam: g.faltam, sobram: g.sobram, status: g.status, emRampup: g.emRampup || 0,
         custoPessoa: g.custo ? g.custo.pessoa : 0,
         contratarPrazo: res.pessoasPrazo, custoContratarPrazo: g.custo ? res.pessoasPrazo * g.custo.pessoa : 0,
         producaoDia: Calculo.ENTREGAS_DA_FUNCAO[f].map(e => ({ id: e.id, unidade: e.unidade, valor: res.producaoDiaPor[e.id] || 0 })),
@@ -140,5 +141,31 @@ export const useDimensionamentoStore = defineStore('dimensionamento', () => {
     };
   });
 
-  return { resultado, fila, fluxo, fluxoAlvo, backlogMes, backlogCenarioMes, filaInicial, anosComLancamento, atendidasDoAno, alvo, filaAlvo, titulo, varias, temCusto, hoje, prazoMeses, unidadeSelValida, evolucao, evolucaoAlvo, atendidasInformadas, temAtendidas };
+  /** A equipe alocada no alvo da tela (unidade escolhida, ou todas), no mês da barra: gente de
+      verdade, com o que cada um contribui. Fonte única das listas de conferência das telas. */
+  const equipeDoMes = computed(() => {
+    const unidadeId = unidadeSelValida.value;
+    const data = d => (d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '');
+    return cad.colaboradoresCompletos
+      .map(c => {
+        const alocs = (c.alocacoes || []).filter(a => (!unidadeId || a.unidadeId === unidadeId) && Number(a.percentual) > 0);
+        if (!alocs.length) return null;
+        const fracao = alocs.reduce((s, a) => s + Number(a.percentual), 0) / 100;
+        const presenca = Calculo.presencaNoMes(c, pref.ano, pref.mesAtual);
+        const entregas = Calculo.ENTREGAS_DA_FUNCAO[c.tipoProducao] || [];
+        return {
+          id: c.id, nome: c.nome, funcao: c.funcao, tipoProducao: c.tipoProducao, chefia: c.chefia,
+          fracao, presenca, equivalente: fracao * presenca,
+          unidades: alocs.map(a => a.unidadeNome).filter(Boolean),
+          producao: c.tipoProducao === Calculo.TEC ? `${num(c.inspecoesDia, 1)} inspeções · ${num(c.relatoriosDia, 1)} relatórios/dia`
+            : c.tipoProducao === Calculo.ADM ? `${num(c.empresasDia, 1)} empresas/dia` : 'sem produção',
+          semProducao: entregas.length > 0 && entregas.every(e => Number(c[e.campo] || 0) <= 0),
+          admissao: data(c.dataAdmissao), desligamento: data(c.dataDesligamento),
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.tipoProducao.localeCompare(b.tipoProducao) || a.nome.localeCompare(b.nome, 'pt-BR'));
+  });
+
+  return { resultado, fila, fluxo, fluxoAlvo, equipeDoMes, backlogMes, backlogCenarioMes, filaInicial, anosComLancamento, atendidasDoAno, alvo, filaAlvo, titulo, varias, temCusto, hoje, prazoMeses, unidadeSelValida, evolucao, evolucaoAlvo, atendidasInformadas, temAtendidas };
 });

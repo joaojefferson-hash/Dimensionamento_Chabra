@@ -541,4 +541,28 @@ teste('cabeças no total: quem atende duas unidades é uma pessoa, não duas', (
   perto(f.total.meses[0].areas[ADM].quadro, 1);
 });
 
+teste('área: ociosa é a menor das atividades — o técnico parado no relatório está inspecionando', () => {
+  // muita demanda: a inspeção satura e o relatório fica sem o que fazer
+  const f = fluxo([unidade(mesesConst(500))], [tecnico({ relatoriosDia: 10 }), administrativo()], { mesAtual: 0 });
+  const m = f.unidades[0].meses[0];
+  assert.ok(m.etapas.inspecoes.saturada, 'a inspeção satura');
+  assert.ok(m.etapas.relatorios.ocioso > 0, 'e o relatório sobra capacidade');
+  perto(m.areas[TEC].ocioso, 0);                        // mas a área não está ociosa
+  assert.ok(m.areas[TEC].saturada, 'a área está saturada');
+  assert.strictEqual(m.areas[TEC].etapaSaturada, 'inspeção');   // nome curto, para as frases das telas
+  assert.deepStrictEqual(m.areas[TEC].atividades, ['Inspeções', 'Relatórios']);
+});
+
+teste('cabeças chegam aos adaptadores das telas (fila e evolução)', () => {
+  const meio = administrativo({ alocacoes: [{ unidadeId: 'u', percentual: 50 }] });
+  const r = calc([unidade(mesesConst(10))], [administrativo(), meio, tecnico()]);
+  const fl = Calculo.fila(r, { prazoMeses: 2, parametros: PARAM, ano: 2026, mesAtual: 0 });
+  perto(fl.unidades[0].grupos[ADM].meses[0].cabecas, 2);
+  perto(fl.unidades[0].grupos[ADM].resumo.cabecas, 2);
+  perto(fl.unidades[0].grupos[ADM].meses[0].pessoas, 1.5);
+  const ev = Calculo.evolucao(r, { prazoMeses: 2, parametros: PARAM, ano: 2026, mesAtual: 0 });
+  perto(ev.unidades[0].areas[ADM].meses[0].cabecas, 2);
+  perto(ev.unidades[0].areas[ADM].meses[0].quadro, 1.5);
+});
+
 console.log(`\n${passaram} testes passaram.`);

@@ -173,7 +173,7 @@ const semDatas = computed(() => cad.colaboradores.length > 0 && cad.colaboradore
             </tr>
             <tr>
               <template v-for="f in FUNCOES" :key="f">
-                <th class="num" title="Equipe daquele mês (pessoas inteiras equivalentes)">real</th>
+                <th class="num" title="Equipe daquele mês: pessoas e, entre parênteses, o equivalente em tempo integral quando há alocação parcial ou entrada no meio do mês">real</th>
                 <th class="num" title="Quadro para dar conta do que entra no mês">vazão</th>
                 <th class="num" title="Quadro para dar conta do que entra e ainda diluir a fila no prazo">recup.</th>
               </template>
@@ -192,7 +192,7 @@ const semDatas = computed(() => cad.colaboradores.length > 0 && cad.colaboradore
               </td>
               <td class="num bg-warn-bg"><strong>{{ num(filaDoMes(i)) }}</strong></td>
               <template v-for="f in FUNCOES" :key="f">
-                <td class="num">{{ numFte(m.porArea[f].quadro) }}</td>
+                <td class="num">{{ num(m.porArea[f].cabecas) }}<small v-if="Math.abs(m.porArea[f].cabecas - m.porArea[f].quadro) > 0.05" class="muted"> ({{ numFte(m.porArea[f].quadro) }})</small></td>
                 <td class="num" :class="m.porArea[f].faltamVazao > 0 ? 'txt-deficit font-semibold' : ''">{{ m.porArea[f].necessarioVazao }}</td>
                 <td class="num muted">{{ m.porArea[f].necessarioRecuperacao }}</td>
               </template>
@@ -219,7 +219,7 @@ const semDatas = computed(() => cad.colaboradores.length > 0 && cad.colaboradore
           </tfoot>
         </table>
       </div>
-      <p class="note">Capacidade = equipe do mês × produção diária × dias úteis, descontada a margem para imprevistos de {{ Math.round(100 - p.ocupacaoAlvo) }}%. <strong>Vazão</strong> = quadro para atender o que entra no mês; <strong>recuperação</strong> = quadro para atender a entrada e ainda diluir a fila no prazo de {{ p.prazoDias }} dias. As admissões sugeridas são acumulativas (quem entra permanece) e produzem menos nos primeiros meses (período de adaptação).</p>
+      <p class="note"><strong>Real</strong> = pessoas na equipe naquele mês; entre parênteses, o equivalente em tempo integral, que é o que entra na capacidade (alocação parcial e entradas no meio do mês). Capacidade = equipe do mês × produção diária × dias úteis, descontada a margem para imprevistos de {{ Math.round(100 - p.ocupacaoAlvo) }}%. <strong>Vazão</strong> = quadro para atender o que entra no mês; <strong>recuperação</strong> = quadro para atender a entrada e ainda diluir a fila no prazo de {{ p.prazoDias }} dias. As admissões sugeridas são acumulativas (quem entra permanece) e produzem menos nos primeiros meses (período de adaptação).</p>
     </section>
 
     <div class="grid gap-5 xl:grid-cols-2">

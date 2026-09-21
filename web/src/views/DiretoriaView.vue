@@ -5,6 +5,7 @@
 import { computed, watch } from 'vue';
 import Calculo from '../engine/calculo.js';
 import BarraOpcoes from '../components/BarraOpcoes.vue';
+import EquipeDaUnidade from '../components/EquipeDaUnidade.vue';
 import Grafico from '../components/ui/Grafico.vue';
 import { useCadastrosStore } from '../stores/cadastros.js';
 import { usePreferenciasStore } from '../stores/preferencias.js';
@@ -50,6 +51,7 @@ const qlp = computed(() => FUNCOES.map(f => {
   return {
     funcao: f, rotulo: ROTULO[f],
     atual: a.quadro,
+    cabecas: a.cabecas,
     operacional: a.qlpOperacional,
     recuperacao: a.qlpRecuperacao,
     estrutural: e.qlp,
@@ -65,6 +67,7 @@ const qlp = computed(() => FUNCOES.map(f => {
 }));
 const totais = computed(() => ({
   atual: qlp.value.reduce((s, q) => s + q.atual, 0),
+  cabecas: qlp.value.reduce((s, q) => s + q.cabecas, 0),
   operacional: qlp.value.reduce((s, q) => s + q.operacional, 0),
   recuperacao: qlp.value.reduce((s, q) => s + q.recuperacao, 0),
   estrutural: qlp.value.reduce((s, q) => s + q.estrutural, 0),
@@ -79,10 +82,26 @@ const temCusto = computed(() => totais.value.custoAtual > 0 || totais.value.cust
 const gargalo = computed(() => {
   const e = ETAPAS.find(x => x.id === mes.value.gargalo) || ETAPAS[0];
   const d = mes.value.etapas[e.id];
-  return { ...e, fila: d.filaFim, capacidade: d.capacidade, ocioso: d.ocioso, saturada: d.saturada };
+  return { ...e, ...d, fila: d.filaFim };
 });
-const ociosas = computed(() => ETAPAS.filter(e => mes.value.etapas[e.id].ocioso > 1e-9)
-  .map(e => ({ ...e, ocioso: mes.value.etapas[e.id].ocioso })));
+/** A conclusão do mês não passa da atividade de menor capacidade da cadeia. */
+const menorCapacidade = computed(() => ETAPAS.map(e => ({ ...e, ...mes.value.etapas[e.id] }))
+  .reduce((a, b) => (b.capacidade < a.capacidade ? b : a)));
+/** A cadeia por área: inspeção e relatório são do mesmo técnico, então são uma linha só. */
+const cadeia = computed(() => FUNCOES.map(f => {
+  const a = mes.value.areas[f];
+  const daArea = Calculo.ENTREGAS_DA_FUNCAO[f];
+  const gargaloAqui = daArea.some(e => e.id === mes.value.gargalo);
+  return {
+    funcao: f, rotulo: ROTULO[f],
+    atividades: a.atividades.map(x => x.toLowerCase()).join(' e '),
+    entrada: a.entrada, capacidade: a.capacidade, concluido: a.concluido,
+    ocioso: a.ocioso, filaFim: a.filaFim,
+    gargalo: gargaloAqui, gargaloRotulo: a.gargaloRotulo,
+    saturada: a.saturada, etapaSaturada: a.etapaSaturada,
+    varias: daArea.length > 1,
+  };
+}));
 const normalizacao = computed(() => (resumo.value.zeraEm != null ? mesLongo(resumo.value.zeraEm) : null));
 
 /* ---- gráficos ---- */
@@ -179,7 +198,7 @@ const imprimir = () => window.print();
           <thead>
             <tr>
               <th>Área</th>
-              <th class="num" title="Pessoas hoje na unidade, em equivalentes de tempo integral">Atual</th>
+              <th class="num" title="Gente hoje na unidade e, abaixo, o equivalente em tempo integral usado na conta">Atual</th>
               <th class="num" title="Pessoas para atender a demanda do mês sem aumentar o backlog">Operacional</th>
               <th class="num" title="Pessoas para atender a demanda e eliminar o backlog dentro do prazo">Recuperação</th>
               <th class="num" title="Pessoas necessárias depois que o backlog for normalizado (demanda média do ano)">Estrutural</th>
@@ -193,7 +212,7 @@ const imprimir = () => window.print();
           <tbody>
             <tr v-for="q in qlp" :key="q.funcao" :class="q.deficitRecuperacao > 0 ? 'row-deficit' : 'row-ok'">
               <td class="font-medium">{{ q.rotulo }}</td>
-              <td class="num">{{ numFte(q.atual) }}</td>
+              <td class="num">{{ num(q.cabecas) }}<small v-if="Math.abs(q.cabecas - q.atual) > 0.05" class="muted block">{{ numFte(q.atual) }} em tempo integral</small></td>
               <td class="num">{{ q.operacional }}</td>
               <td class="num">{{ q.recuperacao }}</td>
               <td class="num">{{ q.estrutural }}</td>
@@ -207,7 +226,7 @@ const imprimir = () => window.print();
           <tfoot>
             <tr class="row-ok font-semibold">
               <th>Total</th>
-              <th class="num">{{ numFte(totais.atual) }}</th>
+              <th class="num">{{ num(totais.cabecas) }}<small v-if="Math.abs(totais.cabecas - totais.atual) > 0.05" class="muted block font-normal normal-case tracking-normal">{{ numFte(totais.atual) }} em tempo integral</small></th>
               <th class="num">{{ totais.operacional }}</th>
               <th class="num">{{ totais.recuperacao }}</th>
               <th class="num">{{ totais.estrutural }}</th>
@@ -222,29 +241,40 @@ const imprimir = () => window.print();
       </div>
       <p v-if="temCusto" class="note">Incremento mensal para o cenário de recuperação: <strong>{{ moeda(totais.custoIncremental) }}</strong> — <strong>{{ moeda(totais.custoIncremental * 12) }}</strong> no ano. Desse incremento, o reforço <strong>temporário</strong> (recuperação − estrutural) sai da folha quando o backlog normalizar.</p>
       <p v-else class="note">Cadastre o custo mensal nas Funções para ver o impacto financeiro de cada leitura do quadro.</p>
+      <p class="note">Déficit e QLP são calculados sobre o <strong>equivalente em tempo integral</strong>, não sobre a contagem de pessoas — por isso pode haver uma unidade de diferença em relação à subtração direta. A lista abaixo mostra de onde vem cada fração.</p>
     </section>
+
+    <EquipeDaUnidade />
 
     <!-- cadeia e gargalo -->
     <section class="card">
-      <div class="card-head"><div><h2>Onde está o gargalo</h2><div class="muted text-[13px]">A cadeia é sequencial: cada etapa só processa o que a anterior concluiu. Valores de {{ mesLongo(pref.mesAtual) }}, em UEP.</div></div></div>
+      <div class="card-head"><div><h2>Onde está o gargalo</h2><div class="muted text-[13px]">A cadeia é sequencial: cada atividade só processa o que a anterior concluiu. Inspeção e relatório são do mesmo técnico, então contam como uma equipe só. Valores de {{ mesLongo(pref.mesAtual) }}, em UEP.</div></div></div>
       <div class="table-wrap">
         <table class="table table-grade">
-          <thead><tr><th>Etapa</th><th>Área</th><th class="num">Entrou</th><th class="num">Capacidade</th><th class="num">Concluiu</th><th class="num">Ociosa</th><th class="num bg-warn-bg">Fila ao fim</th><th>Situação</th></tr></thead>
+          <thead><tr><th>Área</th><th>Atividades</th><th class="num">Entrou</th><th class="num">Capacidade</th><th class="num">Concluiu</th><th class="num">Ociosa</th><th class="num bg-warn-bg">Fila ao fim</th><th>Situação</th></tr></thead>
           <tbody>
-            <tr v-for="e in ETAPAS" :key="e.id" :class="mes.gargalo === e.id ? 'row-deficit' : mes.etapas[e.id].ocioso > 1e-9 ? 'row-atencao' : 'row-ok'">
-              <td class="font-medium">{{ e.rotulo }}<span v-if="mes.gargalo === e.id" class="chip bg-danger-bg text-danger-dark ml-1">gargalo</span></td>
-              <td class="muted">{{ ROTULO[e.funcao] }}</td>
-              <td class="num">{{ num(mes.etapas[e.id].entrada) }}</td>
-              <td class="num">{{ num(mes.etapas[e.id].capacidade) }}</td>
-              <td class="num">{{ num(mes.etapas[e.id].concluido) }}</td>
-              <td class="num" :class="mes.etapas[e.id].ocioso > 1e-9 ? 'text-warn' : 'muted'">{{ mes.etapas[e.id].ocioso > 1e-9 ? num(mes.etapas[e.id].ocioso) : '—' }}</td>
-              <td class="num bg-warn-bg font-semibold">{{ num(mes.etapas[e.id].filaFim) }}</td>
-              <td>{{ mes.etapas[e.id].saturada ? 'Saturada: tudo o que chega não cabe' : mes.etapas[e.id].ocioso > 1e-9 ? 'Ociosa: falta trabalho da etapa anterior' : 'Equilibrada' }}</td>
+            <tr v-for="c in cadeia" :key="c.funcao" :class="c.gargalo ? 'row-deficit' : c.ocioso > 1e-9 ? 'row-atencao' : 'row-ok'">
+              <td class="font-medium">{{ c.rotulo }}<span v-if="c.gargalo" class="chip bg-danger-bg text-danger-dark ml-1">gargalo{{ c.varias ? ': ' + c.gargaloRotulo : '' }}</span></td>
+              <td class="muted">{{ c.atividades }}</td>
+              <td class="num">{{ num(c.entrada) }}</td>
+              <td class="num">{{ num(c.capacidade) }}</td>
+              <td class="num">{{ num(c.concluido) }}</td>
+              <td class="num" :class="c.ocioso > 1e-9 ? 'text-warn' : 'muted'">{{ c.ocioso > 1e-9 ? num(c.ocioso) : '—' }}</td>
+              <td class="num bg-warn-bg font-semibold">{{ num(c.filaFim) }}</td>
+              <td>
+                <template v-if="c.saturada">Saturada{{ c.varias ? ' na ' + c.etapaSaturada : '' }}: tudo o que chega não cabe</template>
+                <template v-else-if="c.ocioso > 1e-9">Ociosa: falta trabalho da área anterior</template>
+                <template v-else>Equilibrada</template>
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p class="note">A conclusão do mês ({{ num(mes.concluido) }} UEP) é limitada pela etapa gargalo — <strong>{{ gargalo.rotulo }}</strong>. Aumentar a equipe de uma etapa ociosa não aumenta a conclusão; é preciso resolver o gargalo primeiro.</p>
+      <p class="note">
+        A conclusão do mês (<strong>{{ num(mes.concluido) }}</strong> UEP) não passa da atividade de menor capacidade da cadeia — <strong>{{ menorCapacidade.atividade }}</strong> ({{ ROTULO[menorCapacidade.funcao].toLowerCase() }}), com {{ num(menorCapacidade.capacidade) }}.
+        A maior fila acumulada está em <strong>{{ gargalo.atividade }}</strong> ({{ ROTULO[gargalo.funcao].toLowerCase() }}): {{ num(gargalo.fila) }}.
+        Aumentar a equipe de uma área ociosa não aumenta a conclusão; é preciso resolver o gargalo primeiro.
+      </p>
     </section>
 
     <div class="grid gap-5 xl:grid-cols-2">

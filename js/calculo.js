@@ -44,9 +44,9 @@ const Calculo = (() => {
   const FUNCAO_SINGULAR = { [TEC]: 'técnico', [ADM]: 'administrativo' };
 
   const ENTREGAS = [
-    { id: 'inspecoes',  funcao: TEC, campo: 'inspecoesDia',  rotulo: 'Inspeções',            unidade: 'inspeções',            singular: 'uma inspeção' },
-    { id: 'relatorios', funcao: TEC, campo: 'relatoriosDia', rotulo: 'Relatórios',           unidade: 'relatórios',           singular: 'um relatório' },
-    { id: 'empresas',   funcao: ADM, campo: 'empresasDia',   rotulo: 'Empresas finalizadas', unidade: 'empresas finalizadas', singular: 'uma finalização' },
+    { id: 'inspecoes',  funcao: TEC, campo: 'inspecoesDia',  rotulo: 'Inspeções',            unidade: 'inspeções',            singular: 'uma inspeção',    atividade: 'inspeção' },
+    { id: 'relatorios', funcao: TEC, campo: 'relatoriosDia', rotulo: 'Relatórios',           unidade: 'relatórios',           singular: 'um relatório',    atividade: 'relatório' },
+    { id: 'empresas',   funcao: ADM, campo: 'empresasDia',   rotulo: 'Empresas finalizadas', unidade: 'empresas finalizadas', singular: 'uma finalização', atividade: 'finalização' },
   ];
   const ENTREGAS_DA_FUNCAO = { [TEC]: ENTREGAS.filter(e => e.funcao === TEC), [ADM]: ENTREGAS.filter(e => e.funcao === ADM) };
 
@@ -708,6 +708,7 @@ const Calculo = (() => {
             concluido: uepConcluido, filaFim: somaCoortes(fica),
             ocioso: Math.max(0, capacidade - uepDisponivel),
             saturada: uepDisponivel > capacidade + 1e-9,
+            atividade: e.atividade,
             producaoPessoa, quadro: n(m.pessoas[e.funcao]),
             coortes: fica, idade,
             // dimensionamento: cada etapa precisa dar conta da DEMANDA do mês (toda empresa passa por
@@ -779,6 +780,13 @@ const Calculo = (() => {
             faltamRecuperacao: Math.max(...daFuncao.map(e => e.faltamRecuperacao)),
             sobram: Math.min(...daFuncao.map(e => e.sobram)),
             producaoPessoa: Math.min(...daFuncao.map(e => e.producaoPessoa)),
+            // a área é uma equipe só: se a inspeção está saturada e o relatório parado por falta de
+            // trabalho, o técnico não está ocioso — ele está inspecionando. Por isso ociosa = a menor.
+            ocioso: Math.min(...daFuncao.map(e => e.ocioso)),
+            saturada: daFuncao.some(e => e.saturada),
+            atividades: daFuncao.map(e => e.rotulo),
+            etapaSaturada: (daFuncao.find(e => e.saturada) || gargalo).atividade,
+            gargaloRotulo: gargalo.atividade,
             custoPessoa,
             admissoesCenario: novasPorFuncao[f],
             quadroCenario: n(m.pessoas[f]) + admissoes[f].reduce((s, a) => s + a.quantidade, 0),
@@ -1013,7 +1021,7 @@ const Calculo = (() => {
           informado: m.demanda, entram: m.demanda,
           filaInicio: a.filaInicio, pendentes: a.filaInicio + m.demanda,
           consegue: a.capacidade, atendidas: a.concluido, filaFim: a.filaFim,
-          pessoas: a.quadro, producaoPessoa: a.producaoPessoa,
+          pessoas: a.quadro, cabecas: a.cabecas, producaoPessoa: a.producaoPessoa,
           producaoDia: m.diasUteis > 0 ? a.capacidade / m.diasUteis : 0,
           producaoDiaPor, gargaloId: a.gargaloEtapa,
           status: a.status,
@@ -1037,7 +1045,7 @@ const Calculo = (() => {
         entramResto: meses.slice(Math.min(t, 11)).reduce((s, x) => s + x.entram, 0),
         filaDezembro: meses[11].filaFim,
         zeraEm: zeraIdx >= 0 ? zeraIdx : null, zeraEmNome: zeraIdx >= 0 ? nomeMes(zeraIdx) : null,
-        pessoas: hoje ? hoje.pessoas : 0, producaoDia: hoje ? hoje.producaoDia : 0,
+        pessoas: hoje ? hoje.pessoas : 0, cabecas: hoje ? hoje.cabecas : 0, producaoDia: hoje ? hoje.producaoDia : 0,
         producaoDiaPor: hoje ? hoje.producaoDiaPor : {}, gargaloId: hoje ? hoje.gargaloId : null,
         status: piorStatus(meses.slice(Math.min(t, 11)).map(x => x.status)),
       };
@@ -1075,7 +1083,7 @@ const Calculo = (() => {
           informadas: m.informadas, informado: m.informado, informadasExatas: m.informadasExatas,
           filaInicio: a.filaInicio, pendentes: a.filaInicio + m.demanda,
           capacidade: a.capacidade, atendidas: a.concluido, filaFim: a.filaFim,
-          quadro: a.quadro, producaoPessoa: a.producaoPessoa, custoPessoa: a.custoPessoa,
+          quadro: a.quadro, cabecas: a.cabecas, producaoPessoa: a.producaoPessoa, custoPessoa: a.custoPessoa,
           necessarioVazao: a.qlpOperacional, necessarioRecuperacao: a.qlpRecuperacao,
           faltamVazao: a.faltamOperacional, faltamRecuperacao: a.faltamRecuperacao,
           sobramPessoas: a.sobram,

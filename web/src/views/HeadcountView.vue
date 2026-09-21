@@ -5,6 +5,7 @@
 import { computed, ref, watch } from 'vue';
 import Calculo from '../engine/calculo.js';
 import BarraOpcoes from '../components/BarraOpcoes.vue';
+import EquipeDaUnidade from '../components/EquipeDaUnidade.vue';
 import { useCadastrosStore } from '../stores/cadastros.js';
 import { usePreferenciasStore } from '../stores/preferencias.js';
 import { useDimensionamentoStore } from '../stores/dimensionamento.js';
@@ -38,60 +39,7 @@ const temCusto = computed(() => calculo.value.cenarios.some(c => c.custoTotal > 
 const anosAnteriores = computed(() => dim.anosComLancamento.filter(a => a < pref.ano));
 const vindoDeAntes = computed(() => (dim.fluxoAlvo.meses[0] ? dim.fluxoAlvo.meses[0].backlogInicio : 0));
 /** Alocados nesta unidade sem produção diária declarada: contam no quadro e não produzem. */
-const semProducaoDeclarada = computed(() => {
-  const unidadeId = dim.unidadeSelValida;
-  return cad.colaboradoresCompletos.filter(c => {
-    if (!FUNCOES.includes(c.tipoProducao)) return false;
-    const aqui = (c.alocacoes || []).some(a => (!unidadeId || a.unidadeId === unidadeId) && Number(a.percentual) > 0);
-    if (!aqui) return false;
-    return Calculo.ENTREGAS_DA_FUNCAO[c.tipoProducao].every(e => Number(c[e.campo] || 0) <= 0);
-  }).map(c => c.nome);
-});
-/** Equipe alocada NESTA unidade, no mês escolhido — a lista que a diretoria confere na mão. */
-const equipeDaUnidade = computed(() => {
-  const unidadeId = dim.unidadeSelValida;
-  const data = d => (d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '');
-  return cad.colaboradoresCompletos
-    .map(c => {
-      const alocs = (c.alocacoes || []).filter(a => a.unidadeId === unidadeId && Number(a.percentual) > 0);
-      if (!alocs.length) return null;
-      const fracao = alocs.reduce((s2, a) => s2 + Number(a.percentual), 0) / 100;
-      const presenca = Calculo.presencaNoMes(c, pref.ano, pref.mesAtual);
-      const entregas = Calculo.ENTREGAS_DA_FUNCAO[c.tipoProducao] || [];
-      return {
-        id: c.id, nome: c.nome, funcao: c.funcao, tipoProducao: c.tipoProducao, chefia: c.chefia,
-        fracao, presenca, equivalente: fracao * presenca,
-        producao: c.tipoProducao === TEC ? `${num(c.inspecoesDia, 1)} inspeções · ${num(c.relatoriosDia, 1)} relatórios/dia`
-          : c.tipoProducao === ADM ? `${num(c.empresasDia, 1)} empresas/dia` : 'sem produção',
-        semProducao: entregas.length > 0 && entregas.every(e => Number(c[e.campo] || 0) <= 0),
-        admissao: data(c.dataAdmissao), desligamento: data(c.dataDesligamento),
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => a.tipoProducao.localeCompare(b.tipoProducao) || a.nome.localeCompare(b.nome, 'pt-BR'));
-});
-const equipeProdutiva = computed(() => equipeDaUnidade.value.filter(c => FUNCOES.includes(c.tipoProducao) && c.presenca > 0));
-const equipeChefia = computed(() => equipeDaUnidade.value.filter(c => c.chefia));
-const equipeForaDoMes = computed(() => equipeDaUnidade.value.filter(c => FUNCOES.includes(c.tipoProducao) && c.presenca <= 0));
-const equipeSemFuncao = computed(() => equipeDaUnidade.value.filter(c => !c.chefia && !FUNCOES.includes(c.tipoProducao)));
-/** Uma linha por área: o técnico faz a inspeção e o relatório do mesmo documento, então as duas
-    atividades são uma conta só — vale a mais exigente, porque é a mesma pessoa. */
-const areasDetalhe = computed(() => FUNCOES.map(f => {
-  const daArea = Calculo.ENTREGAS_DA_FUNCAO[f];
-  const a = escolhido.value.areas[f];
-  const critica = escolhido.value.etapas[a.etapaCritica];
-  const producoes = daArea.map(e => ({ rotulo: e.unidade, valor: escolhido.value.etapas[e.id].producaoPessoa }));
-  return {
-    funcao: f, rotulo: ROTULO[f],
-    atividades: daArea.map(e => e.rotulo.toLowerCase()).join(' e '),
-    trabalho: critica.trabalho, porMes: critica.porMes,
-    producao: producoes.map(x => `${num(x.valor)} ${x.rotulo}`).join(' · '),
-    criticaRotulo: critica.rotulo.toLowerCase(),
-    // só vale destacar a atividade que manda quando as duas exigem gente diferente
-    mandaUma: daArea.length > 1 && daArea.some(e => escolhido.value.etapas[e.id].pessoas !== a.pessoas),
-    pessoas: a.pessoas, quadro: a.quadro, cabecas: a.cabecas, deficit: a.deficit,
-  };
-}));
+const semProducaoDeclarada = computed(() => dim.equipeDoMes.filter(c => FUNCOES.includes(c.tipoProducao) && c.semProducao).map(c => c.nome));
 /** A diferença entre gente e equivalente vem de tempo parcial e de entradas/saídas no meio do mês. */
 const temTempoParcial = computed(() => Math.abs(calculo.value.cabecasAtual - calculo.value.quadroAtual) > 0.05);
 const imprimir = () => window.print();
@@ -150,57 +98,7 @@ const imprimir = () => window.print();
       </div>
     </div>
 
-    <!-- a equipe, pessoa por pessoa: o número da unidade tem que bater com o cadastro -->
-    <section class="card">
-      <div class="card-head">
-        <div>
-          <h2>Equipe de {{ dim.titulo }} em {{ mesLongo(pref.mesAtual) }}</h2>
-          <div class="muted text-[13px]">
-            <strong>{{ plural(calculo.cabecasAtual, 'pessoa', 'pessoas') }}</strong> com alocação nesta unidade.
-            <template v-if="temTempoParcial">O cálculo usa o equivalente em tempo integral — <strong>{{ numFte(calculo.quadroAtual) }}</strong> —, porque quem divide a jornada com outra unidade ou entrou no meio do mês não trabalha o mês inteiro aqui.</template>
-            <template v-else>Todas em tempo integral no mês.</template>
-          </div>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table class="table table-grade">
-          <thead><tr><th>Nome</th><th>Função</th><th class="num">Alocação aqui</th><th class="num">Presença no mês</th><th>Produção diária declarada</th><th class="num">Equivale a</th></tr></thead>
-          <tbody>
-            <tr v-for="c in equipeProdutiva" :key="c.id" :class="c.semProducao ? 'row-deficit' : ''">
-              <td class="font-medium">{{ c.nome }}</td>
-              <td class="muted">{{ c.funcao }}</td>
-              <td class="num">{{ Math.round(c.fracao * 100) }}%</td>
-              <td class="num">
-                {{ Math.round(c.presenca * 100) }}%
-                <small v-if="c.presenca < 0.999" class="muted block">{{ c.admissao ? 'desde ' + c.admissao : '' }}{{ c.desligamento ? ' até ' + c.desligamento : '' }}</small>
-              </td>
-              <td :class="c.semProducao ? 'txt-deficit' : ''">{{ c.producao }}<small v-if="c.semProducao"> — informe a produção</small></td>
-              <td class="num font-semibold">{{ numFte(c.equivalente) }}</td>
-            </tr>
-            <tr v-if="!equipeProdutiva.length"><td colspan="6" class="muted">Ninguém com produção alocado nesta unidade neste mês.</td></tr>
-          </tbody>
-          <tfoot v-if="equipeProdutiva.length">
-            <tr class="font-semibold">
-              <td>Total</td>
-              <td colspan="4" class="muted">{{ FUNCOES.map(f => `${num(mesFluxo.areas[f].cabecas)} ${ROTULO[f].toLowerCase()}`).join(' · ') }}</td>
-              <td class="num">{{ numFte(calculo.quadroAtual) }}</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-      <p v-if="equipeChefia.length" class="note">
-        <strong>Chefia alocada aqui:</strong> {{ equipeChefia.map(c => `${c.nome} (${c.funcao})`).join(', ') }}.
-        Não entra no quadro porque não tem produção própria — coordena a equipe.
-      </p>
-      <p v-if="equipeForaDoMes.length" class="note">
-        <strong>Fora deste mês:</strong> {{ equipeForaDoMes.map(c => `${c.nome}${c.admissao ? ' (admissão em ' + c.admissao + ')' : ''}${c.desligamento ? ' (desligamento em ' + c.desligamento + ')' : ''}`).join(', ') }}.
-        Está alocado na unidade, mas não conta em {{ mesLongo(pref.mesAtual) }}.
-      </p>
-      <p v-if="equipeSemFuncao.length" class="note">
-        <strong>Sem produção cadastrada na função:</strong> {{ equipeSemFuncao.map(c => `${c.nome}${c.funcao ? ' (' + c.funcao + ')' : ''}`).join(', ') }}.
-        A função está marcada como sem produção, então não entra no dimensionamento.
-      </p>
-    </section>
+    <EquipeDaUnidade />
 
     <!-- cenários por prazo -->
     <section class="card">
